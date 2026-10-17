@@ -1,0 +1,15 @@
+6f5cc813590c6e13f3727227f2acbedb2d0c8b57092524c5d0d3d09accabdd22 *./bin/hw/android.hardware.secure_elementnq330@1.1-service
+0ab55a12b1057bf28a8331d8eba853e054b292b7751ef547bc58f8055845c11a *./etc/init/android.hardware.secure_elementnq330@1.1-service.rc
+55f7074c22d4eae479330698e7634835b723094af3eb0c360e23967b79b24eae *./etc/libese-nxp.conf
+2c3528586fb021e571bea12398bcc6f517667acb3a94a36efa86c453d5ca914a *./etc/vintf/manifest/manifest_port_secure_element.xml
+4598c9156af4cbb7e0d3183e0992566da171ec1f701fdad3bf3859377a63aef3 *./lib64/android.hardware.nfc@1.0.so
+a1202d0391222020b4b5d77ebe79cc6377955c02147eb1af92d95a8eba68f2a0 *./lib64/android.hardware.nfc@1.1.so
+d15e6d2b73883ceeccd687e88a841562ccf50d35a03430f4aaf581cf46542234 *./lib64/ese_client.so
+bd293f1822f338ec1022b8b36e1c16d8782bb3383a83e4fdbf7e581bb93a509b *./lib64/ese_spi_nxp_nq330.so
+3f6e445e64e2ba0966a0e8ab98913b73b7a0709e4f25a3268cde626fdbc297f7 *./lib64/libchrome.so
+fb79054b6f067142bc1adcbcafdbf624d8d288706a3f45e8b7456703cca6931a *./lib64/libevent.so
+f346e804800ed8efbf1d72ab33ade6d23c684a46638c0bb687a8d40b57c767e3 *./lib64/libport_shim_trim.so
+e092be2831934b224367a69a3ba6f69ed0eb092b95c838bdfc3c254fa5194d9a *./lib64/ls_client.so
+be6108e058c4a7b49028687083d8ceb004247a170ae6480c4d0d9c295f857528 *./lib64/vendor.nxp.eventprocessor@1.0.so
+d6da2e02f00db5654219a5aa4ba6b15b716dce4746cdcb16107a5da44ddd4176 *./lib64/vendor.nxp.nxpnfc@1.0.so
+2c22a1ac039bf918f9569b2370c9caad8ec05d0c58b77948cd7164aff6e0655d *./lib64/vendor.nxpnq330.nxpese@1.0.so

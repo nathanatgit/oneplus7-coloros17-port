@@ -1,0 +1,7 @@
+Magisk v31.0 temporary boot compatibility check (2026-10-17)
+
+Input: boot-ese-final.img SHA-256 a96c205d24598b824c9e119e48cd7b363151920b21ab351e971539511e3cbe91.
+Patched output: boot-magisk31-17d.img, 100663296 bytes, SHA-256 b073b02da7c29f00f54e510fb4e6a7304d49c5c5df89f684f81d69fa90d4e155.
+Method: selected and patched the exact input in the official Magisk app, then used `fastboot boot` (temporary boot only; no partition write).
+Observed: Android sys.boot_completed=1 on slot B; `magisk -v` returned `31.0:MAGISK:R`; magiskd was running; `su -c id` returned uid=0(root), context u:r:magisk:s0.
+Afterward: normal reboot returned to the installed 17d boot. This test does not verify a clean-wipe installation or Magisk root after installing the release ZIP.

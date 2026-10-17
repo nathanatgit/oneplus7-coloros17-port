@@ -1,0 +1,4 @@
+== system differences
+Files /mnt/17d-old-system/system/build.prop and /mnt/17d-new-system/system/build.prop differ
+== vendor differences
+== my_stock differences

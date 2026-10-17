@@ -1,0 +1,72 @@
+diff --git a/drivers/nfc/Kconfig b/drivers/nfc/Kconfig
+index 224da2fe2..8863421a2 100644
+--- a/drivers/nfc/Kconfig
++++ b/drivers/nfc/Kconfig
+@@ -77,3 +77,10 @@ config NTAG_NQ
+           This is for i2c connected version.
+ 
+ source "drivers/nfc/max32560/Kconfig"
++
++config NFC_P73_ESE
++	tristate "NXP P61/P73 eSE SPI node (/dev/p73) on top of NFC_NQ"
++	depends on SPI && NFC_NQ
++	help
++	  Exposes the NXP eSE on SPI (compatible nxp,p61) as /dev/p73 and
++	  powers it through the nq-nci NFC driver.
+diff --git a/drivers/nfc/Makefile b/drivers/nfc/Makefile
+index 4e1db4e0c..b02aa07c3 100644
+--- a/drivers/nfc/Makefile
++++ b/drivers/nfc/Makefile
+@@ -20,3 +20,4 @@ obj-$(CONFIG_NFC_ST95HF)	+= st95hf/
+ obj-$(CONFIG_NFC_MAX32560)	+= max32560/
+ obj-$(CONFIG_NFC_NQ)		+= nq-nci.o
+ obj-$(CONFIG_NTAG_NQ)		+= nq-ntag.o
++obj-$(CONFIG_NFC_P73_ESE)	+= ese/
+diff --git a/drivers/nfc/nq-nci.c b/drivers/nfc/nq-nci.c
+index c366aef2e..ca000bea1 100644
+--- a/drivers/nfc/nq-nci.c
++++ b/drivers/nfc/nq-nci.c
+@@ -497,6 +497,17 @@ static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long int arg)
+ 	return r;
+ }
+ 
++static struct nqx_dev *g_nqx_dev;
++
++/* Used by drivers/nfc/ese/p73.c: arg 0 = eSE on, 1 = off, 3 = read state */
++int nqx_ese_pwr_ext(unsigned long arg)
++{
++	if (!g_nqx_dev)
++		return -ENODEV;
++	return nqx_ese_pwr(g_nqx_dev, arg);
++}
++EXPORT_SYMBOL(nqx_ese_pwr_ext);
++
+ static int nfc_open(struct inode *inode, struct file *filp)
+ {
+ 	struct nqx_dev *nqx_dev = container_of(inode->i_cdev,
+@@ -1190,6 +1201,17 @@ static int nfc_parse_dt(struct device *dev, struct nqx_platform_data *pdata)
+ 	}
+ 
+ 	pdata->ese_gpio = of_get_named_gpio(np, "qcom,nq-esepwr", 0);
++	/*
++	 * OnePlus board wires the eSE power request to TLMM 49 (stock overlay:
++	 * nxp,pn544-ese-pwr = <&tlmm 49>), not to the Qualcomm reference pin
++	 * (TLMM 42, i.e. VEN + 1) that the LineageOS overlay still carries.
++	 */
++	if (gpio_is_valid(pdata->ese_gpio) && gpio_is_valid(pdata->en_gpio) &&
++	    pdata->ese_gpio == pdata->en_gpio + 1) {
++		pr_info("nq-nci: OnePlus board wires the eSE power to TLMM49, not %d\n",
++			pdata->ese_gpio);
++		pdata->ese_gpio = pdata->en_gpio + (49 - 41);
++	}
+ 	if (!gpio_is_valid(pdata->ese_gpio)) {
+ 		dev_warn(dev,
+ 			"ese GPIO <OPTIONAL> error getting from OF node\n");
+@@ -1485,6 +1507,7 @@ static int nqx_probe(struct i2c_client *client,
+ 	device_init_wakeup(&client->dev, true);
+ 	device_set_wakeup_capable(&client->dev, true);
+ 	i2c_set_clientdata(client, nqx_dev);
++	g_nqx_dev = nqx_dev;
+ 	nqx_dev->irq_wake_up = false;
+ 
+ 	dev_err(&client->dev,

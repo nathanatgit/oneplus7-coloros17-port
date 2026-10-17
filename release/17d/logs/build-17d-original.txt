@@ -1,0 +1,71 @@
+== system tree
+apps: 155 (donor 40)
+-rw-r--r-- 1 root root 5031378944 Oct 17 15:42 /root/plk/my_stock.img
+fac842d6d7ca732c1d5dd7f356cfae1991ee9433f88e89b6e3370a1336811760  /root/plk/my_stock.img
+my_product: OnePlus 7 Pro adjustments applied
+my_product: wireless charging features removed
+cutout blanked: /root/plk/android_framework_res_overlay.display.product.24831.apk
+about device: OnePlus 7 Pro names, battery 4000 mAh, LUMO off
+system_ext_property_contexts: dropped ['vendor.oplus.video.dump.output', 'persist.vendor.side.fp.near.feature.support', 'persist.vendor.rpmb.enable.state']
+3 conflicting property_contexts entries removed
+plat_sepolicy.cil: removed 7 auditallowx/dontauditx
+system_ext_sepolicy.cil: removed 0 auditallowx/dontauditx
+product_sepolicy.cil: removed 0 auditallowx/dontauditx
+getfattr: Removing leading '/' from absolute path names
+  bin/netbpfload (u:object_r:bpfloader_exec:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib/libframework-connectivity-jni.so (u:object_r:system_lib_file:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib64/libframework-connectivity-jni.so (u:object_r:system_lib_file:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib64/libandroid_net_connectivity_com_android_net_module_util_jni.so (u:object_r:system_lib_file:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib64/libnetd_resolv.so (u:object_r:system_lib_file:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib64/libnetd_updatable.so (u:object_r:system_lib_file:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib64/libnetworkstats.so (u:object_r:system_lib_file:s0)
+getfattr: Removing leading '/' from absolute path names
+  lib64/libservice-connectivity.so (u:object_r:system_lib_file:s0)
+# OnePlus7Port: LineageOS (ro.bpf.kver_override-aware) builds over ColorOS's tethering APEX.
+on load-bpf-programs
+    mount none /system/etc/port-los-tether/bin/netbpfload /apex/com.android.tethering/bin/netbpfload bind
+    mount none /system/etc/port-los-tether/lib/libframework-connectivity-jni.so /apex/com.android.tethering/lib/libframework-connectivity-jni.so bind
+    mount none /system/etc/port-los-tether/lib64/libframework-connectivity-jni.so /apex/com.android.tethering/lib64/libframework-connectivity-jni.so bind
+    mount none /system/etc/port-los-tether/lib64/libandroid_net_connectivity_com_android_net_module_util_jni.so /apex/com.android.tethering/lib64/libandroid_net_connectivity_com_android_net_module_util_jni.so bind
+    mount none /system/etc/port-los-tether/lib64/libnetd_resolv.so /apex/com.android.tethering/lib64/libnetd_resolv.so bind
+    mount none /system/etc/port-los-tether/lib64/libnetd_updatable.so /apex/com.android.tethering/lib64/libnetd_updatable.so bind
+    mount none /system/etc/port-los-tether/lib64/libnetworkstats.so /apex/com.android.tethering/lib64/libnetworkstats.so bind
+    mount none /system/etc/port-los-tether/lib64/libservice-connectivity.so /apex/com.android.tethering/lib64/libservice-connectivity.so bind
+    mount none /system/etc/port-los-tether/bpf /apex/com.android.tethering/etc/bpf bind
+-rw-r--r--. 1 root root u:object_r:system_file:s0 23793664 May  4 05:25 com.android.tethering.apex
+== system.img (EROFS + AVB hashtree footer)
+-rw-r--r-- 1 root root 3301081088 Oct 17 15:45 /root/plk/system.img
+== boot.img (first-stage fstab)
+header v2; kernel=49111064, ramdisk=19217257, second=0, recovery_dtbo=0, dtb=9053968
+wrote /root/plk/boot.img: 100663296 bytes, ramdisk 19217257 -> 19217762
+cmdline: androidboot.hardware=qcom androidboot.memcg=1 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.boot_devices=soc/1d84000.ufshc androidboot.selinux_xperms_supported=1
+== vendor.img (/etc/fstab.qcom)
+-rw-r--r--. 1 root root u:object_r:vendor_configs_file:s0 3439 Oct 17 15:45 /mnt/vend/etc/fstab.qcom
+/dev/block/by-name/system                               /system                erofs   ro                                                   wait,slotselect,avb,first_stage_mount
+/dev/block/by-name/system                               /system                ext4    ro,barrier=1,discard                                 wait,slotselect,avb,first_stage_mount
+rename: ['hal_oplus_sensor_aidl', 'hal_oplus_touch_aidl']
+drop:   ['oppo_reserve_file', 'oppo_reserve_media_file', 'oppo_reserve_media_log', 'oppo_reserve_system_config', 'oppo_reserve_system_file', 'vendor_camera_update_data_file']
+patched etc/selinux/plat_pub_versioned.cil
+patched etc/selinux/vendor_sepolicy.cil
+fileencryption=aes-256-xts:aes-256-cts:v2
+getfattr: Removing leading '/' from absolute path names
+/mnt/c/Users/Han/Project/OnePlus7Port/tools/build-port-b.sh: line 538: warning: command substitution: ignored null byte in input
+1
+-rw-r--r--. 1 root root u:object_r:vendor_file:s0             20500 Oct 17 15:45 android.hardware.soundtrigger@2.1-impl.so
+SoundTrigger 2.1 adapter and real native HAL configured
+getfattr: Removing leading '/' from absolute path names
+/mnt/c/Users/Han/Project/OnePlus7Port/tools/build-port-b.sh: line 563: warning: command substitution: ignored null byte in input
+-rwxr-xr-x. 1 root 2000 u:object_r:hal_graphics_composer_default_exec:s0 244992 Oct 17 15:45 /mnt/vend/bin/hw/android.hardware.graphics.composer@2.4-service
+0
+e2fsck 1.47.0 (5-Feb-2023)
+vendor fsck clean
+2d2b4c07ceebcda8b61100467f768fa0dba4baf0440c53c82777e0ea094f18c8  system.img
+fbf04568dd9f8d40cc788897740ef943c622f2f5049546d0006a52611e6bd343  boot.img
+b55bc1810bd49aebae3c34f56e8e098e440f98ce4f5c6a215a16f1f3bfa729f6  vendor.img
+build exit 0
