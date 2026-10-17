@@ -17,6 +17,10 @@ Requirements: unlocked bootloader, current Android platform-tools (`adb` and `fa
 
 The root package uses Magisk v31.0, an official pre-release chosen for Android 17/API 37 compatibility. On its first boot, approve the ADB shell root request in Magisk when prompted so the installer can place `my_stock.img` in userdata.
 
+## Documentation
+
+[docs/](docs/README.md): [architecture](docs/ARCHITECTURE.md), [fixes and patches](docs/FIXES-AND-PATCHES.md), [discoveries](docs/DISCOVERIES.md), [merge principles](docs/PRINCIPLES.md), [open items and rollback](docs/OPEN-ITEMS.md).
+
 ## Release evidence and limits
 
 See [FACTS.md](FACTS.md), [BUILD_SOURCES.md](BUILD_SOURCES.md), and [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md). The Magisk-patched boot image passed a temporary `fastboot boot` test: Android boot completed, `magiskd` ran, and `su -c id` returned UID 0. The boot partition was not flashed during that test. The no-root system image passed the 17d preflight and differs from the original 17d system only in `system/build.prop`; it has not been clean-flashed or live-boot-tested.
