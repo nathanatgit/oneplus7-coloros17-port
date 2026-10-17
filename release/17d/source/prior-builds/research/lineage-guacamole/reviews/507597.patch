@@ -1,0 +1,38 @@
+From 5c6d4b35dc4a65cae62391fab5e64386738e6692 Mon Sep 17 00:00:00 2001
+From: Sylphrena Kleinsasser <syl@kleinsasser.dev>
+Date: Mon, 12 Oct 2026 12:52:35 -0400
+Subject: [PATCH] SystemUI: Let UDFPS biometric prompt follow the sensor on large screens
+
+Large screens always use the bottom prompt layout, so on tablets
+with an under-display sensor the icon is misplaced in landscape.
+Use the rotation-aware layout when the sensor is UDFPS.
+
+Change-Id: Iab0a46f317cad354c6b95763b23f047fd908bb29
+---
+
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/domain/interactor/PromptSelectorInteractor.kt b/packages/SystemUI/src/com/android/systemui/biometrics/domain/interactor/PromptSelectorInteractor.kt
+index b0d5c08..904fd18 100644
+--- a/packages/SystemUI/src/com/android/systemui/biometrics/domain/interactor/PromptSelectorInteractor.kt
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/domain/interactor/PromptSelectorInteractor.kt
+@@ -372,7 +372,7 @@
+                 if (isLandscape) {
+                     val paneType =
+                         when {
+-                            displayStateInteractor.isLargeScreen.value ->
++                            displayStateInteractor.isLargeScreen.value && !modalities.hasUdfps ->
+                                 PromptKind.Biometric.PaneType.ONE_PANE_LARGE_SCREEN_LANDSCAPE
+                             showBpWithoutIconForCredential ->
+                                 PromptKind.Biometric.PaneType.ONE_PANE_NO_SENSOR_LANDSCAPE
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/ui/viewmodel/PromptViewModel.kt b/packages/SystemUI/src/com/android/systemui/biometrics/ui/viewmodel/PromptViewModel.kt
+index 93c6f5c..2e5963e 100644
+--- a/packages/SystemUI/src/com/android/systemui/biometrics/ui/viewmodel/PromptViewModel.kt
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/ui/viewmodel/PromptViewModel.kt
+@@ -238,7 +238,7 @@
+                     isExtraLargeScreen && !modalities.hasUdfps && Flags.largeScreenBp() ->
+                         PromptPosition.Center
+                     forceLarge ||
+-                        isLargeScreen ||
++                        (isLargeScreen && !modalities.hasUdfps) ||
+                         fallbackShowing ||
+                         promptKind.isOnePaneNoSensorLandscapeBiometric() -> PromptPosition.Bottom
+                     rotation == DisplayRotation.ROTATION_90 -> PromptPosition.Right

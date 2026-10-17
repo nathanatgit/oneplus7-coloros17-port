@@ -1,0 +1,257 @@
+From e082f54b3058b801ad6b051c0ac4d68f45144658 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Thu, 08 Oct 2026 12:55:53 +0200
+Subject: [PATCH] DisplayManager: Add requestMaxRefreshRate() API
+
+Unlike requestDisplayModes(), this works on non-VRR displays since it
+votes for refresh rate ranges, which SurfaceFlinger respects directly.
+
+Assisted-by: LLM
+Change-Id: I1c413eb3bf586da5a8a7199b4cc7e37d7843df06
+---
+
+diff --git a/core/java/android/hardware/display/DisplayManager.java b/core/java/android/hardware/display/DisplayManager.java
+index ce3cfd9..0ef35c9 100644
+--- a/core/java/android/hardware/display/DisplayManager.java
++++ b/core/java/android/hardware/display/DisplayManager.java
+@@ -2163,6 +2163,23 @@
+     }
+ 
+     /**
++     * Allows internal application to restrict max refresh rate of the display
++     *
++     * @param displayId display that restriction will be applied to
++     * @param maxRefreshRate max allowed refresh rate, 0 removes the restriction
++     *
++     * @hide
++     */
++    @RequiresPermission("android.permission.RESTRICT_DISPLAY_MODES")
++    public void requestMaxRefreshRate(int displayId, float maxRefreshRate) {
++        if (Float.isNaN(maxRefreshRate) || maxRefreshRate < 0) {
++            throw new IllegalArgumentException(
++                    "requestMaxRefreshRate: maxRefreshRate must be a non-negative number");
++        }
++        mGlobal.requestMaxRefreshRate(displayId, maxRefreshRate);
++    }
++
++    /**
+      * Gets the mapping between the doze brightness sensor values and brightness values. The doze
+      * brightness sensor is a light sensor used to determine the brightness while the device is
+      * dozing. Light sensor values are typically integers in the rage of 0-4. The returned values
+diff --git a/core/java/android/hardware/display/DisplayManagerGlobal.java b/core/java/android/hardware/display/DisplayManagerGlobal.java
+index b931cd4..a52f371 100644
+--- a/core/java/android/hardware/display/DisplayManagerGlobal.java
++++ b/core/java/android/hardware/display/DisplayManagerGlobal.java
+@@ -1544,6 +1544,20 @@
+     }
+ 
+     /**
++     * Sets max allowed refresh rate
++     *
++     * @hide
++     */
++    @RequiresPermission("android.permission.RESTRICT_DISPLAY_MODES")
++    public void requestMaxRefreshRate(int displayId, float maxRefreshRate) {
++        try {
++            mDm.requestMaxRefreshRate(mToken, displayId, maxRefreshRate);
++        } catch (RemoteException ex) {
++            throw ex.rethrowFromSystemServer();
++        }
++    }
++
++    /**
+      * @param displayId The ID of the display
+      * @return The highest HDR/SDR ratio of the ratios defined in Display Device Config. If no
+      * HDR/SDR map is defined, this always returns 1.
+diff --git a/core/java/android/hardware/display/IDisplayManager.aidl b/core/java/android/hardware/display/IDisplayManager.aidl
+index e4c1838..7568757 100644
+--- a/core/java/android/hardware/display/IDisplayManager.aidl
++++ b/core/java/android/hardware/display/IDisplayManager.aidl
+@@ -276,6 +276,10 @@
+     @EnforcePermission("RESTRICT_DISPLAY_MODES")
+     void requestDisplayModes(in IBinder token, int displayId, in @nullable int[] modeIds);
+ 
++    // Restricts max refresh rate to specified value, 0 removes the restriction.
++    @EnforcePermission("RESTRICT_DISPLAY_MODES")
++    void requestMaxRefreshRate(in IBinder token, int displayId, float maxRefreshRate);
++
+     // Get the highest defined HDR/SDR ratio for a display.
+     float getHighestHdrSdrRatio(int displayId);
+ 
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index d622190..e2bb199 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -6485,6 +6485,14 @@
+                     token, displayId, modeIds);
+         }
+ 
++        @EnforcePermission(RESTRICT_DISPLAY_MODES)
++        @Override // Binder call
++        public void requestMaxRefreshRate(IBinder token, int displayId, float maxRefreshRate) {
++            requestMaxRefreshRate_enforcePermission();
++            DisplayManagerService.this.mDisplayModeDirector.requestMaxRefreshRate(
++                    token, displayId, maxRefreshRate);
++        }
++
+         @Override // Binder call
+         public float getHighestHdrSdrRatio(int displayId) {
+             DisplayDeviceConfig ddc =
+diff --git a/services/core/java/com/android/server/display/mode/DisplayModeDirector.java b/services/core/java/com/android/server/display/mode/DisplayModeDirector.java
+index c6927a6..a6335473 100644
+--- a/services/core/java/com/android/server/display/mode/DisplayModeDirector.java
++++ b/services/core/java/com/android/server/display/mode/DisplayModeDirector.java
+@@ -591,6 +591,13 @@
+     }
+ 
+     /**
++     * Delegates requestMaxRefreshRate call to SystemRequestObserver
++     */
++    public void requestMaxRefreshRate(IBinder token, int displayId, float maxRefreshRate) {
++        mSystemRequestObserver.requestMaxRefreshRate(token, displayId, maxRefreshRate);
++    }
++
++    /**
+      * Called when the user switches.
+      */
+     public void onSwitchUser() {
+diff --git a/services/core/java/com/android/server/display/mode/SystemRequestObserver.java b/services/core/java/com/android/server/display/mode/SystemRequestObserver.java
+index 4a4c8da..3c8d4ce 100644
+--- a/services/core/java/com/android/server/display/mode/SystemRequestObserver.java
++++ b/services/core/java/com/android/server/display/mode/SystemRequestObserver.java
+@@ -56,6 +56,8 @@
+     private final Object mLock = new Object();
+     @GuardedBy("mLock")
+     private final Map<IBinder, SparseArray<List<Integer>>> mDisplaysRestrictions = new HashMap<>();
++    @GuardedBy("mLock")
++    private final Map<IBinder, SparseArray<Float>> mDisplaysMaxRefreshRates = new HashMap<>();
+ 
+     SystemRequestObserver(VotesStorage storage) {
+         mVotesStorage = storage;
+@@ -69,6 +71,14 @@
+         }
+     }
+ 
++    void requestMaxRefreshRate(IBinder token, int displayId, float maxRefreshRate) {
++        if (maxRefreshRate == 0) {
++            removeMaxRefreshRateVote(token, displayId);
++        } else {
++            addMaxRefreshRateVote(token, displayId, maxRefreshRate);
++        }
++    }
++
+     private void addSystemRequestedVote(IBinder token, int displayId, @NonNull int[] modeIds) {
+         try {
+             boolean needLinkToDeath = false;
+@@ -77,9 +87,9 @@
+                 modeIdsList.add(mode);
+             }
+             synchronized (mLock) {
++                needLinkToDeath = !isTokenTrackedLocked(token);
+                 SparseArray<List<Integer>> modesByDisplay = mDisplaysRestrictions.get(token);
+                 if (modesByDisplay == null) {
+-                    needLinkToDeath = true;
+                     modesByDisplay = new SparseArray<>();
+                     mDisplaysRestrictions.put(token, modesByDisplay);
+                 }
+@@ -103,7 +113,51 @@
+             SparseArray<List<Integer>> modesByDisplay = mDisplaysRestrictions.get(token);
+             if (modesByDisplay != null && modesByDisplay.size() > 0) {
+                 modesByDisplay.remove(displayId);
+-                needToUnlink = modesByDisplay.size() == 0;
++                needToUnlink = !isTokenTrackedLocked(token);
++                updateStorageLocked(displayId);
++            }
++        }
++        if (needToUnlink) {
++            try {
++                Slog.d(TAG, "binder unlinking to death: " + token);
++                token.unlinkToDeath(mDeathRecipient, 0);
++            } catch (NoSuchElementException e) {
++                Slog.d(TAG, "unlinking to death failed: " + token, e);
++            }
++        }
++    }
++
++    private void addMaxRefreshRateVote(IBinder token, int displayId, float maxRefreshRate) {
++        try {
++            boolean needLinkToDeath = false;
++            synchronized (mLock) {
++                needLinkToDeath = !isTokenTrackedLocked(token);
++                SparseArray<Float> ratesByDisplay = mDisplaysMaxRefreshRates.get(token);
++                if (ratesByDisplay == null) {
++                    ratesByDisplay = new SparseArray<>();
++                    mDisplaysMaxRefreshRates.put(token, ratesByDisplay);
++                }
++
++                ratesByDisplay.put(displayId, maxRefreshRate);
++                updateStorageLocked(displayId);
++            }
++            if (needLinkToDeath) {
++                Slog.d(TAG, "binder linking to death: " + token);
++                token.linkToDeath(mDeathRecipient, 0);
++            }
++        } catch (RemoteException re) {
++            Slog.d(TAG, "linking to death failed: " + token, re);
++            removeSystemRequestedVotes(token);
++        }
++    }
++
++    private void removeMaxRefreshRateVote(IBinder token, int displayId) {
++        boolean needToUnlink = false;
++        synchronized (mLock) {
++            SparseArray<Float> ratesByDisplay = mDisplaysMaxRefreshRates.get(token);
++            if (ratesByDisplay != null && ratesByDisplay.size() > 0) {
++                ratesByDisplay.remove(displayId);
++                needToUnlink = !isTokenTrackedLocked(token);
+                 updateStorageLocked(displayId);
+             }
+         }
+@@ -125,10 +179,24 @@
+                     updateStorageLocked(removed.keyAt(i));
+                 }
+             }
++            SparseArray<Float> removedRates = mDisplaysMaxRefreshRates.remove(token);
++            if (removedRates != null) {
++                for (int i = 0; i < removedRates.size(); i++) {
++                    updateStorageLocked(removedRates.keyAt(i));
++                }
++            }
+         }
+     }
+ 
+     @GuardedBy("mLock")
++    private boolean isTokenTrackedLocked(IBinder token) {
++        SparseArray<List<Integer>> modesByDisplay = mDisplaysRestrictions.get(token);
++        SparseArray<Float> ratesByDisplay = mDisplaysMaxRefreshRates.get(token);
++        return (modesByDisplay != null && modesByDisplay.size() > 0)
++                || (ratesByDisplay != null && ratesByDisplay.size() > 0);
++    }
++
++    @GuardedBy("mLock")
+     private void updateStorageLocked(int displayId) {
+         List<Integer> modeIds = new ArrayList<>();
+         boolean[] modesFound = new boolean[1];
+@@ -145,7 +213,21 @@
+             }
+         });
+ 
++        float maxRefreshRate = Float.POSITIVE_INFINITY;
++        for (SparseArray<Float> ratesByDisplay : mDisplaysMaxRefreshRates.values()) {
++            maxRefreshRate = Math.min(maxRefreshRate,
++                    ratesByDisplay.get(displayId, Float.POSITIVE_INFINITY));
++        }
++
++        List<Vote> votes = new ArrayList<>();
++        if (modesFound[0]) {
++            votes.add(Vote.forSupportedModes(modeIds));
++        }
++        if (maxRefreshRate != Float.POSITIVE_INFINITY) {
++            votes.add(Vote.forPhysicalRefreshRates(0f, maxRefreshRate));
++            votes.add(Vote.forRenderFrameRates(0f, maxRefreshRate));
++        }
+         mVotesStorage.updateVote(displayId, Vote.PRIORITY_SYSTEM_REQUESTED_MODES,
+-                modesFound[0] ? Vote.forSupportedModes(modeIds) : null);
++                Vote.forVotes(votes));
+     }
+ }

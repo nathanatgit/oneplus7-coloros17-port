@@ -1,0 +1,25 @@
+From b789ea1ee4f9fb44c16285742c22e6a918427f91 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Tue, 29 Sep 2026 14:00:40 -0400
+Subject: [PATCH] core: Account for 'acnMask'
+
+Should squash into the effects commit when rebased.
+
+Change-Id: Iac39327d05129d741c8c798d52c2e2c6805ef5ad
+---
+
+diff --git a/hal/core/utils/include/qti-audio-core/Utils.h b/hal/core/utils/include/qti-audio-core/Utils.h
+index 676e210..b0275cf 100644
+--- a/hal/core/utils/include/qti-audio-core/Utils.h
++++ b/hal/core/utils/include/qti-audio-core/Utils.h
+@@ -347,6 +347,10 @@
+             return __builtin_popcount(layout.get<Tag::layoutMask>() & mask);
+         case Tag::voiceMask:
+             return __builtin_popcount(layout.get<Tag::voiceMask>() & mask);
++        case Tag::acnMask:
++            return layout.get<Tag::acnMask>() &
++                   ::aidl::android::media::audio::common::AudioChannelLayout::
++                           ACN_CHANNEL_COUNT_BIT_MASK;
+     }
+     return 0;
+ }

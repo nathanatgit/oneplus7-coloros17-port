@@ -1,0 +1,438 @@
+From 330970dfc2b104cc5b57ff19a36405455ae53213 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Sat, 26 Sep 2026 00:52:33 +0530
+Subject: [PATCH] SUW: Re-write ThemeSettings and Navigation Layout
+
+- This is majorly for tablets to accomodate layout preview
+  and lottie
+
+Change-Id: I587b59050ed38927855e9fe8d15ac1a0ba26bf0c
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
+index 73b3625..f48a5e4 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
+@@ -71,8 +71,24 @@
+         wallpaper.outlineProvider =
+             object : ViewOutlineProvider() {
+                 override fun getOutline(view: View, outline: Outline) {
+-                    val radius = view.width * PREVIEW_CORNER_RADIUS / PREVIEW_WIDTH
+-                    outline.setRoundRect(0, 0, view.width, view.height + radius.toInt(), radius)
++                    val artwork = wallpaper.drawable ?: return
++                    val scale =
++                        minOf(
++                            view.width.toFloat() / artwork.intrinsicWidth,
++                            view.height.toFloat() / artwork.intrinsicHeight,
++                        )
++                    val width = (artwork.intrinsicWidth * scale).toInt()
++                    val height = (artwork.intrinsicHeight * scale).toInt()
++                    val left = (view.width - width) / 2
++                    val top = (view.height - height) / 2
++                    val radius = width * PREVIEW_CORNER_RADIUS / PREVIEW_WIDTH
++                    outline.setRoundRect(
++                        left,
++                        top,
++                        left + width,
++                        top + height + radius.toInt(),
++                        radius,
++                    )
+                 }
+             }
+         wallpaper.clipToOutline = true
+diff --git a/app/src/main/res/layout/setup_navigation.xml b/app/src/main/res/layout/setup_navigation.xml
+index 5576adb..0d6051e 100644
+--- a/app/src/main/res/layout/setup_navigation.xml
++++ b/app/src/main/res/layout/setup_navigation.xml
+@@ -17,103 +17,85 @@
+         android:layout_marginTop="@dimen/base_margin_top"
+         android:orientation="vertical">
+ 
+-        <ScrollView
+-            android:id="@+id/page"
++        <FrameLayout
+             android:layout_width="match_parent"
+-            android:layout_height="0dp"
+-            android:layout_weight="1"
+-            android:fillViewport="true">
++            android:layout_height="wrap_content"
++            android:layout_marginTop="@dimen/preview_margin_top"
++            android:background="@drawable/setup_item_card_background"
++            android:paddingStart="@dimen/preview_card_padding"
++            android:paddingTop="@dimen/preview_card_padding"
++            android:paddingEnd="@dimen/preview_card_padding">
+ 
+-            <LinearLayout
++            <com.airbnb.lottie.LottieAnimationView
++                android:id="@+id/navigation_illustration"
+                 android:layout_width="match_parent"
+-                android:layout_height="match_parent"
+-                android:orientation="vertical">
++                android:layout_height="wrap_content"
++                android:adjustViewBounds="true"
++                android:maxHeight="@dimen/preview_max_height"
++                android:scaleType="fitCenter"
++                app:lottie_autoPlay="true"
++                app:lottie_loop="true"
++                app:lottie_rawRes="@raw/lottie_system_nav_fully_gestural" />
+ 
+-                <FrameLayout
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="@dimen/preview_margin_top"
+-                    android:background="@drawable/setup_item_card_background"
+-                    android:paddingStart="@dimen/preview_card_padding"
+-                    android:paddingTop="@dimen/preview_card_padding"
+-                    android:paddingEnd="@dimen/preview_card_padding">
++        </FrameLayout>
+ 
+-                    <com.airbnb.lottie.LottieAnimationView
+-                        android:id="@+id/navigation_illustration"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:adjustViewBounds="true"
+-                        app:lottie_autoPlay="true"
+-                        app:lottie_loop="true"
+-                        app:lottie_rawRes="@raw/lottie_system_nav_fully_gestural" />
++        <com.google.android.material.button.MaterialButtonToggleGroup
++            android:id="@+id/navigation_mode_group"
++            style="@style/Widget.Material3Expressive.MaterialButtonGroup.Connected"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="@dimen/control_card_margin_top"
++            app:checkedButton="@+id/mode_gesture"
++            app:selectionRequired="true"
++            app:singleSelection="true">
+ 
+-                </FrameLayout>
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/mode_gesture"
++                style="@style/Widget.Material3Expressive.Button.TonalButton"
++                android:layout_width="0dp"
++                android:layout_height="@dimen/connected_button_height"
++                android:layout_weight="1"
++                android:text="@string/gesture_navigation_short" />
+ 
+-                <com.google.android.material.button.MaterialButtonToggleGroup
+-                    android:id="@+id/navigation_mode_group"
+-                    style="@style/Widget.Material3Expressive.MaterialButtonGroup.Connected"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="@dimen/control_card_margin_top"
+-                    app:checkedButton="@+id/mode_gesture"
+-                    app:selectionRequired="true"
+-                    app:singleSelection="true">
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/mode_sw_keys"
++                style="@style/Widget.Material3Expressive.Button.TonalButton"
++                android:layout_width="0dp"
++                android:layout_height="@dimen/connected_button_height"
++                android:layout_weight="1"
++                android:text="@string/navbar_navigation_short" />
+ 
+-                    <com.google.android.material.button.MaterialButton
+-                        android:id="@+id/mode_gesture"
+-                        style="@style/Widget.Material3Expressive.Button.TonalButton"
+-                        android:layout_width="0dp"
+-                        android:layout_height="@dimen/connected_button_height"
+-                        android:layout_weight="1"
+-                        android:text="@string/gesture_navigation_short" />
++        </com.google.android.material.button.MaterialButtonToggleGroup>
+ 
+-                    <com.google.android.material.button.MaterialButton
+-                        android:id="@+id/mode_sw_keys"
+-                        style="@style/Widget.Material3Expressive.Button.TonalButton"
+-                        android:layout_width="0dp"
+-                        android:layout_height="@dimen/connected_button_height"
+-                        android:layout_weight="1"
+-                        android:text="@string/navbar_navigation_short" />
++        <LinearLayout
++            android:id="@+id/hide_navigation_hint_card"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="@dimen/control_card_margin_top"
++            android:background="@drawable/setup_item_card_background"
++            android:baselineAligned="false"
++            android:gravity="center_vertical"
++            android:orientation="horizontal"
++            android:paddingStart="@dimen/control_card_padding_horizontal"
++            android:paddingTop="@dimen/control_card_padding_vertical"
++            android:paddingEnd="@dimen/control_card_padding_horizontal"
++            android:paddingBottom="@dimen/control_card_padding_vertical">
+ 
+-                </com.google.android.material.button.MaterialButtonToggleGroup>
++            <com.google.android.setupdesign.view.RichTextView
++                style="?attr/sudItemTitleStyle"
++                android:layout_width="0dp"
++                android:layout_height="wrap_content"
++                android:layout_weight="1"
++                android:labelFor="@+id/hide_navigation_hint"
++                android:text="@string/hide_gesture_hint" />
+ 
+-                <LinearLayout
+-                    android:id="@+id/hide_navigation_hint_card"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="@dimen/control_card_margin_top"
+-                    android:background="@drawable/setup_item_card_background"
+-                    android:baselineAligned="false"
+-                    android:gravity="center_vertical"
+-                    android:orientation="horizontal"
+-                    android:paddingStart="@dimen/control_card_padding_horizontal"
+-                    android:paddingTop="@dimen/control_card_padding_vertical"
+-                    android:paddingEnd="@dimen/control_card_padding_horizontal"
+-                    android:paddingBottom="@dimen/control_card_padding_vertical">
++            <com.google.android.material.materialswitch.MaterialSwitch
++                android:id="@+id/hide_navigation_hint"
++                style="@style/SudExpressiveSwitchBarStyle"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_gravity="center_vertical" />
+ 
+-                    <com.google.android.setupdesign.view.RichTextView
+-                        style="?attr/sudItemTitleStyle"
+-                        android:layout_width="0dp"
+-                        android:layout_height="wrap_content"
+-                        android:layout_weight="1"
+-                        android:labelFor="@+id/hide_navigation_hint"
+-                        android:text="@string/hide_gesture_hint" />
+-
+-                    <com.google.android.material.materialswitch.MaterialSwitch
+-                        android:id="@+id/hide_navigation_hint"
+-                        style="@style/SudExpressiveSwitchBarStyle"
+-                        android:layout_width="wrap_content"
+-                        android:layout_height="wrap_content"
+-                        android:layout_gravity="center_vertical" />
+-
+-                </LinearLayout>
+-
+-                <Space
+-                    android:layout_width="match_parent"
+-                    android:layout_height="0dp"
+-                    android:layout_weight="1" />
+-
+-            </LinearLayout>
+-        </ScrollView>
+-    </LinearLayout>
++        </LinearLayout>
++</LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/setup_theme.xml b/app/src/main/res/layout/setup_theme.xml
+index bf0f57b..1a4d1ba 100644
+--- a/app/src/main/res/layout/setup_theme.xml
++++ b/app/src/main/res/layout/setup_theme.xml
+@@ -17,111 +17,93 @@
+         android:layout_marginTop="@dimen/base_margin_top"
+         android:orientation="vertical">
+ 
+-        <ScrollView
+-            android:id="@+id/page"
++        <FrameLayout
+             android:layout_width="match_parent"
+-            android:layout_height="0dp"
+-            android:layout_weight="1"
+-            android:fillViewport="true">
++            android:layout_height="wrap_content"
++            android:layout_marginTop="@dimen/preview_margin_top"
++            android:background="@drawable/setup_item_card_background"
++            android:paddingStart="@dimen/preview_card_padding"
++            android:paddingTop="@dimen/preview_card_padding"
++            android:paddingEnd="@dimen/preview_card_padding">
+ 
+-            <LinearLayout
++            <ImageView
++                android:id="@+id/theme_preview_wallpaper"
+                 android:layout_width="match_parent"
+-                android:layout_height="match_parent"
+-                android:orientation="vertical">
++                android:layout_height="wrap_content"
++                android:adjustViewBounds="true"
++                android:maxHeight="@dimen/preview_max_height"
++                android:contentDescription="@null"
++                android:scaleType="fitCenter"
++                android:src="@drawable/theme_preview_wallpaper" />
+ 
+-                <FrameLayout
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="@dimen/preview_margin_top"
+-                    android:background="@drawable/setup_item_card_background"
+-                    android:paddingStart="@dimen/preview_card_padding"
+-                    android:paddingTop="@dimen/preview_card_padding"
+-                    android:paddingEnd="@dimen/preview_card_padding">
++            <ImageView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:adjustViewBounds="true"
++                android:maxHeight="@dimen/preview_max_height"
++                android:contentDescription="@string/theme_preview"
++                android:scaleType="fitCenter"
++                android:src="@drawable/theme_preview_qs" />
+ 
+-                    <ImageView
+-                        android:id="@+id/theme_preview_wallpaper"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:adjustViewBounds="true"
+-                        android:contentDescription="@null"
+-                        android:scaleType="fitCenter"
+-                        android:src="@drawable/theme_preview_wallpaper" />
++        </FrameLayout>
+ 
+-                    <ImageView
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:adjustViewBounds="true"
+-                        android:contentDescription="@string/theme_preview"
+-                        android:scaleType="fitCenter"
+-                        android:src="@drawable/theme_preview_qs" />
++        <com.google.android.material.button.MaterialButtonToggleGroup
++            android:id="@+id/theme_mode_group"
++            style="@style/Widget.Material3Expressive.MaterialButtonGroup.Connected"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="@dimen/control_card_margin_top"
++            app:checkedButton="@+id/mode_dark"
++            app:selectionRequired="true"
++            app:singleSelection="true">
+ 
+-                </FrameLayout>
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/mode_dark"
++                style="@style/Widget.Material3Expressive.Button.TonalButton"
++                android:layout_width="0dp"
++                android:layout_height="@dimen/connected_button_height"
++                android:layout_weight="1"
++                android:text="@string/dark" />
+ 
+-                <com.google.android.material.button.MaterialButtonToggleGroup
+-                    android:id="@+id/theme_mode_group"
+-                    style="@style/Widget.Material3Expressive.MaterialButtonGroup.Connected"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="@dimen/control_card_margin_top"
+-                    app:checkedButton="@+id/mode_dark"
+-                    app:selectionRequired="true"
+-                    app:singleSelection="true">
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/mode_light"
++                style="@style/Widget.Material3Expressive.Button.TonalButton"
++                android:layout_width="0dp"
++                android:layout_height="@dimen/connected_button_height"
++                android:layout_weight="1"
++                android:text="@string/light" />
+ 
+-                    <com.google.android.material.button.MaterialButton
+-                        android:id="@+id/mode_dark"
+-                        style="@style/Widget.Material3Expressive.Button.TonalButton"
+-                        android:layout_width="0dp"
+-                        android:layout_height="@dimen/connected_button_height"
+-                        android:layout_weight="1"
+-                        android:text="@string/dark" />
++        </com.google.android.material.button.MaterialButtonToggleGroup>
+ 
+-                    <com.google.android.material.button.MaterialButton
+-                        android:id="@+id/mode_light"
+-                        style="@style/Widget.Material3Expressive.Button.TonalButton"
+-                        android:layout_width="0dp"
+-                        android:layout_height="@dimen/connected_button_height"
+-                        android:layout_weight="1"
+-                        android:text="@string/light" />
++        <LinearLayout
++            android:id="@+id/black_theme_card"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="@dimen/control_card_margin_top"
++            android:background="@drawable/setup_item_card_background"
++            android:baselineAligned="false"
++            android:gravity="center_vertical"
++            android:orientation="horizontal"
++            android:paddingStart="@dimen/control_card_padding_horizontal"
++            android:paddingTop="@dimen/control_card_padding_vertical"
++            android:paddingEnd="@dimen/control_card_padding_horizontal"
++            android:paddingBottom="@dimen/control_card_padding_vertical">
+ 
+-                </com.google.android.material.button.MaterialButtonToggleGroup>
++            <com.google.android.setupdesign.view.RichTextView
++            style="?attr/sudItemTitleStyle"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:labelFor="@+id/black_theme"
++            android:text="@string/pure_black_theme" />
+ 
+-                <LinearLayout
+-                    android:id="@+id/black_theme_card"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="@dimen/control_card_margin_top"
+-                    android:background="@drawable/setup_item_card_background"
+-                    android:baselineAligned="false"
+-                    android:gravity="center_vertical"
+-                    android:orientation="horizontal"
+-                    android:paddingStart="@dimen/control_card_padding_horizontal"
+-                    android:paddingTop="@dimen/control_card_padding_vertical"
+-                    android:paddingEnd="@dimen/control_card_padding_horizontal"
+-                    android:paddingBottom="@dimen/control_card_padding_vertical">
++            <com.google.android.material.materialswitch.MaterialSwitch
++            android:id="@+id/black_theme"
++            style="@style/SudExpressiveSwitchBarStyle"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_gravity="center_vertical" />
+ 
+-                    <com.google.android.setupdesign.view.RichTextView
+-                    style="?attr/sudItemTitleStyle"
+-                    android:layout_width="0dp"
+-                    android:layout_height="wrap_content"
+-                    android:layout_weight="1"
+-                    android:labelFor="@+id/black_theme"
+-                    android:text="@string/pure_black_theme" />
+-
+-                    <com.google.android.material.materialswitch.MaterialSwitch
+-                    android:id="@+id/black_theme"
+-                    style="@style/SudExpressiveSwitchBarStyle"
+-                    android:layout_width="wrap_content"
+-                    android:layout_height="wrap_content"
+-                    android:layout_gravity="center_vertical" />
+-
+-                </LinearLayout>
+-
+-                <Space
+-                    android:layout_width="match_parent"
+-                    android:layout_height="0dp"
+-                    android:layout_weight="1" />
+-
+-            </LinearLayout>
+-        </ScrollView>
+-    </LinearLayout>
++        </LinearLayout>
++</LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/values-w600dp/dimens.xml b/app/src/main/res/values-w600dp/dimens.xml
+new file mode 100644
+index 0000000..b445389
+--- /dev/null
++++ b/app/src/main/res/values-w600dp/dimens.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <dimen name="preview_max_height">300dp</dimen>
++</resources>
+diff --git a/app/src/main/res/values/dimens.xml b/app/src/main/res/values/dimens.xml
+index 92b1be9..d8836e8 100644
+--- a/app/src/main/res/values/dimens.xml
++++ b/app/src/main/res/values/dimens.xml
+@@ -56,6 +56,7 @@
+ 
+     <dimen name="preview_margin_top">24dp</dimen>
+     <dimen name="preview_card_padding">40dp</dimen>
++    <dimen name="preview_max_height">9999dp</dimen>
+     <dimen name="control_card_margin_top">8dp</dimen>
+     <dimen name="control_card_padding_horizontal">24dp</dimen>
+     <dimen name="control_card_padding_vertical">20dp</dimen>

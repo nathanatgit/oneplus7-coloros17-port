@@ -1,0 +1,167 @@
+From 55e2c5a65c30e228f5e212ca726dea1542ed5636 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 17 Sep 2026 00:05:08 +0530
+Subject: [PATCH] SUW: Dynamically set Finish footer button
+
+Change-Id: If46a1bf07ee518ff11798f1e40e7f5a40907d9ff
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+index 49c2642..5993813 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+@@ -29,9 +29,13 @@
+ import com.google.android.setupdesign.template.IconMixin
+ import com.google.android.setupdesign.transition.TransitionHelper
+ import com.google.android.setupdesign.util.ThemeHelper
++import org.lineageos.setupwizard.EXTRA_ACTION_ID
++import org.lineageos.setupwizard.EXTRA_SCRIPT_URI
++import org.lineageos.setupwizard.EXTRA_WIZARD_BUNDLE
+ import org.lineageos.setupwizard.LOGV
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.util.SetupWizardUtils
++import org.lineageos.setupwizard.wizardmanager.WizardManager
+ 
+ abstract class BaseSetupWizardActivity : AppCompatActivity() {
+ 
+@@ -121,13 +125,26 @@
+         }
+     }
+ 
++    private fun isLastStep(): Boolean {
++        val wizardBundle = intent.getBundleExtra(EXTRA_WIZARD_BUNDLE) ?: return false
++        val scriptUri = wizardBundle.getString(EXTRA_SCRIPT_URI) ?: return false
++        val actionId = wizardBundle.getString(EXTRA_ACTION_ID) ?: return false
++
++        val nextAction =
++            runCatching { WizardManager.getNextAction(this, scriptUri, actionId, RESULT_OK) }
++                .onFailure { Log.w(TAG, "No next action found", it) }
++                .getOrNull() ?: return false
++
++        return nextAction.getIntent()?.action == ACTION_SETUP_COMPLETE
++    }
++
+     private fun setupFooterBar() {
+         val mixin = glifLayout.getMixin(FooterBarMixin::class.java)
+         footerBarMixin = mixin
+ 
+         nextFooterButton =
+             FooterButton.Builder(this)
+-                .setText(R.string.next)
++                .setText(if (isLastStep()) R.string.finish else R.string.next)
+                 .setListener { onNextPressed() }
+                 .setButtonType(FooterButton.ButtonType.NEXT)
+                 .build()
+@@ -281,6 +298,9 @@
+ 
+     companion object {
+         private const val TAG = "BaseSetupWizardActivity"
++
++        /** The wizard action of the reveal screen, which ends the wizard. */
++        private const val ACTION_SETUP_COMPLETE = "org.lineageos.setupwizard.LINEAGE_SETUP_COMPLETE"
+         const val DEFAULT_TRANSITION = TransitionHelper.TRANSITION_FADE_THROUGH
+     }
+ }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+index 19ca3f0..60921a2 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+@@ -61,7 +61,6 @@
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         SystemBarHelper.setBackButtonVisible(window, true)
+-        setNextText(R.string.next)
+         languagePicker = findViewById(R.id.locale_list)
+         nextButton?.let { languagePicker.setNextRight(it.id) }
+         languagePicker.requestFocus()
+diff --git a/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
+index 4453ca2..7e673c4 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
+@@ -35,7 +35,6 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        setNextText(R.string.next)
+         glifLayout.setDescriptionText(getString(R.string.location_summary))
+ 
+         locationAgpsAccess.isVisible = userManager.isMainUser
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt
+index 74ec32f..b1db849 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt
+@@ -34,7 +34,6 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        setNextText(R.string.next)
+ 
+         val osName = getString(R.string.os_name)
+         glifLayout.setDescriptionText(buildDescription(osName))
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt
+index 372093e..557c16f 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt
+@@ -43,7 +43,6 @@
+         val hasHomeKey = (deviceKeys and KEY_MASK_APP_SWITCH) != 0
+ 
+         glifLayout.setDescriptionText(getString(R.string.navigation_summary))
+-        setNextText(R.string.next)
+ 
+         val modeGroup = findViewById<MaterialButtonToggleGroup>(R.id.navigation_mode_group)
+         val gestureButton = findViewById<MaterialButton>(R.id.mode_gesture)
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+index 134183c..da7ff57 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+@@ -39,7 +39,6 @@
+             return
+         }
+ 
+-        setNextText(R.string.next)
+         recoveryUpdateCheckbox = findViewById(R.id.update_recovery_checkbox)
+ 
+         findViewById<View>(R.id.update_recovery_checkbox_view).setOnClickListener {
+diff --git a/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt b/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt
+index 7fc60fb..7c68450 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt
+@@ -62,7 +62,6 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        setNextText(R.string.next)
+         glifLayout.setDescriptionText(getString(R.string.date_time_summary))
+ 
+         dateFormatItem.summary = dateFormatOrder()
+diff --git a/app/src/main/java/org/lineageos/setupwizard/wizardmanager/WizardManager.kt b/app/src/main/java/org/lineageos/setupwizard/wizardmanager/WizardManager.kt
+index 9172dfb..49c1e7a 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/wizardmanager/WizardManager.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/wizardmanager/WizardManager.kt
+@@ -160,6 +160,13 @@
+ 
+         private val wizardScripts = mutableMapOf<String, WizardScript>()
+ 
++        fun getNextAction(
++            context: Context,
++            scriptUri: String,
++            actionId: String,
++            resultCode: Int,
++        ): WizardAction? = checkNextAction(context, scriptUri, actionId, resultCode)
++
+         private fun checkNextAction(
+             context: Context,
+             scriptUri: String,
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 0f88c1a..e61c89a 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -15,6 +15,7 @@
+     <string name="activity_label_empty" />
+ 
+     <string name="next">Next</string>
++    <string name="finish">Finish</string>
+     <string name="skip">Skip</string>
+     <string name="start">Start</string>
+     <string name="done">Done</string>

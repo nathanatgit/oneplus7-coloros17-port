@@ -1,0 +1,81 @@
+From f261216e0ea7686c2830896b6315aa0cc5e97c8d Mon Sep 17 00:00:00 2001
+From: NullCode1337 <contact.nullcode@proton.me>
+Date: Wed, 19 Aug 2026 09:22:33 +0600
+Subject: [PATCH] sepolicy: qti: Add rules for oplus EID
+
+Change-Id: I61b5f1fee000f8ca7353b60123ae5c8f7488f0ef
+---
+
+diff --git a/sepolicy/qti/public/attributes b/sepolicy/qti/public/attributes
+index ef16d4a..9e2269f 100644
+--- a/sepolicy/qti/public/attributes
++++ b/sepolicy/qti/public/attributes
+@@ -5,6 +5,7 @@
+ vendor_hal_attribute(oplus_commcenter)
+ vendor_hal_attribute(oplus_commondcs)
+ vendor_hal_attribute(oplus_displaypanelfeature)
++vendor_hal_attribute(oplus_eid)
+ vendor_hal_attribute(oplus_esim)
+ vendor_hal_attribute(oplus_osense)
+ vendor_hal_attribute(oplus_performance)
+diff --git a/sepolicy/qti/vendor/file_contexts b/sepolicy/qti/vendor/file_contexts
+index 1ab392d..c454520 100644
+--- a/sepolicy/qti/vendor/file_contexts
++++ b/sepolicy/qti/vendor/file_contexts
+@@ -41,6 +41,9 @@
+ # Engineering
+ /mnt/vendor/persist/engineermode(/.*)?    u:object_r:vendor_persist_engineer_file:s0
+ 
++# EID
++/(odm|vendor/odm)/bin/hw/vendor\.oplus\.hardware\.eid@1\.0-service    u:object_r:hal_oplus_eid_exec:s0
++
+ # eSIM
+ /(odm|vendor/odm)/bin/hw/vendor\.oplus\.hardware\.esim@1\.0-service    u:object_r:hal_oplus_esim_aidl_exec:s0
+ /dev/esim-det                                                          u:object_r:esim_det_device:s0
+diff --git a/sepolicy/qti/vendor/hal_oplus_eid.te b/sepolicy/qti/vendor/hal_oplus_eid.te
+new file mode 100644
+index 0000000..2ae6e78
+--- /dev/null
++++ b/sepolicy/qti/vendor/hal_oplus_eid.te
+@@ -0,0 +1,13 @@
++type hal_oplus_eid, domain;
++binder_use(hal_oplus_eid)
++
++hal_server_domain(hal_oplus_eid, vendor_hal_oplus_eid)
++
++type hal_oplus_eid_exec, exec_type, vendor_file_type, file_type;
++init_daemon_domain(hal_oplus_eid)
++
++binder_call(vendor_hal_oplus_eid_client, vendor_hal_oplus_eid_server)
++
++hal_attribute_service(vendor_hal_oplus_eid, hal_oplus_eid_service)
++
++allow hal_oplus_eid nfc_device:chr_file r_file_perms;
+diff --git a/sepolicy/qti/vendor/service.te b/sepolicy/qti/vendor/service.te
+index 7b70d3b..3ad38cd 100644
+--- a/sepolicy/qti/vendor/service.te
++++ b/sepolicy/qti/vendor/service.te
+@@ -22,6 +22,9 @@
+ # Display (Pixelworks)
+ type hal_display_iris_aidl_service, hal_service_type, service_manager_type;
+ 
++# EID
++type hal_oplus_eid_service, hal_service_type, service_manager_type;
++
+ # eSIM
+ type hal_oplus_esim_aidl_service, hal_service_type, service_manager_type;
+ 
+diff --git a/sepolicy/qti/vendor/service_contexts b/sepolicy/qti/vendor/service_contexts
+index 9d80147..f1c9e3a 100644
+--- a/sepolicy/qti/vendor/service_contexts
++++ b/sepolicy/qti/vendor/service_contexts
+@@ -25,6 +25,9 @@
+ # Display (Pixelworks)
+ vendor.pixelworks.hardware.display.IIris/default    u:object_r:hal_display_iris_aidl_service:s0
+ 
++# EID
++vendor.oplus.hardware.eid.IEidDevice/default    u:object_r:hal_oplus_eid_service:s0
++
+ # eSIM
+ vendor.oplus.hardware.esim.IOplusEsim/default    u:object_r:hal_oplus_esim_aidl_service:s0
+ 

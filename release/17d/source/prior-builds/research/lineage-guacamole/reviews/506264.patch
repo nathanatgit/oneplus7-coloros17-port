@@ -1,0 +1,71 @@
+From 64ac0499672f19b513a154e6291d4c525249b349 Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 15:49:03 +0200
+Subject: [PATCH] Canvas: Organize strings
+
+I started adding some of them randomly
+
+Change-Id: I642c3b2e7e0f15ecd2c17508093cd1ce7e920b77
+---
+
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 5cf4fd5..d431339 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -4,32 +4,40 @@
+      SPDX-License-Identifier: Apache-2.0
+ -->
+ <resources>
++    <!-- App -->
+     <string name="app_name">Canvas</string>
+ 
++    <!-- Navigation and actions -->
+     <string name="close">Close</string>
+-    <string name="save">Save</string>
+-    <string name="save_as">Save as…</string>
++    <string name="back">Back</string>
++    <string name="cancel_action">Cancel action</string>
++    <string name="confirm_action">Confirm action</string>
+     <string name="undo">Undo</string>
+     <string name="redo">Redo</string>
++    <string name="save">Save</string>
++    <string name="save_as">Save as…</string>
+     <string name="share">Share</string>
+     <string name="more">More…</string>
+-    <string name="back">Back</string>
++
++    <!-- Edit categories -->
+     <string name="category_transformation">Transform image</string>
+     <string name="category_drawing">Drawing tools</string>
+     <string name="category_adjustments">Image adjustments</string>
+-    <string name="cancel_action">Cancel action</string>
+-    <string name="confirm_action">Confirm action</string>
+ 
+     <!-- Edit modes -->
+     <string name="edit_mode_crop">Crop</string>
+     <string name="edit_mode_rotation">Rotation</string>
+-    <string name="rotate_counterclockwise">Rotate counterclockwise</string>
+-    <string name="rotate_clockwise">Rotate clockwise</string>
+     <string name="edit_mode_marker">Marker</string>
+     <string name="edit_mode_highlighter">Highlighter</string>
+     <string name="edit_mode_text">Text</string>
+     <string name="edit_mode_brightness">Brightness</string>
+     <string name="edit_mode_contrast">Contrast</string>
++
++    <!-- Rotation -->
++    <string name="rotate_counterclockwise">Rotate counterclockwise</string>
++    <string name="rotate_clockwise">Rotate clockwise</string>
++
++    <!-- Adjustments -->
+     <string name="adjustment_percent">%1$.0f%%</string>
+ 
+     <!-- Drawing colors -->
+@@ -42,7 +50,7 @@
+     <string name="color_cyan">Cyan</string>
+     <string name="color_magenta">Magenta</string>
+ 
+-
++    <!-- Text editor -->
+     <string name="enter_text">Enter text…</string>
+ 
+     <!-- Text decorations -->

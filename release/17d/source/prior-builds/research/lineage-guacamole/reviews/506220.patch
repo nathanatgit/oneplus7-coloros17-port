@@ -1,0 +1,56 @@
+From bf78c2711a9462f2cfe352ecf6e0ae529a53db43 Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 11:09:26 +0200
+Subject: [PATCH] Canvas: Draw handles taking into account navigation transition
+
+Change-Id: Ic7f2491f5e973d1c7897ad54685103fb7396d3ed
+---
+
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt b/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt
+index cdd6f23..a19633c 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt
+@@ -5,6 +5,8 @@
+ 
+ package org.lineageos.canvas.ui.screens
+ 
++import androidx.compose.animation.fadeIn
++import androidx.compose.animation.fadeOut
+ import androidx.compose.foundation.Canvas
+ import androidx.compose.foundation.gestures.detectDragGestures
+ import androidx.compose.foundation.layout.Box
+@@ -28,12 +30,14 @@
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.unit.IntRect
+ import androidx.compose.ui.unit.dp
++import androidx.navigation3.ui.LocalNavAnimatedContentScope
+ import org.lineageos.canvas.ext.drawCropOverlay
+ import org.lineageos.canvas.models.Action
+ import org.lineageos.canvas.models.Handle
++import org.lineageos.canvas.ui.LocalSharedTransitionScope
++import org.lineageos.canvas.ui.composables.CanvasBottomBar
+ import org.lineageos.canvas.ui.composables.CanvasImage
+ import org.lineageos.canvas.ui.composables.ImageInformation
+-import org.lineageos.canvas.ui.composables.CanvasBottomBar
+ import org.lineageos.canvas.ui.theme.CropOverlayStyle
+ import org.lineageos.canvas.ui.theme.defaultCropOverlayStyle
+ 
+@@ -105,8 +109,17 @@
+     }
+     val minimumCropSizePx = with(LocalDensity.current) { 100.dp.toPx() }
+ 
++    val transitionScope = LocalSharedTransitionScope.current
++    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
++    val overlayModifier = with(transitionScope) {
++        modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 1f)
++    }
++    val animatedOverlayModifier = with(animatedVisibilityScope) {
++        overlayModifier.animateEnterExit(enter = fadeIn(), exit = fadeOut())
++    }
++
+     Canvas(
+-        modifier = modifier
++        modifier = animatedOverlayModifier
+             .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+             .pointerInput(imageBounds) {
+                 detectDragGestures(

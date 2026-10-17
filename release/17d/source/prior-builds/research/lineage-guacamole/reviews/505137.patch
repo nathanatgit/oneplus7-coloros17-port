@@ -1,0 +1,35 @@
+From bba72988b0d29336df34af185449d604cf94dc2b Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sun, 27 Sep 2026 15:03:25 +0200
+Subject: [PATCH] Phone: Strip *#*# prefix and #*#* suffix from dialer special codes
+
+Google Dialer ships per-manufacturer MMI code configs (selected by
+Build.MANUFACTURER via assets/device_mmi_codes_file_mappings).
+
+Configs for OnePlus/Oppo/Realme, vivo, TCL and LG set
+usePrefixAndSuffix=true, in which case it passes the full dialed string
+(*#*#<code>#*#*) instead of extracting <code>.
+
+Relevant logcat snippet:
+I DialerSingletonScopedExternalsLogging: com.google.android.dialershared.externals.logging.SingletonScopedExternalsLogging.recordCallMethodInvocation:75 event: TELEPHONY_SEND_DIALER_SPECIAL_CODE, function parameters: [*#*#4636#*#*], return value: Default
+
+Assisted-by: LLM
+Change-Id: If59b70ec94412f2712e3df7dfae35f753d23ed45
+---
+
+diff --git a/src/java/com/android/internal/telephony/Phone.java b/src/java/com/android/internal/telephony/Phone.java
+index 40f6470..9c2112d 100644
+--- a/src/java/com/android/internal/telephony/Phone.java
++++ b/src/java/com/android/internal/telephony/Phone.java
+@@ -3113,6 +3113,11 @@
+      */
+     public void sendDialerSpecialCode(String code) {
+         if (!TextUtils.isEmpty(code)) {
++            // Some dialers pass the full *#*#<code>#*#* sequence, strip it.
++            if (code.length() > 8 && code.startsWith("*#*#") && code.endsWith("#*#*")) {
++                code = code.substring(4, code.length() - 4);
++            }
++
+             final BroadcastOptions options = BroadcastOptions.makeBasic();
+             options.setBackgroundActivityStartsAllowed(true);
+             Intent intent = new Intent(TelephonyIntents.SECRET_CODE_ACTION,

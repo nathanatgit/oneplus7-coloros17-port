@@ -1,0 +1,100 @@
+From 1c45e31a86be95f51a94ffd1a5014c3fb2019112 Mon Sep 17 00:00:00 2001
+From: armdebug <armdebug@protonmail.com>
+Date: Mon, 21 Sep 2026 04:41:43 +0000
+Subject: [PATCH] core: Support breath LED mode
+
+[1] added support for devices to opt in to hardware breathing
+capabilities via overlay. However, the framework services were never
+updated to query this capability. So devices advertising
+LIGHTS_BREATHING_LED were still forced into timed flashing.
+
+Query LIGHTS_BREATHING_LED in the framework and use hardware flash mode
+when advertised, falling back to timed flashing otherwise.
+
+[1]: I9ec757a784dc3fb3afcb6f909f10e2eee86502ea
+
+Change-Id: I5a8ae31e6cc1d63f43e5060e2c9a05f8dc1bec35
+---
+
+diff --git a/services/core/java/com/android/server/BatteryService.java b/services/core/java/com/android/server/BatteryService.java
+index f4b69f1..11dfa24 100644
+--- a/services/core/java/com/android/server/BatteryService.java
++++ b/services/core/java/com/android/server/BatteryService.java
+@@ -87,6 +87,7 @@
+ import com.android.server.lights.LogicalLight;
+ 
+ import org.lineageos.internal.notification.LedValues;
++import org.lineageos.internal.notification.LightsCapabilities;
+ import org.lineageos.internal.notification.LineageBatteryLights;
+ 
+ import java.io.File;
+@@ -1781,6 +1782,7 @@
+         private final int mBatteryLedOn;
+         private final int mBatteryLedOff;
+         private final int mBatteryLowBehavior;
++        private final int mFlashMode;
+ 
+         public Led(Context context, LightsManager lights) {
+             mBatteryLight = lights.getLight(LightsManager.LIGHT_ID_BATTERY);
+@@ -1799,6 +1801,10 @@
+                     com.android.internal.R.integer.config_notificationsBatteryNearlyFullLevel);
+             mBatteryLowBehavior = context.getResources().getInteger(
+                     com.android.internal.R.integer.config_notificationsBatteryLowBehavior);
++            mFlashMode = LightsCapabilities.supports(context,
++                    LightsCapabilities.LIGHTS_BREATHING_LED)
++                            ? LogicalLight.LIGHT_FLASH_HARDWARE
++                            : LogicalLight.LIGHT_FLASH_TIMED;
+         }
+ 
+         /**
+@@ -1834,7 +1840,7 @@
+                 mBatteryLight.turnOff();
+             } else if (ledValues.isPulsed()) {
+                 mBatteryLight.setModes(ledValues.getBrightness());
+-                mBatteryLight.setFlashing(ledValues.getColor(), LogicalLight.LIGHT_FLASH_TIMED,
++                mBatteryLight.setFlashing(ledValues.getColor(), mFlashMode,
+                         ledValues.getOnMs(), ledValues.getOffMs());
+             } else {
+                 mBatteryLight.setModes(ledValues.getBrightness());
+diff --git a/services/core/java/com/android/server/notification/NotificationAttentionHelper.java b/services/core/java/com/android/server/notification/NotificationAttentionHelper.java
+index 89abfcd..deda139 100644
+--- a/services/core/java/com/android/server/notification/NotificationAttentionHelper.java
++++ b/services/core/java/com/android/server/notification/NotificationAttentionHelper.java
+@@ -83,6 +83,7 @@
+ import com.android.server.lights.LogicalLight;
+ 
+ import org.lineageos.internal.notification.LedValues;
++import org.lineageos.internal.notification.LightsCapabilities;
+ import org.lineageos.internal.notification.LineageNotificationLights;
+ 
+ import java.io.PrintWriter;
+@@ -179,6 +180,7 @@
+     ArrayList<String> mLights = new ArrayList<>();
+     private LogicalLight mNotificationLight;
+     private LogicalLight mAttentionLight;
++    private final int mFlashMode;
+ 
+     private final boolean mUseAttentionLight;
+     boolean mHasLight;
+@@ -236,6 +238,10 @@
+ 
+         mNotificationLight = lightsManager.getLight(LightsManager.LIGHT_ID_NOTIFICATIONS);
+         mAttentionLight = lightsManager.getLight(LightsManager.LIGHT_ID_ATTENTION);
++        mFlashMode = LightsCapabilities.supports(context,
++                LightsCapabilities.LIGHTS_BREATHING_LED)
++                        ? LogicalLight.LIGHT_FLASH_HARDWARE
++                        : LogicalLight.LIGHT_FLASH_TIMED;
+ 
+         Resources resources = context.getResources();
+         mUseAttentionLight = resources.getBoolean(R.bool.config_useAttentionLight);
+@@ -1029,8 +1035,8 @@
+             if (ledValues.getOnMs() == 1 && ledValues.getOffMs() == 0) {
+                 mNotificationLight.setColor(ledValues.getColor());
+             } else {
+-                mNotificationLight.setFlashing(ledValues.getColor(),
+-                        LogicalLight.LIGHT_FLASH_TIMED, ledValues.getOnMs(), ledValues.getOffMs());
++                mNotificationLight.setFlashing(ledValues.getColor(), mFlashMode,
++                        ledValues.getOnMs(), ledValues.getOffMs());
+             }
+         }
+     }

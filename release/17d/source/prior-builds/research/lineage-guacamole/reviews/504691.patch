@@ -1,0 +1,180 @@
+From 7de708902f687691a4f9de04446bcbbcb9ca590a Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 24 Sep 2026 12:04:17 +0530
+Subject: [PATCH] SUW: Revamp UpdateRecovery to GlifRecyclerLayout
+
+Change-Id: Ic411d8b475c115d4fcc65956c256f2cc8bbe2fa4
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+index da7ff57..f15d187 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+@@ -8,9 +8,10 @@
+ import android.os.Bundle
+ import android.os.SystemProperties
+ import android.util.Log
+-import android.view.View
+-import android.widget.CheckBox
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
++import com.google.android.setupdesign.GlifRecyclerLayout
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++import com.google.android.setupdesign.items.SwitchItem
+ import org.lineageos.setupwizard.ENABLE_RECOVERY_UPDATE
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.SetupWizardApp
+@@ -20,7 +21,13 @@
+ 
+ class UpdateRecoveryActivity : BaseSetupWizardActivity() {
+ 
+-    private lateinit var recoveryUpdateCheckbox: CheckBox
++    private val itemAdapter by lazy {
++        (glifLayout as GlifRecyclerLayout).adapter as RecyclerItemAdapter
++    }
++
++    private val updateRecoveryItem by lazy {
++        itemAdapter.findItemById(R.id.update_recovery_item) as SwitchItem
++    }
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+@@ -39,13 +46,13 @@
+             return
+         }
+ 
+-        recoveryUpdateCheckbox = findViewById(R.id.update_recovery_checkbox)
+-
+-        findViewById<View>(R.id.update_recovery_checkbox_view).setOnClickListener {
+-            recoveryUpdateCheckbox.isChecked = !recoveryUpdateCheckbox.isChecked
++        itemAdapter.setOnItemSelectedListener { item ->
++            if (item is SwitchItem) {
++                item.isChecked = !item.isChecked
++            }
+         }
+ 
+-        // Allow overriding the default checkbox state
++        // Allow overriding the default switch state
+         if (firstTime) {
+             SetupWizardApp.settingsBundle.putBoolean(
+                 ENABLE_RECOVERY_UPDATE,
+@@ -58,14 +65,14 @@
+ 
+     override fun onResume() {
+         super.onResume()
+-        recoveryUpdateCheckbox.isChecked =
++        updateRecoveryItem.isChecked =
+             SetupWizardApp.settingsBundle.getBoolean(ENABLE_RECOVERY_UPDATE, true)
+     }
+ 
+     override fun onNextPressed() {
+         SetupWizardApp.settingsBundle.putBoolean(
+             ENABLE_RECOVERY_UPDATE,
+-            recoveryUpdateCheckbox.isChecked,
++            updateRecoveryItem.isChecked,
+         )
+         super.onNextPressed()
+     }
+diff --git a/app/src/main/res/layout/update_recovery_page.xml b/app/src/main/res/layout/update_recovery_page.xml
+index be4aed8..15e7971 100644
+--- a/app/src/main/res/layout/update_recovery_page.xml
++++ b/app/src/main/res/layout/update_recovery_page.xml
+@@ -4,63 +4,9 @@
+      SPDX-FileCopyrightText: The LineageOS Project
+      SPDX-License-Identifier: Apache-2.0
+ -->
+-<com.google.android.setupdesign.GlifLayout
++<com.google.android.setupdesign.GlifRecyclerLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:id="@+id/setup_wizard_layout"
+     android:layout_width="match_parent"
+-    android:layout_height="match_parent">
+-
+-    <LinearLayout
+-        android:orientation="vertical"
+-        android:layout_width="match_parent"
+-        android:layout_height="match_parent"
+-        style="@style/SudContentFrame">
+-
+-        <FrameLayout
+-            android:id="@+id/page"
+-            android:layout_width="match_parent"
+-            android:layout_height="0dp"
+-            android:layout_weight="1">
+-
+-            <ScrollView
+-                android:layout_width="match_parent"
+-                android:layout_height="match_parent"
+-                android:fillViewport="true">
+-
+-                <LinearLayout
+-                    android:orientation="vertical"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="match_parent">
+-
+-                    <LinearLayout
+-                        android:id="@+id/update_recovery_checkbox_view"
+-                        android:orientation="horizontal"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:paddingLeft="@dimen/location_margin_left"
+-                        android:paddingRight="@dimen/content_margin_right"
+-                        android:background="?android:attr/selectableItemBackground"
+-                        android:clickable="true">
+-
+-                        <CheckBox
+-                            android:id="@+id/update_recovery_checkbox"
+-                            android:layout_width="wrap_content"
+-                            android:layout_height="wrap_content"
+-                            android:duplicateParentState="true"
+-                            android:clickable="false"
+-                            style="@style/SudCheckBox.Multiline" />
+-
+-                        <TextView
+-                            android:layout_width="wrap_content"
+-                            android:layout_height="wrap_content"
+-                            android:text="@string/update_recovery_setting"
+-                            android:textStyle="bold"
+-                            style="@style/SudCheckBox.Multiline" />
+-
+-                    </LinearLayout>
+-                </LinearLayout>
+-            </ScrollView>
+-        </FrameLayout>
+-
+-    </LinearLayout>
+-</com.google.android.setupdesign.GlifLayout>
++    android:layout_height="match_parent"
++    android:entries="@xml/update_recovery_items" />
+diff --git a/app/src/main/res/values/dimens.xml b/app/src/main/res/values/dimens.xml
+index 0d4907d..509d105 100644
+--- a/app/src/main/res/values/dimens.xml
++++ b/app/src/main/res/values/dimens.xml
+@@ -7,8 +7,6 @@
+ <resources>
+     <dimen name="content_margin_top">26dp</dimen>
+     <dimen name="content_margin_left">26dp</dimen>
+-    <dimen name="content_margin_right">14dp</dimen>
+-    <dimen name="location_margin_left">20dp</dimen>
+     <dimen name="location_text_margin_left">10dp</dimen>
+     <dimen name="location_text_margin_right">30dp</dimen>
+     <dimen name="base_margin_top">0dp</dimen>
+diff --git a/app/src/main/res/xml/update_recovery_items.xml b/app/src/main/res/xml/update_recovery_items.xml
+new file mode 100644
+index 0000000..3171971
+--- /dev/null
++++ b/app/src/main/res/xml/update_recovery_items.xml
+@@ -0,0 +1,13 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<ItemGroup xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <SwitchItem
++        android:id="@+id/update_recovery_item"
++        android:layout="@layout/setup_items_switch"
++        android:title="@string/update_recovery_setting" />
++
++</ItemGroup>

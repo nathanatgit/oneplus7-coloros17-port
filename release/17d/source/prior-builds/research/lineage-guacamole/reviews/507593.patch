@@ -1,0 +1,122 @@
+From 8f0219bbb56bd0e8a9798d6801699dbd24d6f1b7 Mon Sep 17 00:00:00 2001
+From: pjgowtham <pjgowtham@gmail.com>
+Date: Fri, 14 Feb 2025 22:28:35 +0530
+Subject: [PATCH] pal: Parse LVACFS microphone feature parameter
+
+Change-Id: I83ebe64152da56674fbd401b38bdc3201838cf1f
+
+---
+
+diff --git a/inc/PalDefs.h b/inc/PalDefs.h
+index a69bee7..de01158 100644
+--- a/inc/PalDefs.h
++++ b/inc/PalDefs.h
+@@ -969,6 +969,7 @@
+     PAL_PARAM_ID_ULTRASOUND_RAMPDOWN = 62,
+     PAL_PARAM_ID_VOLUME_CTRL_RAMP = 63,
+     PAL_PARAM_ID_ULTRASOUND_SET_GAIN = 64,
++    PAL_PARAM_ID_LVACFS = 1001,
+ } pal_param_id_type_t;
+ 
+ /** HDMI/DP */
+diff --git a/resource_manager/inc/ResourceManager.h b/resource_manager/inc/ResourceManager.h
+index c32de12..39bf04a 100644
+--- a/resource_manager/inc/ResourceManager.h
++++ b/resource_manager/inc/ResourceManager.h
+@@ -85,6 +85,7 @@
+ #define AUDIO_PARAMETER_KEY_UPD_DUTY_CYCLE "upd_duty_cycle_enable"
+ #define AUDIO_PARAMETER_KEY_UPD_VIRTUAL_PORT "upd_virtual_port"
+ #define AUDIO_PARAMETER_KEY_SPKR_XMAX_TMAX_LOG "spkr_xmax_tmax_logging_enable"
++#define AUDIO_PARAMETER_KEY_RECORD_USE_AP_LVACFS "record_use_ap_lvacfs"
+ #define MAX_PCM_NAME_SIZE 50
+ #define MAX_STREAM_INSTANCES (sizeof(uint64_t) << 3)
+ #define MIN_USECASE_PRIORITY 0xFFFFFFFF
+@@ -396,6 +397,7 @@
+ class SndCardMonitor;
+ class StreamUltraSound;
+ class ContextManager;
++class Lvacfs;
+ class StreamSensorPCMData;
+ class StreamContextProxy;
+ 
+@@ -617,6 +619,7 @@
+     static bool isDualMonoEnabled;
+     static bool isDeviceMuxConfigEnabled;
+     static bool isUHQAEnabled;
++    static bool isLvacfsEnabled;
+     static bool isSignalHandlerEnabled;
+     static std::mutex mChargerBoostMutex;
+     /* Variable to store which speaker side is being used for call audio.
+@@ -921,6 +924,7 @@
+     static int setUpdVirtualPortParam(struct str_parms *parms, char *value, int len);
+     static int setUpdCustomGainParam(struct str_parms *parms,char *value, int len);
+     static int setDualMonoEnableParam(struct str_parms *parms,char *value, int len);
++    static int setLvacfsEnableParam(struct str_parms *parms,char *value, int len);
+     static int setSignalHandlerEnableParam(struct str_parms *parms,char *value, int len);
+     static int setMuxconfigEnableParam(struct str_parms *parms,char *value, int len);
+     static int setSpkrXmaxTmaxLoggingParam(struct str_parms* parms, char* value, int len);
+diff --git a/resource_manager/src/ResourceManager.cpp b/resource_manager/src/ResourceManager.cpp
+index e141156..d6871a9 100644
+--- a/resource_manager/src/ResourceManager.cpp
++++ b/resource_manager/src/ResourceManager.cpp
+@@ -514,6 +514,7 @@
+ bool ResourceManager::isUpdSetCustomGainEnabled = false;
+ int ResourceManager::max_voice_vol = -1;     /* Variable to store max volume index for voice call */
+ 
++bool ResourceManager::isLvacfsEnabled = false;
+ bool ResourceManager::isSignalHandlerEnabled = false;
+ #ifdef SOC_PERIPHERAL_PROT
+ std::thread ResourceManager::socPerithread;
+@@ -8124,6 +8125,7 @@
+     ret = setUpdDedicatedBeEnableParam(parms, value, len);
+     ret = setUpdCustomGainParam(parms, value, len);
+     ret = setDualMonoEnableParam(parms, value, len);
++    ret = setLvacfsEnableParam(parms, value, len);
+     ret = setSignalHandlerEnableParam(parms, value, len);
+     ret = setMuxconfigEnableParam(parms, value, len);
+     ret = setUpdDutyCycleEnableParam(parms, value, len);
+@@ -8358,6 +8360,29 @@
+     return ret;
+ }
+ 
++int ResourceManager::setLvacfsEnableParam(struct str_parms *parms,
++                                 char *value, int len)
++{
++    int ret = -EINVAL;
++
++    if (!value || !parms)
++        return ret;
++
++    ret = str_parms_get_str(parms, AUDIO_PARAMETER_KEY_RECORD_USE_AP_LVACFS,
++                                value, len);
++    PAL_INFO(LOG_TAG," value %s", value);
++    if (ret >= 0) {
++        if (value && !strncmp(value, "enable", sizeof("enable") - 1))
++            isLvacfsEnabled = true;
++
++        str_parms_del(parms, AUDIO_PARAMETER_KEY_RECORD_USE_AP_LVACFS);
++    }
++
++    PAL_INFO(LOG_TAG, "LVACFS enabled is=%x", isLvacfsEnabled);
++
++    return ret;
++}
++
+ int ResourceManager::setSignalHandlerEnableParam(struct str_parms *parms,
+                                  char *value, int len)
+ {
+@@ -9180,6 +9205,14 @@
+             **(bool **)param_payload = isHifiFilterEnabled;
+         }
+         break;
++        case PAL_PARAM_ID_LVACFS:
++        {
++            PAL_INFO(LOG_TAG, "get parameter for LVACFS");
++
++            *payload_size = sizeof(isLvacfsEnabled);
++            **(bool **)param_payload = isLvacfsEnabled;
++        }
++        break;
+         default:
+             status = -EINVAL;
+             PAL_ERR(LOG_TAG, "Unknown ParamID:%d", param_id);

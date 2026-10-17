@@ -24,3 +24,5 @@ See [FACTS.md](FACTS.md), [BUILD_SOURCES.md](BUILD_SOURCES.md), and [DEVELOPMENT
 The build/source image share and extraction details are in [`images/README.md`](images/README.md). Binary images and generated ZIPs are excluded from Git; this folder is for source, build notes, and scripts.
 
 This is a local test release, not a production or public release. The package install flow has not been run end-to-end on a wiped second device.
+
+The cumulative developer tools and patches from builds 1–17 are preserved under source/prior-builds/; see BUILD_SOURCES.md for scope and exclusions.

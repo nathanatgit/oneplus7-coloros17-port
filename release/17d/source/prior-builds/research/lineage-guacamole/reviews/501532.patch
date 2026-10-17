@@ -1,0 +1,561 @@
+From 17dad85f179f50a59c6e1489da36a07238693e17 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Wed, 02 Sep 2026 04:37:35 +0530
+Subject: [PATCH] SUW: Drop stale services_find_privacy_policy translations
+
+Change-Id: I02b2e137cf5bb0037424ae14dd7123dae6233d79
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/res/values-ar/strings.xml b/app/src/main/res/values-ar/strings.xml
+index 325ba2b..acf8248 100644
+--- a/app/src/main/res/values-ar/strings.xml
++++ b/app/src/main/res/values-ar/strings.xml
+@@ -35,7 +35,6 @@
+     <string name="update_recovery_setting">تحديث Lineage Recovery إلى جانب نظام التشغيل</string>
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">ميزات LineageOS</string>
+-    <string name="services_find_privacy_policy">يمكنك قراءة سياسة الخصوصية على جهاز آخر بزيارة <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">ساهم في تحسين <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_os_nav_keys_label"><b>استخدام مفاتيح التنقل على الشاشة</b> بدلاً من مفاتيح الأجهزة.</string>
+     <string name="services_full_description"><xliff:g id="pp_explanation">%1$s</xliff:g>\n<xliff:g id="pp_find">%2$s</xliff:g></string>
+diff --git a/app/src/main/res/values-ast-rES/strings.xml b/app/src/main/res/values-ast-rES/strings.xml
+index 2fb240c..86c0dbd 100644
+--- a/app/src/main/res/values-ast-rES/strings.xml
++++ b/app/src/main/res/values-ast-rES/strings.xml
+@@ -36,7 +36,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funciones de LineageOS</string>
+     <string name="services_pp_explanation">Estos servicios funcionen p\'aumentar les funciones del preséu. Los datos van usase d\'acuerdu cola política de privacidá de <xliff:g id="name" example="LineageOS">%1$s</xliff:g></string>
+-    <string name="services_find_privacy_policy">Pues lleer la política de privacidá n\'otru preséu pente la visita a <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ayudar a ameyorar <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> pente l\'unviu los datos de diagnósticu y d\'usu a <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Esta información nun se pue usar pa identificate mas val p\'agabitar a los desendolcadores pa que trabayen en coses como la duración de la batería, el rindimientu de les aplicaciones y les funciones nueves de <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_full_description"><xliff:g id="pp_explanation">%1$s</xliff:g>\n<xliff:g id="pp_find">%2$s</xliff:g></string>
+diff --git a/app/src/main/res/values-az/strings.xml b/app/src/main/res/values-az/strings.xml
+index 53b952c..73a2930 100644
+--- a/app/src/main/res/values-az/strings.xml
++++ b/app/src/main/res/values-az/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS özəllikləri</string>
+     <string name="services_pp_explanation">Bu xidmətlər cihazınızın imkanlarını artırır. Verilər, <xliff:g id="name" example="LineageOS">%1$s</xliff:g>un məxfilik siyasətinə uyğun olaraq istifadə ediləcək.</string>
+-    <string name="services_find_privacy_policy">Məxfilik siyasətini fərqli cihazda <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> ünvanını ziyarət edərək oxuya bilərsiniz</string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g>u təkmilləşdirməyə kömək edin</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="LineageOS">%2$s</xliff:g>-a diaqnostikanı və istifadə verilərini avtomatik göndərərək <xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g>. Bu məlumatlar, kimliyinizi müəyyənləşdirmək üçün istifadə edilmir və batareya ömrü, tətbiq performansı və yeni <xliff:g id="name" example="LineageOS">%3$s</xliff:g> xüsusiyyətləri kimi işlərlə məşğul olan komandalara kömək edir.</string>
+     <string name="services_os_nav_keys_label">Donanım düymələri əvəzinə <b>ekran üzərindəki naviqasiya düymələrini istifadə edin.</b></string>
+diff --git a/app/src/main/res/values-bg/strings.xml b/app/src/main/res/values-bg/strings.xml
+index 45c360c..056698d 100644
+--- a/app/src/main/res/values-bg/strings.xml
++++ b/app/src/main/res/values-bg/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS функции</string>
+     <string name="services_pp_explanation">Тези услуги работят за вас, за да разширите възможностите на вашето устройство. Данните ще бъдат използвани в съответствие с<xliff:g id="name" example="LineageOS">%1$s</xliff:g> политика за поверителност.</string>
+-    <string name="services_find_privacy_policy">Можете да прочетете политиката за поверителност на друго устройство, като посетите <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Помогне за подобряване на <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> чрез автоматично изпращане на диагностични данни и данни за употреба до <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Тази информация не може да се използва, за да ви идентифицира и помага на екипи, работещи по неща като живот на батерията, производителност на приложенията и нови <xliff:g id="name" example="LineageOS">%3$s</xliff:g> функции.</string>
+     <string name="services_os_nav_keys_label"><b>Използване на клавишите за навигация на екрана</b> вместо хардуерните бутони.</string>
+diff --git a/app/src/main/res/values-ca/strings.xml b/app/src/main/res/values-ca/strings.xml
+index e83cbc7..04e149e 100644
+--- a/app/src/main/res/values-ca/strings.xml
++++ b/app/src/main/res/values-ca/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Característiques de LineageOS</string>
+     <string name="services_pp_explanation">Aquests serveis funcionen per ampliar les capacitats del vostre dispositiu. Les dades s\'utilitzaran d\'acord amb la política de privadesa de &lt;xliff:g id="name" example="LineageOS"&gt;.</string>
+-    <string name="services_find_privacy_policy">Podeu llegir la política de privadesa en un altre dispositiu visitant <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ajuda a millorar <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label">&lt;xliff:g id="name" example="Help improve LineageOS"&gt; enviant automàticament dades de diagnòstic i d\'ús a &lt;xliff:g id="name" example="LineageOS"&gt;. Aquesta informació no es pot utilitzar per identificar-vos i dóna un cop de mà als equips que treballen en coses com ara la durada de la bateria, el rendiment de les aplicacions i les noves característiques de &lt;xliff:g id="name" example="LineageOS"&gt;.</string>
+     <string name="services_os_nav_keys_label"><b>Utilitza les tecles de navegació en pantalla</b> enlloc de les tecles físiques.</string>
+diff --git a/app/src/main/res/values-ckb/strings.xml b/app/src/main/res/values-ckb/strings.xml
+index 5019170..1d38dee 100644
+--- a/app/src/main/res/values-ckb/strings.xml
++++ b/app/src/main/res/values-ckb/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">تایبەتمەندییەکانی LineageOS</string>
+     <string name="services_pp_explanation">ئەم خزمەتگوزارییانە بۆ فراوانکردنی تواناکانی ئامێرەکەت کار دەکەن. داتاکان بەپێی سیاسەتی پاراستنی نهێنیی <xliff:g id="name" example="LineageOS">%1$s</xliff:g> بەکاردەهێنرێن.</string>
+-    <string name="services_find_privacy_policy">دەتوانیت سیاسەتی پاراستنی نهێنی لە ئامێرێکی ترەوە بخوێنیتەوە بە سەردانکردنی <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">یارمەتیدان لە بەرەوپێشبردنی <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label">یارمەتیی <xliff:g id="name" example="LineageOS">%1$s</xliff:g> بدە بە ناردنی خۆکاری زانیارییەکانی دەستنیشانکردنی هەڵە و بەکارهێنان بۆ <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. ئەم زانیارییانە بۆ ناسینەوەی تۆ بەکارنایەن و یارمەتی تیمەکان دەدەن بۆ باشترکردنی تەمەنی باتری، کارکردنی بەرنامەکان و تایبەتمەندییە نوێیەکانی <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>بەکارهێنانی دوگمەکانی سەر ڕوونما</b> لە جیاتی دوگمەکانی ڕەقەکاڵا.</string>
+diff --git a/app/src/main/res/values-cs/strings.xml b/app/src/main/res/values-cs/strings.xml
+index fac5409..0fa2cef 100644
+--- a/app/src/main/res/values-cs/strings.xml
++++ b/app/src/main/res/values-cs/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS funkce</string>
+     <string name="services_pp_explanation">Tyto služby rozšiřují funkce vašeho zařízení. Data budou použita v souladu se zásadami ochrany osobních údajů <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Zásady ochrany osobních údajů si můžete přečíst na jiném zařízení navštívením odkazu <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Pomozte vylepšit <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Pomozte vylepšit LineageOS">%1$s</xliff:g> automatickým odesíláním diagnostických dat a dat o používání <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Tato data nelze použít pro Vaší identifikaci, ale pomohou vývojářskému týmu s informacemi o výdrži baterie, výkonu aplikací a vývoji nových funkcí pro <xliff:g id="name" example="LineageOS">%2$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Použít navigační klávesy na obrazovce</b> namísto hw kláves.</string>
+diff --git a/app/src/main/res/values-cy/strings.xml b/app/src/main/res/values-cy/strings.xml
+index c9a786a..8012a47 100644
+--- a/app/src/main/res/values-cy/strings.xml
++++ b/app/src/main/res/values-cy/strings.xml
+@@ -36,7 +36,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Nodweddion LineageOS</string>
+     <string name="services_pp_explanation">Mae\'r gwasanaethau hyn yn gweithio i ti fedru ymestyn gallu dy ddyfais. Caiff data ei ddefnyddio yn ôl polisi preifatrwydd <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Gellir darllen y polisi preifatrwydd ar ddyfais arall wrth ymweld â <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Helpu i wella <xliff:g id="name" example="CyanogenMod">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> wrth anfon gwybodaeth ddiagnostig a defnydd data at <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Ni fydd yn bosib defnyddio\'r wybodaeth i dy adnabod di ac mi fydd o help mawr i\'r timau sy\'n gweithio ar bethau fel gwella perfformiad apiau a bywyd batri a chreu nodweddion newydd yn <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Defnyddio bysellau llywio ar y sgrin</b> yn hytrach na botymau\'r ddyfais.</string>
+diff --git a/app/src/main/res/values-da/strings.xml b/app/src/main/res/values-da/strings.xml
+index 482fca4..02a3246 100644
+--- a/app/src/main/res/values-da/strings.xml
++++ b/app/src/main/res/values-da/strings.xml
+@@ -36,7 +36,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS-funktioner</string>
+     <string name="services_pp_explanation">&lt;xliff:g id="name" example="LineageOS"&gt;Disse tjenester virker for at udvide funktionerne på din enhed. Data vil blive brugt i overensstemmelse med  &lt;xliff:g id="name" example="LineageOS"&gt;%1$s&lt;/xliff:g&gt;\'s privatlivspolitik.</string>
+-    <string name="services_find_privacy_policy">Du kan læse privatlivspolitikken på en anden enhed ved at besøge <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Hjælp med at forbedre <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> ved automatisk at sende diagnose og forbrugsdata til <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Denne information kan ikke bruge til at identificere dig men giver en hjælpende hånd til de hold der arbejder med batteri levetid, app præstation og nye<xliff:g id="name" example="LineageOS">%3$s</xliff:g> funktioner.</string>
+     <string name="services_os_nav_keys_label"><b>Brug navigationstaster på skærm</b> i stedet for fysiske-taster.</string>
+diff --git a/app/src/main/res/values-de/strings.xml b/app/src/main/res/values-de/strings.xml
+index 77084cd..5f00e8c 100644
+--- a/app/src/main/res/values-de/strings.xml
++++ b/app/src/main/res/values-de/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS-Funktionen</string>
+     <string name="services_pp_explanation">Diese Dienste werden verwendet, um die Funktionen deines Gerätes zu erweitern. Deine Daten werden in Übereinstimmung mit der <xliff:g id="name" example="LineageOS">%1$s</xliff:g> Datenschutzerklärung verwendet.</string>
+-    <string name="services_find_privacy_policy">Du kannst die Datenschutzbestimmungen auf einem anderen Gerät lesen, indem du <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> aufrufst.</string>
+     <string name="services_help_improve_cm">Hilf <xliff:g id="name" example="LineageOS">%s</xliff:g> zu verbessern</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Hilf LineageOS zu verbessern">%1$s</xliff:g>, indem du automatisch Diagnose- und Nutzungsdaten an <xliff:g id="name" example="LineageOS">%2$s</xliff:g> sendest. Diese Informationen können nicht verwendet werden, um dich zu identifizieren und helfen den Teams, die an Dingen wie Akkulaufzeit, App-Leistung und neuen <xliff:g id="name" example="LineageOS">%3$s</xliff:g>-Funktionen arbeiten.</string>
+     <string name="services_os_nav_keys_label"><b>Bildschirm-Navigationstasten</b> statt Hardwaretasten verwenden.</string>
+diff --git a/app/src/main/res/values-el/strings.xml b/app/src/main/res/values-el/strings.xml
+index 7995c19..5e9218a 100644
+--- a/app/src/main/res/values-el/strings.xml
++++ b/app/src/main/res/values-el/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Χαρακτηριστικά LineageOS</string>
+     <string name="services_pp_explanation">Οι υπηρεσίες αυτές έχουν σκοπό να επεκτείνουν τις δυνατότητες της συσκευής σας. Τα δεδομένα θα χρησιμοποιηθούν σύμφωνα με την πολιτική απορρήτου του <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Μπορείτε να διαβάσετε την πολιτική απορρήτου σε μια άλλη συσκευή επισκεπτόμενοι το <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Βοηθήστε στη βελτίωση του <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> στέλνοντας αυτόματα διαγνωστικά δεδομένα και στατιστικά χρήσης στο <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Αυτές οι πληροφορίες δε μπορούν να χρησιμοποιηθούν για να σας αναγνωρίσουν και δίνουν ένα χέρι βοηθείας στις ομάδες που εργάζονται σε θέματα όπως η διάρκεια ζωής μπαταρίας, επιδόσεις εφαρμογών και νέα χαρακτηριστικά του <xliff:g id="name" example="LineageOS">%2$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Κάντε χρήση των πλήκτρων πλοήγησης της οθόνης</b> αντί των φυσικών πλήκτρων.</string>
+diff --git a/app/src/main/res/values-en-rAU/strings.xml b/app/src/main/res/values-en-rAU/strings.xml
+index b791039..ecc5cb0 100644
+--- a/app/src/main/res/values-en-rAU/strings.xml
++++ b/app/src/main/res/values-en-rAU/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS features</string>
+     <string name="services_pp_explanation">These services work for you to extend the capabilities of your device. Data will be used in accordance with <xliff:g id="name" example="LineageOS">%1$s</xliff:g>\'s privacy policy.</string>
+-    <string name="services_find_privacy_policy">You can read the privacy policy on another device by visiting <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Help improve <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> by automatically sending diagnostic and usage data to <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. This information can’t be used to identify you and lends a hand to teams working on things like battery life, app performance, and new <xliff:g id="name" example="LineageOS">%3$s</xliff:g> features.</string>
+     <string name="services_os_nav_keys_label"><b>Use on screen navigation keys</b> instead of hardware keys.</string>
+diff --git a/app/src/main/res/values-en-rCA/strings.xml b/app/src/main/res/values-en-rCA/strings.xml
+index b791039..ecc5cb0 100644
+--- a/app/src/main/res/values-en-rCA/strings.xml
++++ b/app/src/main/res/values-en-rCA/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS features</string>
+     <string name="services_pp_explanation">These services work for you to extend the capabilities of your device. Data will be used in accordance with <xliff:g id="name" example="LineageOS">%1$s</xliff:g>\'s privacy policy.</string>
+-    <string name="services_find_privacy_policy">You can read the privacy policy on another device by visiting <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Help improve <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> by automatically sending diagnostic and usage data to <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. This information can’t be used to identify you and lends a hand to teams working on things like battery life, app performance, and new <xliff:g id="name" example="LineageOS">%3$s</xliff:g> features.</string>
+     <string name="services_os_nav_keys_label"><b>Use on screen navigation keys</b> instead of hardware keys.</string>
+diff --git a/app/src/main/res/values-en-rGB/strings.xml b/app/src/main/res/values-en-rGB/strings.xml
+index 5a2ef76..762bf48 100644
+--- a/app/src/main/res/values-en-rGB/strings.xml
++++ b/app/src/main/res/values-en-rGB/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS features</string>
+     <string name="services_pp_explanation">These services work for you to extend the capabilities of your device. Data will be used in accordance with <xliff:g id="name" example="LineageOS">%1$s</xliff:g>\'s privacy policy.</string>
+-    <string name="services_find_privacy_policy">You can read the privacy policy on another device by visiting <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Help improve <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> by automatically sending diagnostic and usage data to <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. This information can’t be used to identify you and lends a hand to teams working on things like battery life, app performance, and new <xliff:g id="name" example="LineageOS">%3$s</xliff:g> features.</string>
+     <string name="services_os_nav_keys_label"><b>Use on screen navigation keys</b> instead of hardware keys.</string>
+diff --git a/app/src/main/res/values-en-rIN/strings.xml b/app/src/main/res/values-en-rIN/strings.xml
+index b791039..ecc5cb0 100644
+--- a/app/src/main/res/values-en-rIN/strings.xml
++++ b/app/src/main/res/values-en-rIN/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS features</string>
+     <string name="services_pp_explanation">These services work for you to extend the capabilities of your device. Data will be used in accordance with <xliff:g id="name" example="LineageOS">%1$s</xliff:g>\'s privacy policy.</string>
+-    <string name="services_find_privacy_policy">You can read the privacy policy on another device by visiting <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Help improve <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> by automatically sending diagnostic and usage data to <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. This information can’t be used to identify you and lends a hand to teams working on things like battery life, app performance, and new <xliff:g id="name" example="LineageOS">%3$s</xliff:g> features.</string>
+     <string name="services_os_nav_keys_label"><b>Use on screen navigation keys</b> instead of hardware keys.</string>
+diff --git a/app/src/main/res/values-es/strings.xml b/app/src/main/res/values-es/strings.xml
+index 9ff42e7..20f7485 100644
+--- a/app/src/main/res/values-es/strings.xml
++++ b/app/src/main/res/values-es/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Características de LineageOS</string>
+     <string name="services_pp_explanation">Estos servicios sirven para extender las capacidades de tu dispositivo. Los datos se utilizarán de acuerdo a la política de privacidad de <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Puedes leer la política de privacidad en otro dispositivo visitando <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ayuda a mejorar <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> enviando automáticamente datos de diagnóstico y uso a <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Esta información no puede usarse para identificarte y ayuda a los equipos que trabajan en aspectos como la duración de la batería, el rendimiento de la aplicación y las nuevas funciones de <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Usar las teclas de navegación en pantalla</b> en vez de las teclas físicas.</string>
+diff --git a/app/src/main/res/values-fa/strings.xml b/app/src/main/res/values-fa/strings.xml
+index 6371e30..5b103bd 100644
+--- a/app/src/main/res/values-fa/strings.xml
++++ b/app/src/main/res/values-fa/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">ویژگی‌های لینیِج اواِس</string>
+     <string name="services_pp_explanation">این خدمات در جهت افزایش قابلیت‌های دستگاه شما عمل می‌کنند. داده‌ها مطابق سیاست های حریم خصوصی <xliff:g id="name" example="LineageOS">%1$s</xliff:g> مورد استفاده قرار خواهند گرفت.</string>
+-    <string name="services_find_privacy_policy">شما می‌توانید سیاست های حریم خصوصی را بر روی یک دستگاه دیگر با بازدید از <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> بخوانید</string>
+     <string name="services_help_improve_cm">کمک به بهبود <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> با ارسال خودکار داده های عیب یابی و استفاده به <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. این اطلاعات قادر به آشکار سازی هویت شما نبوده و به تیم های مشغول بر روی چیز هایی مثل عمر باتری، کارایی نرم افزار و ویژگی های <xliff:g id="name" example="LineageOS">%3$s</xliff:g> جدید کمک می‌کند.</string>
+     <string name="services_os_nav_keys_label"><b>استفاده از کلیدهای پیمایش صفحه نمایش</b> به جای کلیدهای سخت‌افزاری.</string>
+diff --git a/app/src/main/res/values-fr/strings.xml b/app/src/main/res/values-fr/strings.xml
+index bfbb499..e676abf 100644
+--- a/app/src/main/res/values-fr/strings.xml
++++ b/app/src/main/res/values-fr/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Fonctionnalités de LineageOS</string>
+     <string name="services_pp_explanation">Ces services fonctionnent pour étendre les fonctionnalités de votre appareil. Les données seront utilisées conformément à la politique de confidentialité de <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Vous pouvez lire la politique de confidentialité sur un autre appareil en visitant <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Contribuer à l\'amélioration de <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> en envoyant automatiquement des données de diagnostic et d\'utilisation à <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Cette information ne peut pas être utilisée pour vous identifier et est d\'une grande aide aux équipes travaillant sur des sujets tels que la durée de vie de la batterie, les performances des applications, et de nouvelles fonctionnalités de <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Utilisation des touches de navigation de l\'écran</b> au lieu des touches physiques.</string>
+diff --git a/app/src/main/res/values-fur-rIT/strings.xml b/app/src/main/res/values-fur-rIT/strings.xml
+index 3cd4f60..58e249d 100644
+--- a/app/src/main/res/values-fur-rIT/strings.xml
++++ b/app/src/main/res/values-fur-rIT/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funzionalitâts di LineageOS</string>
+     <string name="services_pp_explanation">Chescj servizis a funzionin par slargjâ lis funzionalitâts dal to dispositîf. I dâts a vignaran doprâts in conformitât cu la informative su la riservatece di <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Tu puedis lei la informative su la riservatece suntun altri dispositîf visitant <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Jude a miorâ <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> inviant in automatic i dâts diagnostiche di consum ai svilupadôrs di <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Nol sarà pussibil doprâ chestis informazions par identificâti ma a dan une man ai grups che a lavorin su robis come la durade de batarie, lis prestazions des aplicazions e lis gnovis funzionalitâts di <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Dopre i botons virtuâi sul schermi</b> invezit di chei fisics.</string>
+diff --git a/app/src/main/res/values-ga-rIE/strings.xml b/app/src/main/res/values-ga-rIE/strings.xml
+index 3d5b919..3512d9d 100644
+--- a/app/src/main/res/values-ga-rIE/strings.xml
++++ b/app/src/main/res/values-ga-rIE/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS gnéithe</string>
+     <string name="services_pp_explanation">Oibríonn na seirbhísí seo duit chun cumais do ghléis a leathnú. Úsáidfear sonraí de réir pholasaí príobháideachais <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Is féidir leat an polasaí príobháideachais a léamh ar ghléas eile trí chuairt a thabhairt ar <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Cabhraigh le feabhas a chur ar <xliff:g id="name" example="LineageOS"> %s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Cabhraigh le LineageOS a fheabhsú">%1$s</xliff:g> trí shonraí diagnóiseacha agus úsáide a sheoladh go huathoibríoch chuig <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Ní féidir an fhaisnéis seo a úsáid chun tú a aithint agus tugann sé cúnamh d\'fhoirne atá ag obair ar rudaí cosúil le saol ceallraí, feidhmíocht aipe agus <xliff:g id="name" example="LineageOS">%3$s</xliff:g> gnéithe.</string>
+     <string name="services_os_nav_keys_label"><b>Úsáid eochracha nascleanúna scáileáin</b> in ionad eochracha crua-earraí.</string>
+diff --git a/app/src/main/res/values-gd/strings.xml b/app/src/main/res/values-gd/strings.xml
+index 9556cd0..2ad7458 100644
+--- a/app/src/main/res/values-gd/strings.xml
++++ b/app/src/main/res/values-gd/strings.xml
+@@ -33,7 +33,6 @@
+     <string name="update_recovery_setting">Ùraich aiseag Lineage leis an t-siostam obrachaidh</string>
+     <string name="setup_services">Gleusan LineageOS</string>
+     <string name="services_pp_explanation">Leudaichidh na seirbheisean seo comasan an uidheim agad. Thèid an dàta a chleachdadh a-rèir poileasaidh prìobhaideachd <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">’S urrainn dhut am poileasaidh a leughadh air uidheam eile is tu a’ tadhal air <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Cuidich gus piseach a thoirt air <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> is tu a’ cur dàta na diagnosachd ’s a’ chleachdaidh gu <xliff:g id="name" example="LineageOS">%2$s</xliff:g> gu fèin-obrachail. Cha ghabh an dàta sin a chleachdadh airson d’ aithneachadh agus bheir e cuideachadh dha na sgiobaidhean a bhios ag obair air rudan mar beatha a’ bhataraidh, dèanadas nan aplacaidean agus gleusan <xliff:g id="name" example="LineageOS">%3$s</xliff:g> ùra.</string>
+     <string name="services_os_nav_keys_label"><b>Cleachd iuchraichean seòladaireachd air an sgrìn</b> seach iuchraichean bathair-chruaidh.</string>
+diff --git a/app/src/main/res/values-gl/strings.xml b/app/src/main/res/values-gl/strings.xml
+index eae0229..5f6805f 100644
+--- a/app/src/main/res/values-gl/strings.xml
++++ b/app/src/main/res/values-gl/strings.xml
+@@ -33,7 +33,6 @@
+     <string name="update_recovery_setting">Actualizar o Recuperador de Lineage xunto co sistema operativo</string>
+     <string name="setup_services">Actualizacións de LineageOS</string>
+     <string name="services_pp_explanation">Estes servizos serven para mellorar as capacidades do seu dispositivo. Os datos utilizaranse de acordo coa <xliff:g id="name" example="Politica de privacidade">%1$s</xliff:g> de LineageOS</string>
+-    <string name="services_find_privacy_policy">Podes ler a política de privacidade noutro dispositivo visitando <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Axuda a mellorar <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Axuda a mellorar LineageOS">%1$s</xliff:g> enviando automaticamente diagnóstico e uso de datos a <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Esta información non se pode utilizar para identificalo a vostede e acaba nas mans dos equipos que traballan en cousas como a duración da batería, rendemento das aplicacións e novas características de <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Usar as teclas de navegación</b> en vez das do hardware.</string>
+diff --git a/app/src/main/res/values-hu/strings.xml b/app/src/main/res/values-hu/strings.xml
+index 5f33fe1..e60e4d5 100644
+--- a/app/src/main/res/values-hu/strings.xml
++++ b/app/src/main/res/values-hu/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS újítások</string>
+     <string name="services_pp_explanation">Ezek a szolgáltatások Önért dolgoznak, hogy kibővítsék telefonja képességeit. Az adatok felhasználása a <xliff:g id="name" example="LineageOS">%1$s</xliff:g> adatvédelmi szabályzata alapján történik.</string>
+-    <string name="services_find_privacy_policy">Elolvashatja az adatvédelmi szabályokat, ha megnyitja a következő weboldalt <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g>, segítsen a fejlesztésében</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> automatikus diagnosztikai és használati adatok küldésével segíthet a <xliff:g id="name" example="LineageOS">%2$s</xliff:g> fejlesztőinek. Ez az információ nem használható az Ön beazonosítására, csupán segítséget nyújt a csapat számára például az akkumulátor használat, alkalmazás teljesítmény, és más új <xliff:g id="name" example="LineageOS">%3$s</xliff:g> funkciók fejlesztésében.</string>
+     <string name="services_os_nav_keys_label"><b>A képernyő navigációs gombjainak használata</b> a hardveres gombok helyett.</string>
+diff --git a/app/src/main/res/values-in/strings.xml b/app/src/main/res/values-in/strings.xml
+index 38401a5..5b24cd9 100644
+--- a/app/src/main/res/values-in/strings.xml
++++ b/app/src/main/res/values-in/strings.xml
+@@ -36,7 +36,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Fitur LineageOS</string>
+     <string name="services_pp_explanation">Layanan ini digunakan untuk meningkatkan kemampuan perangkat Anda. Data akan digunakan sesuai dengan kebijakan privasi <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Anda dapat membaca kebijakan privasi di perangkat lainnya dengan mengunjungi <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Membantu meningkatkan <xliff:g id="name" example="LineageOS">%s </xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> dengan mengirim  data diagnosa dan penggunaan ke <xliff:g id="name" example="LineageOS">%2$s</xliff:g> secara otomatis. Informasi tersebut tidak untuk mengidentifikasi Anda, dan hanya berfungsi untuk membantu tim bekerja pada hal-hal seperti masa pakai baterai, performa aplikasi dan fitur-fitur <xliff:g id="name" example="LineageOS">%3$s</xliff:g> yang baru.</string>
+     <string name="services_os_nav_keys_label"><b>Gunakan tombol navigasi pada layar</b> bukan tombol perangkat keras.</string>
+diff --git a/app/src/main/res/values-is/strings.xml b/app/src/main/res/values-is/strings.xml
+index 4b01f89..75eb0a4 100644
+--- a/app/src/main/res/values-is/strings.xml
++++ b/app/src/main/res/values-is/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Eiginleikar LineageOS</string>
+     <string name="services_pp_explanation">Þessar þjónustur gera þér kleift að útvíkka eiginleika tækisins þíns. Gögn verða notuð í samræmi við persónuverndarstefnu <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Lestu stefnu varðandi meðferð persónulegra gagna með því að fara á <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Hjálpaðu okkur að bæta <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> með því að senda sjálfvirkt greiningargögn og upplýsingar um notkun til <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Þessar upplýsingar er ekki hægt að nota til að auðkenna þig og hjálpa þróunarteymum við vinnu varðandi ýmis atriði, eins og líftíma rafhlöðu, afköst forrita og nýja eiginleika í <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Nota leiðsagnarlykla á skjánum</b> í stað vélbúnaðarhnappa.</string>
+diff --git a/app/src/main/res/values-it/strings.xml b/app/src/main/res/values-it/strings.xml
+index b71c8ba..d516af6 100644
+--- a/app/src/main/res/values-it/strings.xml
++++ b/app/src/main/res/values-it/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funzioni LineageOS</string>
+     <string name="services_pp_explanation">Questi servizi funzionano per estendere le funzionalità del tuo dispositivo. I dati saranno utilizzati in conformità con l\'informativa sulla privacy di <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Puoi leggere l\'informativa sulla privacy su un altro dispositivo visitando <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Contribuisci a migliorare <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> inviando automaticamente dati diagnostici e di consumo agli svilupatori di <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Queste informazioni non possono essere utilizzate per identificare te ma danno una mano ai team che lavorano su cose come la durata della batteria, performance delle app e nuove funzioni di <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Usa i pulsanti virtuali a schermo</b> invece di quelli fisici.</string>
+diff --git a/app/src/main/res/values-iw/strings.xml b/app/src/main/res/values-iw/strings.xml
+index 13ad51e..f334bb8 100644
+--- a/app/src/main/res/values-iw/strings.xml
++++ b/app/src/main/res/values-iw/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">תכונות LineageOS</string>
+     <string name="services_pp_explanation">שירותים אלו פועלים עבורך כדי להרחיב את יכולות ההתקן שלך.  הנתונים ישמשו בכפוף לתנאי הפרטיות המופיעים במדיניות הפרטיות של <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">ניתן לעיין במדיניות הפרטיות בהתקן אחר באמצעות ביקור בכתובת  <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">עזרה בשיפור <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> על ידי שליחת נתוני אבחון ושימוש אוטומטית אל <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. לא ניתן להשתמש במידע זה כדי לזהות אותך, המידע יעניק סיוע לצוותים העובדים על דברים כמו חיי סוללה, ביצועי יישומים ותכונות חדשות של <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>השתמש במקשי הניווט במסך</b> במקום במקשים הפיזיים.</string>
+diff --git a/app/src/main/res/values-ja/strings.xml b/app/src/main/res/values-ja/strings.xml
+index 1bdd842..45620f2 100644
+--- a/app/src/main/res/values-ja/strings.xml
++++ b/app/src/main/res/values-ja/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS の機能</string>
+     <string name="services_pp_explanation">これらのサービスはデバイスの機能を拡張するために動作します。データは <xliff:g id="name" example="LineageOS">%1$s</xliff:g> のプライバシーポリシーに従って使用されます。</string>
+-    <string name="services_find_privacy_policy">別のデバイスで<xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g>にアクセスしてプライバシーポリシーを読むことができます。</string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g>の改善に協力します</string>
+     <string name="services_metrics_label">診断と使用状況データを自動的に <xliff:g id="name" example="LineageOS">%2$s</xliff:g>に送信して、<xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g>。この情報は個人を特定するために使用されることはなく、電池持ち、アプリのパフォーマンス、<xliff:g id="name" example="LineageOS">%3$s</xliff:g> の新機能などへの取り組みに活用されます。</string>
+     <string name="services_os_nav_keys_label">ハードウェアキーのかわりに<b>スクリーンナビゲーションキーを使用します</b>。</string>
+diff --git a/app/src/main/res/values-ka/strings.xml b/app/src/main/res/values-ka/strings.xml
+index df0aa83..cf49886 100644
+--- a/app/src/main/res/values-ka/strings.xml
++++ b/app/src/main/res/values-ka/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS-ს შესაძლებლობები</string>
+     <string name="services_pp_explanation">ამ მომსახურებების მუშაობა აფართოებს თქვენი მოწყობილობების შესაძლებლობებს. მონაცემებით სარგებლობის პირობებს განსაზღვრავს <xliff:g id="name" example="LineageOS">%1$s</xliff:g> მისი პირადულობის დებულებით.</string>
+-    <string name="services_find_privacy_policy">შეგიძლიათ გაეცნოთ პირადულობის დაცვის დებულებას სხვა მოწყობილობიდან მისამართზე <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">დაგვეხმარეთ, გავაუმჯობესოთ <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> იმ საკვლევი და გამოყენების მონაცემთა ავტომატური გაგზავნით, რომელთაც გაეცნობა <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. ეს მონაცემები არ გამოდგება თქვენი ვინაობის დასადგენად, სამაგიეროდ ხელს გაუმართავს შემმუშავებლებს, რომ დახვეწონ ბატარეის მოხმარება, გაზარდონ აპების წარმადობა და გააუმჯობესონ <xliff:g id="name" example="LineageOS">%3$s</xliff:g> ახალი შესაძლებლობებით.</string>
+     <string name="services_os_nav_keys_label"><b>ეკრანული ღილაკების გამოყენება სამოძრაოდ</b> ფიზიკურის ნაცვლად.</string>
+diff --git a/app/src/main/res/values-ko/strings.xml b/app/src/main/res/values-ko/strings.xml
+index e8045dd..7b3bf71 100644
+--- a/app/src/main/res/values-ko/strings.xml
++++ b/app/src/main/res/values-ko/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS 기능</string>
+     <string name="services_pp_explanation">이 서비스는 기기의 성능 향상을 위해 작동합니다. 수집한 데이터는 <xliff:g id="name" example="LineageOS">%1$s</xliff:g>의 개인 정보 보호 정책에 따라 사용됩니다.</string>
+-    <string name="services_find_privacy_policy">다른 기기에서 <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> 페이지를 방문하여 개인 정보 보호 정책을 확인할 수 있습니다.</string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g> 의 개선을 돕기 위해</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="LineageOS의 개선을 돕기 위해">%1$s</xliff:g> 진단 및 사용 정보를 <xliff:g id="name" example="LineageOS">%2$s</xliff:g>에 보냅니다. 이 정보로는 사용자를 식별할 수 없으며 <xliff:g id="name" example="LineageOS">%3$s</xliff:g>에 새로운 기능을 추가하거나 배터리 수명, 앱 성능을 개선하는 데 도움이 됩니다.</string>
+     <string name="services_os_nav_keys_label">하드웨어 키 대신 <b>화면 상의 내비게이션 키</b>를 사용합니다.</string>
+diff --git a/app/src/main/res/values-nl/strings.xml b/app/src/main/res/values-nl/strings.xml
+index b22c697..4747705 100644
+--- a/app/src/main/res/values-nl/strings.xml
++++ b/app/src/main/res/values-nl/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Functies van LineageOS</string>
+     <string name="services_pp_explanation">Deze diensten worden gebruikt om de mogelijkheden van uw apparaat uit te breiden. Gegevens zullen worden gebruikt conform het privacybeleid van <xliff:g id="name" example="LineageOS">%1$s</xliff:g></string>
+-    <string name="services_find_privacy_policy">U kunt het privacybeleid op een ander apparaat lezen door <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> te bezoeken</string>
+     <string name="services_help_improve_cm">Help mee met het verbeteren van <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> door automatisch diagnose- en verbruiksgegevens te verzenden naar  <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Deze informatie kan niet gebruikt worden om u te identificeren en helpt de teams om te werken aan zaken zoals levensduur van de accu, app-prestaties en nieuwe <xliff:g id="name" example="LineageOS">%3$s</xliff:g> features.</string>
+     <string name="services_os_nav_keys_label"><b>On-screen navigatieknoppen</b> gebruiken in plaats van de hardwareknoppen.</string>
+diff --git a/app/src/main/res/values-nn-rNO/strings.xml b/app/src/main/res/values-nn-rNO/strings.xml
+index 30d2541..fd30e3f 100644
+--- a/app/src/main/res/values-nn-rNO/strings.xml
++++ b/app/src/main/res/values-nn-rNO/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS-funksjonar</string>
+     <string name="services_pp_explanation">Desse tenestene utvidar kva eininga di kan gjera. Data vert brukt i samsvar med personvernreglane til <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Du kan lesa personvernreglane på ei anna eining ved å gå til <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Hjelp til med å gjera <xliff:g id="name" example="LineageOS">%s</xliff:g> betre</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> ved å senda diagnose- og brukdata til <xliff:g id="name" example="LineageOS">%2$s</xliff:g> automatisk. Informasjonen kan ikkje brukast til å identifisera deg, men hjelper utviklarane med ting som batteritid, app-yting og nye <xliff:g id="name" example="LineageOS">%3$s</xliff:g>-funksjonar.</string>
+     <string name="services_os_nav_keys_label"><b>Bruk navigasjonsknappar på skjermen</b> i staden for fysiske knappar.</string>
+diff --git a/app/src/main/res/values-pl/strings.xml b/app/src/main/res/values-pl/strings.xml
+index c2e076d..8222c21 100644
+--- a/app/src/main/res/values-pl/strings.xml
++++ b/app/src/main/res/values-pl/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funkcje LineageOS</string>
+     <string name="services_pp_explanation">Te usługi są uruchomione w celu rozszerzenia możliwości twojego urządzenia. Dane będą używane zgodnie z polityką prywatności <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Możesz przeczytać politykę prywatności na innym urządzeniu, odwiedzając <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Pomóż ulepszyć <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Pomóż ulepszyć LineageOS">%1$s</xliff:g>, automatycznie wysyłając dane diagnostyczne oraz dotyczące użytkowania do <xliff:g id="name" example="LineageOS"> %2$s</xliff:g>. Informacje te nie mogą być wykorzystane do identyfikacji użytkownika i pomagają zespołom pracującym nad takimi kwestiami, jak żywotność baterii, wydajność aplikacji i nowe funkcje <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Użyj ekranowych przycisków nawigacyjnych</b> zamiast klawiszy sprzętowych.</string>
+diff --git a/app/src/main/res/values-pt-rBR/strings.xml b/app/src/main/res/values-pt-rBR/strings.xml
+index 4a48337..bb49812 100644
+--- a/app/src/main/res/values-pt-rBR/strings.xml
++++ b/app/src/main/res/values-pt-rBR/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Recursos do LineageOS</string>
+     <string name="services_pp_explanation">Estes serviços trabalham para você, estendendo os recursos do seu dispositivo. Os dados serão usados de acordo com a política de privacidade do <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Você pode ler a política de privacidade em outro dispositivo visitando <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ajude a melhorar o <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> enviando automaticamente dados de diagnóstico e utilização ao  <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Esta informação não pode ser usada para identificá-lo e ajuda os desenvolvedores a melhorarem coisas como, a duração da bateria, desempenho de apps e o desenvolvimento de novos recursos para o <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Use as teclas de navegação na tela</b> em vez de botões físicos.</string>
+diff --git a/app/src/main/res/values-pt-rPT/strings.xml b/app/src/main/res/values-pt-rPT/strings.xml
+index 803ede7..29b18a5 100644
+--- a/app/src/main/res/values-pt-rPT/strings.xml
++++ b/app/src/main/res/values-pt-rPT/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funcionalidades LineageOS</string>
+     <string name="services_pp_explanation">Estes serviços servem para ampliar os recursos do seu telefone. Os dados serão utilizados em conformidade com a politica de privacidade de <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Pode ler a política de privacidade noutro dispositivo visitando <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ajude a melhorar a <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Ajude a melhorar a LineageOS">%1$s</xliff:g> enviando automaticamente dados de diagnóstico e utilização para <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Esta informação não pode ser usada para identificá-lo e ajuda as equipas de desenvolvimento a melhorarem coisas como a duração da bateria, o desempenho das aplicações e o desenvolvimento de novas funcionalidades para <xliff:g id="name" example="LineageOS">%2$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Usar os botões de navegação no ecrã</b> em vez dos botões do dispositivo.</string>
+diff --git a/app/src/main/res/values-ro/strings.xml b/app/src/main/res/values-ro/strings.xml
+index 64d5d73..2331d39 100644
+--- a/app/src/main/res/values-ro/strings.xml
++++ b/app/src/main/res/values-ro/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Caracteristici LineageOS</string>
+     <string name="services_pp_explanation">Aceste servicii lucrează pentru dvs. pentru a extinde capabilitățile dispozitivului. Datele vor fi utilizate în concordanță cu politica de confidențialitate a <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Puteți citi politica de confidențialitate pe un alt dispozitiv accesând <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ajutați la îmbunătățirea <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> prin trimiterea automată a datelor de diagnosticare și utilizare la <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Aceste informații nu pot fi folosite pentru a te identifica și oferă o mână de ajutor echipelor care lucrează la lucruri precum durata bateriei, performanța aplicațiilor și noile caracteristici <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Utilizează tastele de navigare de pe ecran</b> în locul tastelor fizice.</string>
+diff --git a/app/src/main/res/values-ru/strings.xml b/app/src/main/res/values-ru/strings.xml
+index 2933c52..3ba671b 100644
+--- a/app/src/main/res/values-ru/strings.xml
++++ b/app/src/main/res/values-ru/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Возможности LineageOS</string>
+     <string name="services_pp_explanation">Эти службы работают, чтобы расширить возможности вашего устройства. Данные будут использоваться в соответствии с политикой конфиденциальности <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Вы можете ознакомиться с политикой конфиденциальности на другом устройстве, посетив <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Помочь улучшить <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g>, разрешив отправку данных диагностики и использования в <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Эта информация не может быть использована для идентификации вашей личности и поможет в работе над повышением автономности, производительности и новыми возможностями <xliff:g id="name" example="LineageOS">%3$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Использовать экранные навигационные кнопки</b> вместо аппаратных.</string>
+diff --git a/app/src/main/res/values-sc-rIT/strings.xml b/app/src/main/res/values-sc-rIT/strings.xml
+index ca885e1..0b0ac80 100644
+--- a/app/src/main/res/values-sc-rIT/strings.xml
++++ b/app/src/main/res/values-sc-rIT/strings.xml
+@@ -29,7 +29,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funtziones LineageOS</string>
+     <string name="services_pp_explanation">Custos servìtzios funtzionant pro chi potzas crèschere is funtziones de su telèfonu. Is datos s\'ant a impreare de acordu cun sa polìtica de riservadesa de <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Podes lèghere sa polìtica de riservadesa in un\'àteru dispositivu in <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Agiuda a megiorare <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve CyanogenMod">%1$s</xliff:g> imbiende in automàticu is datos diagnòsticos e de consumu a s\'iscuadra de isvilupu de LineageOS. Custas infomatziones non si podent impreare pro t\'identificare, ma donant una manu a is iscuadras chi traballant subra de cosas che a sa durada de sa bateria, su rendimentu de is aplicatziones e funtziones noas de <xliff:g id="name" example="CyanogenMod">%2$s</xliff:g>.</string>
+     <string name="services_os_nav_keys_label"><b>Imprea is teclas de navigatzione in ischermu</b> imbetzes de is teclas fìsicas.</string>
+diff --git a/app/src/main/res/values-sl/strings.xml b/app/src/main/res/values-sl/strings.xml
+index 5dabef2..df59e63 100644
+--- a/app/src/main/res/values-sl/strings.xml
++++ b/app/src/main/res/values-sl/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS funkcije</string>
+     <string name="services_pp_explanation">Te storitve služijo vam za razširitev zmogljivosti vaše naprave. Podatki bodo uporabljeni v skladu z <xliff:g id="name" example="LineageOS">%1$s</xliff:g>-ovo politiko zasebnosti.</string>
+-    <string name="services_find_privacy_policy">Politiko zasebnosti lahko preberete na drugi napravi z obiskom <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Pomagajte izboljšati <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> s samodejnim pošiljanjem diagnostičnih podatkov in podatkov uporabe <xliff:g id="name" example="LineageOS">%2$s</xliff:g>-u. Ti podatki se ne uporabljajo za vaše prepoznavanje in ekipi pomagajo pri izboljšanju npr. življenjske dobe baterije, zmogljivosti aplikacij in novih <xliff:g id="name" example="LineageOS">%3$s</xliff:g> funkcij.</string>
+     <string name="services_os_nav_keys_label"><b>Uporabite zaslonske tipke za krmarjenje</b> namesto fizičnih tipk.</string>
+diff --git a/app/src/main/res/values-sq/strings.xml b/app/src/main/res/values-sq/strings.xml
+index fc51db6..1a5697a 100644
+--- a/app/src/main/res/values-sq/strings.xml
++++ b/app/src/main/res/values-sq/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Funksionet e LineageOS</string>
+     <string name="services_pp_explanation">Këto shërbime punojnë për ju për të zgjeruar aftësitë e pajisjes tuaj. Të dhënat do të përdoren në përputhje me <xliff:g id="name" example="LineageOS">%1$s</xliff:g> politikës së privatësisë</string>
+-    <string name="services_find_privacy_policy">Ju mund të lexoni politikën e privatësisë në një pajisje tjetër duke vizituar  <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Ndihmo në përmirësimin e <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label">&lt;xliff:g id="name" example="Ndihmoni në përmirësimin e LineageOS&gt;%1$s&lt;/xliff:g&gt; duke dërguar automatikisht të dhënat diagnostikuese dhe të përdorimit te &lt;xliff:g id="name" example="LineageOS"&gt;%2$s&lt;/xliff:g&gt;. Ky informacion nuk mund të përdoret për të të identifikuar ty dhe u jep ndihmë ekipeve që punojnë për gjëra të tilla si jetëgjatësia e baterisë, performanca e aplikacionit dhe të reja &lt;xliff:g id="name" example="LineageOS"&gt;%3$s&lt;/xliff:g&gt; veçoritë.</string>
+     <string name="services_os_nav_keys_label"><b>Përdor butonat virtualë të lundrimit</b> në vend të butonave fizikë.</string>
+diff --git a/app/src/main/res/values-ta/strings.xml b/app/src/main/res/values-ta/strings.xml
+index 790698d..a8333da 100644
+--- a/app/src/main/res/values-ta/strings.xml
++++ b/app/src/main/res/values-ta/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS சிறப்பியல்புகள்</string>
+     <string name="services_pp_explanation">உமது கருவியின் திறன்களை விரிவாக்க இப்பணிவிடைகள் உமக்காக வேலை செய்கின்றன. <xliff:g id="name" example="LineageOS">%1$s</xliff:g> இன் தனியுரிமைக் கொள்கையின்படி தரவு பயன்படுத்தப்படும்.</string>
+-    <string name="services_find_privacy_policy"><xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> இதைப் பார்வையிடுவதன் மூலம் மற்றொரு கருவியில் தனியுரிமைக் கொள்கையைப் படிக்கலாம்</string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g> ஐ மேம்படுத்த உதவுக</string>
+     <string name="services_metrics_label">தன்னியக்கமாகப் பகுப்பாய்வும், பயன்பாட்டுத் தரவையும்  <xliff:g id="name" example="LineageOS">%2$s</xliff:g> இற்கு அனுப்புவதன் மூலம் <xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g>. இத்தகவலால் உம்மை அடையாளங் காணப்பயன்படுத்த முடியாது. மேலும், மின்கல வாழ்நாள், செயலிச் செயற்திறன், புதிய <xliff:g id="name" example="LineageOS">%3$s</xliff:g> சிறப்பியல்புகள் போன்றவற்றில் பணிபுரியும் குழுக்களுக்கு இஃது உதவும்.</string>
+     <string name="services_os_nav_keys_label">வன்பொருள் விசைகளுக்குப் பதிலாகத் <b>திரையில் வழிசெலுத்தல் விசைகளைப் பயன்படுத்துக</b>.</string>
+diff --git a/app/src/main/res/values-tr/strings.xml b/app/src/main/res/values-tr/strings.xml
+index c253dc7..05ec5ec 100644
+--- a/app/src/main/res/values-tr/strings.xml
++++ b/app/src/main/res/values-tr/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS özellikleri</string>
+     <string name="services_pp_explanation">Bu hizmetler, cihazınızın özelliklerini genişletmeniz için çalışır. Veri <xliff:g id="name" example="LineageOS">%1$s</xliff:g>\'un gizlilik politikası ile kullanılacaktır.</string>
+-    <string name="services_find_privacy_policy">Gizlilik politikasını farklı cihazla <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> adresini ziyaret ederek okuyabilirsiniz</string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g>\'u geliştirmeye yardımcı olun</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> teşhis ve kullanım verilerini otomatik olarak <xliff:g id="name" example="LineageOS">%2$s</xliff:g>\'a gönderir. Bu bilgiler kimliğinizi belirlemek için kullanılamaz ve pil ömrü, uygulama performansı ve yeni <xliff:g id="name" example="LineageOS">%3$s</xliff:g> özellikler gibi konularda çalışan ekiplere yardımcı olur.</string>
+     <string name="services_os_nav_keys_label">Donanımsal tuşlar yerine <b>yazılımsal gezinme tuşlarını kullanın</b>.</string>
+diff --git a/app/src/main/res/values-ug/strings.xml b/app/src/main/res/values-ug/strings.xml
+index 23440bb..54fe786 100644
+--- a/app/src/main/res/values-ug/strings.xml
++++ b/app/src/main/res/values-ug/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS ئىقتىدارلىرى</string>
+     <string name="services_pp_explanation">بۇ مۇلازىمەتلەر ئۈسكۈنىڭىزنىڭ ئىقتىدارىنى كېڭەيتىش ئۈچۈن خىزمەت قىلىدۇ. سانلىق مەلۇمات <xliff:g id="name" example="LineageOS">%1$s</xliff:g> نىڭ شەخسىيەت تۈزۈمىگە ئاساسەن ئىشلىتىلىدۇ.</string>
+-    <string name="services_find_privacy_policy">باشقا ئۈسكۈنىدە <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> نى زىيارەت قىلىپ شەخسىيەت تۈزۈمىنى ئوقۇيالايسىز</string>
+     <string name="services_help_improve_cm"><xliff:g id="name" example="LineageOS">%s</xliff:g> نى ياخشىلاشقا ياردەملىشىڭ</string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> ئۆزلۈكىدىن دىياگنوز ۋە ئىشلىتىش سانلىق مەلۇماتىنى <xliff:g id="name" example="LineageOS">%2$s</xliff:g> غا يوللايدۇ. بۇ ئۇچۇرلارنى سىزنى پەرقلەندۈرۈشكە ئىشلىتىشكە بولمايدۇ، ئىجادكارلار قوشۇنىنىڭ توكدان ئۆمرى، ئەپ ياخشىلاش ۋە  يېڭى <xliff:g id="name" example="LineageOS">%3$s</xliff:g> ئىقتىدارنى قوشۇش ئوخشاش ئىشلارغا ياردىمى بولىدۇ.</string>
+     <string name="services_os_nav_keys_label"><b>مەۋھۇم كونۇپكىنى</b> ھەقىقىي كونۇپكىنىڭ ئورنىغا ئالماشتۇرۇش.</string>
+diff --git a/app/src/main/res/values-vi/strings.xml b/app/src/main/res/values-vi/strings.xml
+index 67a05ad..8bf64f5 100644
+--- a/app/src/main/res/values-vi/strings.xml
++++ b/app/src/main/res/values-vi/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">Các tính năng LineageOS</string>
+     <string name="services_pp_explanation">Các dịch vụ này giúp bạn mở rộng khả năng của thiết bị. Dữ liệu sẽ được sử dụng theo chính sách bảo mật của <xliff:g id="name" example="LineageOS">%1$s</xliff:g>.</string>
+-    <string name="services_find_privacy_policy">Bạn có thể đọc chính sách bảo mật trên một thiết bị khác bằng cách truy cập <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g></string>
+     <string name="services_help_improve_cm">Giúp cải thiện <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> bằng cách tự động gửi dữ liệu sử dụng và chẩn đoán đến <xliff:g id="name" example="LineageOS">%2$s</xliff:g>. Thông tin này không thể được sử dụng để nhận dạng bạn và hỗ trợ các nhóm làm việc về những yếu tố như thời lượng pin, hiệu suất ứng dụng và <xliff:g id="name" example="LineageOS">%3$s</xliff:g> tính năng mới.</string>
+     <string name="services_os_nav_keys_label"><b>Sử dụng các phím điều hướng trên màn hình</b> thay cho các phím cứng.</string>
+diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
+index 9dda4e8..f589cc4 100644
+--- a/app/src/main/res/values-zh-rCN/strings.xml
++++ b/app/src/main/res/values-zh-rCN/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS 功能</string>
+     <string name="services_pp_explanation">这些服务可帮助您扩展设备的功能。 数据将按照 <xliff:g id="name" example="LineageOS">%1$s</xliff:g>的隐私政策进行使用。</string>
+-    <string name="services_find_privacy_policy">您可以使用其他设备访问 <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> 来了解隐私政策</string>
+     <string name="services_help_improve_cm">帮助改进 <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> 通过自动发送诊断和使用数据给 <xliff:g id="name" example="LineageOS">%2$s</xliff:g>。这些信息不会被用于识别您的身份，而是用于帮助团队致力于诸如电池寿命、应用性能和新 <xliff:g id="name" example="LineageOS">%3$s</xliff:g> 功能。</string>
+     <string name="services_os_nav_keys_label"><b>使用虚拟导航键</b>替代实体按键。</string>
+diff --git a/app/src/main/res/values-zh-rTW/strings.xml b/app/src/main/res/values-zh-rTW/strings.xml
+index 74bb992..24463cd 100644
+--- a/app/src/main/res/values-zh-rTW/strings.xml
++++ b/app/src/main/res/values-zh-rTW/strings.xml
+@@ -38,7 +38,6 @@
+     <string name="update_recovery_full_description"><xliff:g id="recovery_update_description">%1$s</xliff:g>\n<xliff:g id="recovery_update_warning">%2$s</xliff:g></string>
+     <string name="setup_services">LineageOS 功能</string>
+     <string name="services_pp_explanation">這些服務可協助您強化裝置的功能。資料將會根據 <xliff:g id="name" example="LineageOS">%1$s</xliff:g> 的隱私權政策使用。</string>
+-    <string name="services_find_privacy_policy">您可以透過在其他裝置上造訪 <xliff:g id="uri" example="https://lineageos.org/legal">%1$s</xliff:g> 來閱讀隱私權政策</string>
+     <string name="services_help_improve_cm">協助改善 <xliff:g id="name" example="LineageOS">%s</xliff:g></string>
+     <string name="services_metrics_label"><xliff:g id="name" example="Help improve LineageOS">%1$s</xliff:g> 經由傳送錯誤報告及使用資料給 <xliff:g id="name" example="LineageOS">%2$s</xliff:g>，這些資料不會用於識別您的身分，而是用於幫助團隊改善電池壽命、應用程式效能與新的 <xliff:g id="name" example="LineageOS">%3$s</xliff:g> 功能。</string>
+     <string name="services_os_nav_keys_label"><b>使用虛擬按鍵</b>替代實體按鍵。</string>

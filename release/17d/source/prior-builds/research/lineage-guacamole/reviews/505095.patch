@@ -1,0 +1,43 @@
+From ddb43619de0aee37b95f2e1720cc9f186355ad1e Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:42:47 +0300
+Subject: [PATCH] Merge tag 'AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0' into staging/lineage-24.0_merge-AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0
+
+AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0
+
+* tag 'AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0':
+  agm: avoid spr_session_time_reset_info config
+
+Change-Id: I7e52658ba55df64f629da4a03c5ac2b6aa2eec9a
+---
+
+diff --git a/service/src/graph_module.c b/service/src/graph_module.c
+index 0426cbb..eca9ca4 100644
+--- a/service/src/graph_module.c
++++ b/service/src/graph_module.c
+@@ -47,6 +47,7 @@
+ #define LOG_MASK AGM_MOD_FILE_GRAPH_MODULE
+ #include <log_utils.h>
+ #endif
++#include <cutils/properties.h>
+ 
+ #define MONO 1
+ #define GET_BITS_PER_SAMPLE(format, bit_width) \
+@@ -2034,7 +2035,16 @@
+         free(payload);
+ 
+     if (ret == 0 && graph_obj->state != STARTED) {
+-        ret = configure_spr_session_time_reset_info(spr_mod, graph_obj);
++        char vendor_sku[PROPERTY_VALUE_MAX] = {'\0'};
++        if (property_get("ro.boot.product.vendor.sku", vendor_sku, "") <= 0) {
++            AGM_LOGE("Failed to get vendor.sku prop");
++        } else {
++            /* PARAM_ID_SPR_SESSION_TIME_RESET_INFO is not supported by ravelin/bourtzi
++               variants so avoid calling configure_spr_session_time_reset_info() */
++            if (strcmp(vendor_sku, "ravelin") && strcmp(vendor_sku, "bourtzi")) {
++                ret = configure_spr_session_time_reset_info(spr_mod, graph_obj);
++            }
++        }
+     }
+ 
+     return ret;

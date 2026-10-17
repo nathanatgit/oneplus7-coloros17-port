@@ -1,0 +1,132 @@
+From 9065b8997de40616d582f60b1f3f9aa05493c7d8 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 17 Sep 2026 00:01:03 +0530
+Subject: [PATCH] SUW: Add pure-black theme switch to ThemeSettings
+
+Change-Id: I7d831895fdcd08aa099a4398e8b1f3adf000194a
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
+index fc007e2..399002c 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
+@@ -8,7 +8,10 @@
+ import android.app.UiModeManager
+ import android.content.res.Configuration
+ import android.os.Bundle
++import android.view.View
+ import com.google.android.material.button.MaterialButtonToggleGroup
++import com.google.android.material.materialswitch.MaterialSwitch
++import lineageos.providers.LineageSettings
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.base.BaseSetupWizardActivity
+ import org.lineageos.setupwizard.util.updateCheckedIcons
+@@ -16,6 +19,7 @@
+ class ThemeSettingsActivity : BaseSetupWizardActivity() {
+ 
+     private val uiModeManager by lazy { getSystemService(UiModeManager::class.java) }
++    private lateinit var blackThemeCard: View
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+@@ -23,10 +27,26 @@
+         glifLayout.setDescriptionText(getString(R.string.theme_summary))
+ 
+         val modeGroup = findViewById<MaterialButtonToggleGroup>(R.id.theme_mode_group)
++        val blackTheme = findViewById<MaterialSwitch>(R.id.black_theme)
++        blackThemeCard = findViewById(R.id.black_theme_card)
+         val isNight =
+             (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                 Configuration.UI_MODE_NIGHT_YES
+ 
++        blackTheme.isChecked =
++            LineageSettings.Secure.getInt(
++                contentResolver,
++                LineageSettings.Secure.BERRY_BLACK_THEME,
++                0,
++            ) != 0
++        blackTheme.setOnCheckedChangeListener { _, checked ->
++            LineageSettings.Secure.putInt(
++                contentResolver,
++                LineageSettings.Secure.BERRY_BLACK_THEME,
++                if (checked) 1 else 0,
++            )
++        }
++
+         modeGroup.check(if (isNight) R.id.mode_dark else R.id.mode_light)
+         modeGroup.updateCheckedIcons(R.drawable.ic_check)
+ 
+@@ -34,9 +54,17 @@
+             if (!checked) {
+                 return@addOnButtonCheckedListener
+             }
++            val night = checkedId == R.id.mode_dark
+             modeGroup.updateCheckedIcons(R.drawable.ic_check)
+-            uiModeManager.setNightModeActivated(checkedId == R.id.mode_dark)
++            setBlackThemeRevealed(night)
++            uiModeManager.setNightModeActivated(night)
+         }
++
++        setBlackThemeRevealed(isNight)
++    }
++
++    private fun setBlackThemeRevealed(revealed: Boolean) {
++        blackThemeCard.visibility = if (revealed) View.VISIBLE else View.GONE
+     }
+ 
+     override val layoutResId = R.layout.setup_theme
+diff --git a/app/src/main/res/layout/setup_theme.xml b/app/src/main/res/layout/setup_theme.xml
+index 3b61343..b846e3c 100644
+--- a/app/src/main/res/layout/setup_theme.xml
++++ b/app/src/main/res/layout/setup_theme.xml
+@@ -60,6 +60,37 @@
+                         android:text="@string/light" />
+ 
+                 </com.google.android.material.button.MaterialButtonToggleGroup>
++
++                <LinearLayout
++                    android:id="@+id/black_theme_card"
++                    android:layout_width="match_parent"
++                    android:layout_height="wrap_content"
++                    android:layout_marginTop="@dimen/control_card_margin_top"
++                    android:background="@drawable/setup_item_card_background"
++                    android:baselineAligned="false"
++                    android:gravity="center_vertical"
++                    android:orientation="horizontal"
++                    android:paddingStart="@dimen/control_card_padding_horizontal"
++                    android:paddingTop="@dimen/control_card_padding_vertical"
++                    android:paddingEnd="@dimen/control_card_padding_horizontal"
++                    android:paddingBottom="@dimen/control_card_padding_vertical">
++
++                    <com.google.android.setupdesign.view.RichTextView
++                    style="?attr/sudItemTitleStyle"
++                    android:layout_width="0dp"
++                    android:layout_height="wrap_content"
++                    android:layout_weight="1"
++                    android:labelFor="@+id/black_theme"
++                    android:text="@string/pure_black_theme" />
++
++                    <com.google.android.material.materialswitch.MaterialSwitch
++                    android:id="@+id/black_theme"
++                    style="@style/SudExpressiveSwitchBarStyle"
++                    android:layout_width="wrap_content"
++                    android:layout_height="wrap_content"
++                    android:layout_gravity="center_vertical" />
++
++                </LinearLayout>
+             </LinearLayout>
+         </ScrollView>
+     </LinearLayout>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index c3b8822..7d2883d 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -96,6 +96,7 @@
+     <string name="theme_summary">Dark theme uses a black background to help keep battery alive longer on some screens</string>
+     <string name="dark">Dark</string>
+     <string name="light">Light</string>
++    <string name="pure_black_theme">Use pure black background</string>
+ 
+     <!-- Finish Screen -->
+     <string name="swipe_up_to_go_home">Swipe up to go home</string>

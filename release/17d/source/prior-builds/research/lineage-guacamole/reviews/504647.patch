@@ -1,0 +1,158 @@
+From 888d557fe72776ee8d5bda0e14a64c537c7b3443 Mon Sep 17 00:00:00 2001
+From: dianlujitao <dianlujitao@lineageos.org>
+Date: Wed, 16 Sep 2026 21:26:19 +0100
+Subject: [PATCH] interfaces: Add vendor.oplus.hardware.oplusSensor V1
+
+Change-Id: Ib444cae73f946579d4e96fa8beebc20cc0bcaa2c
+---
+
+diff --git a/interfaces/Android.bp b/interfaces/Android.bp
+index 010dddc..1bea676 100644
+--- a/interfaces/Android.bp
++++ b/interfaces/Android.bp
+@@ -471,6 +471,31 @@
+ }
+ 
+ aidl_interface {
++    name: "vendor.oplus.hardware.oplusSensor",
++    system_ext_specific: true,
++    vendor_available: true,
++    local_include_dir: "aidl",
++    srcs: ["aidl/vendor/oplus/hardware/oplusSensor/*.aidl"],
++    stability: "vintf",
++    owner: "oplus",
++
++    backend: {
++        cpp: {
++            enabled: true,
++        },
++        java: {
++            sdk_version: "module_current",
++        },
++    },
++    versions_with_info: [
++        {
++            version: "1",
++            imports: [],
++        },
++    ],
++}
++
++aidl_interface {
+     name: "vendor.oplus.hardware.osense.client",
+     system_ext_specific: true,
+     vendor_available: true,
+diff --git a/interfaces/aidl/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl b/interfaces/aidl/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl
+new file mode 100644
+index 0000000..f91e36e
+--- /dev/null
++++ b/interfaces/aidl/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl
+@@ -0,0 +1,19 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package vendor.oplus.hardware.oplusSensor;
++
++@VintfStability
++interface ISensorFeature {
++    boolean calibrateSensor(int sensor_type, int para);
++    String getSensorCalibrationData(int sensor_type);
++    String getSensorConfig();
++    float getSensorRawData(int sensor_type);
++    int saveCalibrationData(int sensor_type, int type, in byte[] cali_data);
++    boolean sensorRawDataEnableDisable(int sensor_type, int para);
++    String sensorReadNodeFile(String node_name, int length);
++    int sensorWriteNodeFile(String node_name, String info);
++    int setPhoneMode(byte type, byte on);
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/1/.hash b/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/1/.hash
+new file mode 100644
+index 0000000..d663e7f
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/1/.hash
+@@ -0,0 +1 @@
++ef4de31ef39c29dd7a50bdfa7869f235428c5b71
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/1/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl b/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/1/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl
+new file mode 100644
+index 0000000..f7452e3
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/1/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl
+@@ -0,0 +1,35 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.oplusSensor;
++@VintfStability
++interface ISensorFeature {
++  boolean calibrateSensor(int sensor_type, int para);
++  String getSensorCalibrationData(int sensor_type);
++  String getSensorConfig();
++  float getSensorRawData(int sensor_type);
++  int saveCalibrationData(int sensor_type, int type, in byte[] cali_data);
++  boolean sensorRawDataEnableDisable(int sensor_type, int para);
++  String sensorReadNodeFile(String node_name, int length);
++  int sensorWriteNodeFile(String node_name, String info);
++  int setPhoneMode(byte type, byte on);
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/current/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl b/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/current/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl
+new file mode 100644
+index 0000000..f7452e3
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.oplusSensor/current/vendor/oplus/hardware/oplusSensor/ISensorFeature.aidl
+@@ -0,0 +1,35 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.oplusSensor;
++@VintfStability
++interface ISensorFeature {
++  boolean calibrateSensor(int sensor_type, int para);
++  String getSensorCalibrationData(int sensor_type);
++  String getSensorConfig();
++  float getSensorRawData(int sensor_type);
++  int saveCalibrationData(int sensor_type, int type, in byte[] cali_data);
++  boolean sensorRawDataEnableDisable(int sensor_type, int para);
++  String sensorReadNodeFile(String node_name, int length);
++  int sensorWriteNodeFile(String node_name, String info);
++  int setPhoneMode(byte type, byte on);
++}

@@ -1,0 +1,453 @@
+From bd21997589c726fabd7c0eb7b0b71c51a84a0c94 Mon Sep 17 00:00:00 2001
+From: Benjamin Wiegand <benjamin.lineageos@wiegand.pw>
+Date: Sun, 20 Sep 2026 20:24:12 -0700
+Subject: [PATCH] Launcher3: Support multiple display densities for default grid size
+
+invDistWeightedInterpolate() previously assumed all internal displays
+have the same density, which causes problems on foldables which require
+their displays to have different densities for usability.
+
+For example: on smith, the inner display density (360 dpi) would be
+paired with the outer display resolution (800x600) causing the grid to
+be 2x2.
+
+Change-Id: I97b61b7d7bf4fa01bfdb16134cba0d327779b826
+---
+
+diff --git a/quickstep/src/com/android/quickstep/OrientationTouchTransformer.java b/quickstep/src/com/android/quickstep/OrientationTouchTransformer.java
+index 21e2df3..74b61e5 100644
+--- a/quickstep/src/com/android/quickstep/OrientationTouchTransformer.java
++++ b/quickstep/src/com/android/quickstep/OrientationTouchTransformer.java
+@@ -160,7 +160,8 @@
+      * @see #enableMultipleRegions(boolean, LauncherDisplayInfo)
+      */
+     void createOrAddTouchRegion(LauncherDisplayInfo info, String reason) {
+-        mCachedDisplayInfo = new CachedDisplayInfo(info.currentSize, info.rotation);
++        mCachedDisplayInfo = new CachedDisplayInfo(info.currentSize, info.rotation,
++                info.getDensityDpi());
+ 
+         if (mQuickStepStartingRotation > QUICKSTEP_ROTATION_UNINITIALIZED
+                 && mCachedDisplayInfo.rotation == mQuickStepStartingRotation) {
+@@ -225,7 +226,8 @@
+                     + " reason=" + reason);
+         }
+ 
+-        mCachedDisplayInfo = new CachedDisplayInfo(region.currentSize, region.rotation);
++        mCachedDisplayInfo = new CachedDisplayInfo(region.currentSize, region.rotation,
++                region.getDensityDpi());
+         OrientationRectF regionToKeep = mSwipeTouchRegions.get(mCachedDisplayInfo);
+         if (regionToKeep == null) {
+             regionToKeep = createRegionForDisplay(region, reason);
+diff --git a/quickstep/tests/multivalentTests/src/com/android/quickstep/HotseatWidthCalculationTest.kt b/quickstep/tests/multivalentTests/src/com/android/quickstep/HotseatWidthCalculationTest.kt
+index 33e1663..ef8c0ed 100644
+--- a/quickstep/tests/multivalentTests/src/com/android/quickstep/HotseatWidthCalculationTest.kt
++++ b/quickstep/tests/multivalentTests/src/com/android/quickstep/HotseatWidthCalculationTest.kt
+@@ -16,6 +16,7 @@
+ package com.android.quickstep
+ 
+ import android.graphics.Rect
++import android.util.DisplayMetrics
+ import androidx.test.ext.junit.runners.AndroidJUnit4
+ import androidx.test.filters.SmallTest
+ import com.android.launcher3.FakeInvariantDeviceProfileTest
+@@ -35,7 +36,8 @@
+     @Test
+     fun distribute_border_space_when_space_is_enough_portrait() {
+         initializeVarsForTablet(isGestureMode = false)
+-        windowBounds = WindowBounds(Rect(0, 0, 1800, 2560), Rect(0, 104, 0, 0))
++        windowBounds = WindowBounds(Rect(0, 0, 1800, 2560), Rect(0, 104, 0, 0),
++            DisplayMetrics.DENSITY_DEFAULT)
+         val dp = newDP()
+         dp.updateIsTaskbarPresentInApps(true)
+ 
+@@ -59,7 +61,8 @@
+     @Test
+     fun decrease_num_of_icons_when_not_enough_space_portrait() {
+         initializeVarsForTablet(isGestureMode = false)
+-        windowBounds = WindowBounds(Rect(0, 0, 1300, 2560), Rect(0, 104, 0, 0))
++        windowBounds = WindowBounds(Rect(0, 0, 1300, 2560), Rect(0, 104, 0, 0),
++            DisplayMetrics.DENSITY_DEFAULT)
+         val dp = newDP()
+         dp.updateIsTaskbarPresentInApps(true)
+ 
+@@ -127,7 +130,8 @@
+     @Test
+     fun decrease_qsb_when_not_enough_space_landscape() {
+         initializeVarsForTablet(isGestureMode = false, isLandscape = true)
+-        windowBounds = WindowBounds(Rect(0, 0, 2460, 1600), Rect(0, 104, 0, 0))
++        windowBounds = WindowBounds(Rect(0, 0, 2460, 1600), Rect(0, 104, 0, 0),
++            DisplayMetrics.DENSITY_DEFAULT)
+         val dp = newDP()
+         dp.updateIsTaskbarPresentInApps(true)
+ 
+@@ -151,7 +155,8 @@
+     @Test
+     fun decrease_num_of_icons_when_not_enough_space_landscape() {
+         initializeVarsForTablet(isGestureMode = false, isLandscape = true)
+-        windowBounds = WindowBounds(Rect(0, 0, 2260, 1600), Rect(0, 104, 0, 0))
++        windowBounds = WindowBounds(Rect(0, 0, 2260, 1600), Rect(0, 104, 0, 0),
++            DisplayMetrics.DENSITY_DEFAULT)
+         val dp = newDP()
+         dp.updateIsTaskbarPresentInApps(true)
+ 
+diff --git a/quickstep/tests/multivalentTests/src/com/android/quickstep/util/TaskViewSimulatorTest.java b/quickstep/tests/multivalentTests/src/com/android/quickstep/util/TaskViewSimulatorTest.java
+index 1065bda..cfddf6c 100644
+--- a/quickstep/tests/multivalentTests/src/com/android/quickstep/util/TaskViewSimulatorTest.java
++++ b/quickstep/tests/multivalentTests/src/com/android/quickstep/util/TaskViewSimulatorTest.java
+@@ -176,10 +176,11 @@
+         void verifyNoTransforms() {
+             int rotation = mDisplaySize.x > mDisplaySize.y
+                     ? Surface.ROTATION_90 : Surface.ROTATION_0;
+-            CachedDisplayInfo cdi = new CachedDisplayInfo(mDisplaySize, rotation);
++            CachedDisplayInfo cdi = new CachedDisplayInfo(mDisplaySize, rotation, mDensityDpi);
+             WindowBounds wm = new WindowBounds(
+                     new Rect(0, 0, mDisplaySize.x, mDisplaySize.y),
+-                    mDisplayInsets);
++                    mDisplayInsets,
++                    mDensityDpi);
+             List<WindowBounds> allBounds = new ArrayList<>(4);
+             for (int i = 0; i < 4; i++) {
+                 Rect boundsR = new Rect(wm.bounds);
+@@ -188,7 +189,7 @@
+                 RotationUtils.rotateRect(insetsR, RotationUtils.deltaRotation(rotation, i));
+                 RotationUtils.rotateRect(boundsR, RotationUtils.deltaRotation(rotation, i));
+                 boundsR.set(0, 0, Math.abs(boundsR.width()), Math.abs(boundsR.height()));
+-                allBounds.add(new WindowBounds(boundsR, insetsR));
++                allBounds.add(new WindowBounds(boundsR, insetsR, mDensityDpi));
+             }
+ 
+             WindowManagerProxy wmProxy = mock(WindowManagerProxy.class);
+diff --git a/src/com/android/launcher3/DeviceProfile.java b/src/com/android/launcher3/DeviceProfile.java
+index 14392da..c4da9c4 100644
+--- a/src/com/android/launcher3/DeviceProfile.java
++++ b/src/com/android/launcher3/DeviceProfile.java
+@@ -163,7 +163,8 @@
+                         false,
+                         false
+                 ),
+-                new TaskbarConfiguration(false)
++                new TaskbarConfiguration(false),
++                0
+         );
+         mBottomSheetProfile = new BottomSheetProfile(0, 0, 0, 0f, 0f);
+         overviewProfile = new OverviewProfile(
+diff --git a/src/com/android/launcher3/InvariantDeviceProfile.java b/src/com/android/launcher3/InvariantDeviceProfile.java
+index c98fdac..575aed3 100644
+--- a/src/com/android/launcher3/InvariantDeviceProfile.java
++++ b/src/com/android/launcher3/InvariantDeviceProfile.java
+@@ -668,27 +668,33 @@
+     private static DisplayOption invDistWeightedInterpolate(
+             LauncherDisplayInfo displayInfo, List<DisplayOption> points,
+             @DeviceType int deviceType) {
+-        int minWidthPx = Integer.MAX_VALUE;
+-        int minHeightPx = Integer.MAX_VALUE;
++        float minWidth = Float.MAX_VALUE;
++        float minHeight = Float.MAX_VALUE;
+         for (WindowBounds bounds : displayInfo.supportedBounds) {
+             boolean isLargeScreen = displayInfo.isLargeScreen(bounds);
+             if (isLargeScreen && deviceType == TYPE_MULTI_DISPLAY) {
+                 // For split displays, take half width per page
+-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.x / 2);
+-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.y);
++                minWidth = Math.min(minWidth,
++                        dpiFromPx(bounds.availableSize.x / 2, bounds.densityDpi));
++                minHeight = Math.min(minHeight,
++                        dpiFromPx(bounds.availableSize.y, bounds.densityDpi));
+ 
+             } else if (!isLargeScreen && bounds.isLandscape()) {
+                 // We will use transposed layout in this case
+-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.y);
+-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.x);
++                minWidth = Math.min(minWidth,
++                        dpiFromPx(bounds.availableSize.y, bounds.densityDpi));
++                minHeight = Math.min(minHeight,
++                        dpiFromPx(bounds.availableSize.x, bounds.densityDpi));
+             } else {
+-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.x);
+-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.y);
++                minWidth = Math.min(minWidth,
++                        dpiFromPx(bounds.availableSize.x, bounds.densityDpi));
++                minHeight = Math.min(minHeight,
++                        dpiFromPx(bounds.availableSize.y, bounds.densityDpi));
+             }
+         }
+ 
+-        float width = dpiFromPx(minWidthPx, displayInfo.getDensityDpi());
+-        float height = dpiFromPx(minHeightPx, displayInfo.getDensityDpi());
++        float width = minWidth;
++        float height = minHeight;
+ 
+         // Sort the profiles based on the closeness to the device size
+         points.sort((a, b) ->
+diff --git a/src/com/android/launcher3/deviceprofile/DeviceProperties.kt b/src/com/android/launcher3/deviceprofile/DeviceProperties.kt
+index 1b365f7..9a1f444 100644
+--- a/src/com/android/launcher3/deviceprofile/DeviceProperties.kt
++++ b/src/com/android/launcher3/deviceprofile/DeviceProperties.kt
+@@ -49,6 +49,7 @@
+     val insets: Rect,
+     val deviceConfiguration: DeviceConfiguration,
+     val taskbarConfiguration: TaskbarConfiguration,
++    val densityDpi: Int
+ ) {
+ 
+     /**
+@@ -59,7 +60,7 @@
+         get() = isPhone
+ 
+     fun createWindowBounds() =
+-        WindowBounds(widthPx, heightPx, availableWidthPx, availableHeightPx, rotationHint)
++        WindowBounds(widthPx, heightPx, availableWidthPx, availableHeightPx, rotationHint, densityDpi)
+ 
+     companion object Factory {
+         // b/419264328 adding here all the improvements/cleanup for this class
+@@ -102,6 +103,7 @@
+                                 (taskbarOrBubbleBarOnPhones &&
+                                     deviceConfiguration.isGestureMode)) && isTaskbarDrawnInProcess
+                     ),
++                densityDpi = windowBounds.densityDpi,
+             )
+         }
+     }
+diff --git a/src/com/android/launcher3/util/WindowBounds.java b/src/com/android/launcher3/util/WindowBounds.java
+index 84a3e7a..21d3278 100644
+--- a/src/com/android/launcher3/util/WindowBounds.java
++++ b/src/com/android/launcher3/util/WindowBounds.java
+@@ -34,31 +34,34 @@
+     public final Rect insets;
+     public final Point availableSize;
+     public final int rotationHint;
++    public final int densityDpi;
+ 
+-    public WindowBounds(Rect bounds, Rect insets) {
+-        this(bounds, insets, -1);
++    public WindowBounds(Rect bounds, Rect insets, int densityDpi) {
++        this(bounds, insets, -1, densityDpi);
+     }
+ 
+-    public WindowBounds(Rect bounds, Rect insets, int rotationHint) {
++    public WindowBounds(Rect bounds, Rect insets, int rotationHint, int densityDpi) {
+         this.bounds = bounds;
+         this.insets = insets;
+         this.rotationHint = rotationHint;
+         availableSize = new Point(bounds.width() - insets.left - insets.right,
+                 bounds.height() - insets.top - insets.bottom);
++        this.densityDpi = densityDpi;
+     }
+ 
+     public WindowBounds(int width, int height, int availableWidth, int availableHeight,
+-            int rotationHint) {
++            int rotationHint, int densityDpi) {
+         this.bounds = new Rect(0, 0, width, height);
+         this.availableSize = new Point(availableWidth, availableHeight);
+         // We don't care about insets in this case
+         this.insets = new Rect(0, 0, width - availableWidth, height - availableHeight);
+         this.rotationHint = rotationHint;
++        this.densityDpi = densityDpi;
+     }
+ 
+     @Override
+     public int hashCode() {
+-        return Objects.hash(bounds, insets);
++        return Objects.hash(bounds, insets, densityDpi);
+     }
+ 
+     @Override
+@@ -78,6 +81,7 @@
+                 + ", insets=" + insets
+                 + ", availableSize=" + availableSize
+                 + ", rotationHint=" + rotationHint
++                + ", densityDpi=" + densityDpi
+                 + '}';
+     }
+ 
+@@ -95,6 +99,7 @@
+     public static WindowBounds fromWindowMetrics(WindowMetrics wm) {
+         Insets insets = wm.getWindowInsets().getInsets(Type.systemBars());
+         return new WindowBounds(wm.getBounds(),
+-                new Rect(insets.left, insets.top, insets.right, insets.bottom));
++                new Rect(insets.left, insets.top, insets.right, insets.bottom),
++                (int) (wm.getDensity() * 160));
+     }
+ }
+diff --git a/src/com/android/launcher3/util/window/CachedDisplayInfo.java b/src/com/android/launcher3/util/window/CachedDisplayInfo.java
+index c5084ad..80328bf 100644
+--- a/src/com/android/launcher3/util/window/CachedDisplayInfo.java
++++ b/src/com/android/launcher3/util/window/CachedDisplayInfo.java
+@@ -40,18 +40,21 @@
+     public final int rotation;
+     @NonNull
+     public final DisplayCutout cutout;
++    public final int densityDpi;
+ 
+     public CachedDisplayInfo() {
+-        this(new Point(0, 0), 0);
++        this(new Point(0, 0), 0, 0);
+     }
+ 
+-    public CachedDisplayInfo(Point size, int rotation) {
+-        this(size, rotation, NO_CUTOUT);
++    public CachedDisplayInfo(Point size, int rotation, int densityDpi) {
++        this(size, rotation, densityDpi, NO_CUTOUT);
+     }
+ 
+-    public CachedDisplayInfo(Point size, int rotation, @Nullable DisplayCutout cutout) {
++    public CachedDisplayInfo(Point size, int rotation, int densityDpi,
++            @Nullable DisplayCutout cutout) {
+         this.size = size;
+         this.rotation = rotation;
++        this.densityDpi = densityDpi;
+         this.cutout = cutout == null ? NO_CUTOUT : cutout;
+     }
+ 
+@@ -67,7 +70,7 @@
+ 
+         DisplayCutout newCutout = windowManagerProxy.rotateCutout(
+                 cutout, size.x, size.y, rotation, Surface.ROTATION_0);
+-        return new CachedDisplayInfo(newSize, Surface.ROTATION_0, newCutout);
++        return new CachedDisplayInfo(newSize, Surface.ROTATION_0, densityDpi, newCutout);
+     }
+ 
+     @Override
+@@ -76,6 +79,7 @@
+                 + "size=" + size
+                 + ", cutout=" + cutout
+                 + ", rotation=" + rotation
++                + ", densityDpi=" + densityDpi
+                 + '}';
+     }
+ 
+@@ -86,6 +90,7 @@
+         CachedDisplayInfo that = (CachedDisplayInfo) o;
+         return rotation == that.rotation
+                 && Objects.equals(size, that.size)
++                && densityDpi == that.densityDpi
+                 && cutout.getSafeInsetLeft() == that.cutout.getSafeInsetLeft()
+                 && cutout.getSafeInsetTop() == that.cutout.getSafeInsetTop()
+                 && cutout.getSafeInsetRight() == that.cutout.getSafeInsetRight()
+@@ -94,7 +99,7 @@
+ 
+     @Override
+     public int hashCode() {
+-        return Objects.hash(size, rotation,
++        return Objects.hash(size, rotation, densityDpi,
+                 cutout.getSafeInsetLeft(), cutout.getSafeInsetTop(),
+                 cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
+     }
+diff --git a/src/com/android/launcher3/util/window/WindowManagerProxy.java b/src/com/android/launcher3/util/window/WindowManagerProxy.java
+index eeead86..2189dc4 100644
+--- a/src/com/android/launcher3/util/window/WindowManagerProxy.java
++++ b/src/com/android/launcher3/util/window/WindowManagerProxy.java
+@@ -138,7 +138,8 @@
+         normalizeWindowInsets(displayInfoContext,
+                 showDesktopTaskbarForFreeformDisplay(displayInfoContext),
+                 windowMetrics.getWindowInsets(), insets);
+-        return new WindowBounds(windowMetrics.getBounds(), insets, info.rotation);
++        return new WindowBounds(windowMetrics.getBounds(), insets, info.rotation,
++                (int) (windowMetrics.getDensity() * 160));
+     }
+ 
+     /**
+@@ -302,7 +303,7 @@
+      */
+     protected List<WindowBounds> estimateWindowBounds(Context context,
+             final CachedDisplayInfo displayInfo) {
+-        int densityDpi = context.getResources().getConfiguration().densityDpi;
++        int densityDpi = displayInfo.densityDpi;
+         final int rotation = displayInfo.rotation;
+ 
+         int minSize = Math.min(displayInfo.size.x, displayInfo.size.y);
+@@ -381,7 +382,7 @@
+             } else {
+                 insets.right = Math.max(insets.right, navbarWidth);
+             }
+-            result.add(new WindowBounds(bounds, insets, i));
++            result.add(new WindowBounds(bounds, insets, i, densityDpi));
+         }
+         return result;
+     }
+@@ -426,6 +427,7 @@
+     protected CachedDisplayInfo getDisplayInfo(WindowMetrics windowMetrics, int rotation) {
+         Point size = new Point(windowMetrics.getBounds().right, windowMetrics.getBounds().bottom);
+         return new CachedDisplayInfo(size, rotation,
++                (int) (windowMetrics.getDensity() * 160),
+                 windowMetrics.getWindowInsets().getDisplayCutout());
+     }
+ 
+diff --git a/tests/multivalentTests/src/com/android/launcher3/AbstractDeviceProfileTest.kt b/tests/multivalentTests/src/com/android/launcher3/AbstractDeviceProfileTest.kt
+index 945034e..7732f68 100644
+--- a/tests/multivalentTests/src/com/android/launcher3/AbstractDeviceProfileTest.kt
++++ b/tests/multivalentTests/src/com/android/launcher3/AbstractDeviceProfileTest.kt
+@@ -289,10 +289,14 @@
+             )
+ 
+         return listOf(
+-            WindowBounds(Rect(0, 0, naturalX, naturalY), rotation0Insets, Surface.ROTATION_0),
+-            WindowBounds(Rect(0, 0, naturalY, naturalX), rotation90Insets, Surface.ROTATION_90),
+-            WindowBounds(Rect(0, 0, naturalX, naturalY), rotation180Insets, Surface.ROTATION_180),
+-            WindowBounds(Rect(0, 0, naturalY, naturalX), rotation270Insets, Surface.ROTATION_270),
++            WindowBounds(Rect(0, 0, naturalX, naturalY), rotation0Insets, Surface.ROTATION_0,
++                deviceSpec.densityDpi),
++            WindowBounds(Rect(0, 0, naturalY, naturalX), rotation90Insets, Surface.ROTATION_90,
++                deviceSpec.densityDpi),
++            WindowBounds(Rect(0, 0, naturalX, naturalY), rotation180Insets, Surface.ROTATION_180,
++                deviceSpec.densityDpi),
++            WindowBounds(Rect(0, 0, naturalY, naturalX), rotation270Insets, Surface.ROTATION_270,
++                deviceSpec.densityDpi),
+         )
+     }
+ 
+@@ -305,10 +309,14 @@
+         val rotatedInsets = Rect(0, deviceSpec.statusBarRotatedPx, 0, 0)
+ 
+         return listOf(
+-            WindowBounds(Rect(0, 0, naturalX, naturalY), naturalInsets, Surface.ROTATION_0),
+-            WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_90),
+-            WindowBounds(Rect(0, 0, naturalX, naturalY), naturalInsets, Surface.ROTATION_180),
+-            WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_270),
++            WindowBounds(Rect(0, 0, naturalX, naturalY), naturalInsets, Surface.ROTATION_0,
++                deviceSpec.densityDpi),
++            WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_90,
++                deviceSpec.densityDpi),
++            WindowBounds(Rect(0, 0, naturalX, naturalY), naturalInsets, Surface.ROTATION_180,
++                deviceSpec.densityDpi),
++            WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_270,
++                deviceSpec.densityDpi),
+         )
+     }
+ 
+diff --git a/tests/multivalentTests/src/com/android/launcher3/util/DisplayControllerTest.kt b/tests/multivalentTests/src/com/android/launcher3/util/DisplayControllerTest.kt
+index 7852175..18b7530 100644
+--- a/tests/multivalentTests/src/com/android/launcher3/util/DisplayControllerTest.kt
++++ b/tests/multivalentTests/src/com/android/launcher3/util/DisplayControllerTest.kt
+@@ -85,10 +85,14 @@
+     private val density = densityDpi / DisplayMetrics.DENSITY_DEFAULT.toFloat()
+     private val bounds =
+         arrayOf(
+-            WindowBounds(Rect(0, 0, width, height), Rect(0, inset, 0, 0), Surface.ROTATION_0),
+-            WindowBounds(Rect(0, 0, height, width), Rect(0, inset, 0, 0), Surface.ROTATION_90),
+-            WindowBounds(Rect(0, 0, width, height), Rect(0, inset, 0, 0), Surface.ROTATION_180),
+-            WindowBounds(Rect(0, 0, height, width), Rect(0, inset, 0, 0), Surface.ROTATION_270),
++            WindowBounds(Rect(0, 0, width, height), Rect(0, inset, 0, 0), Surface.ROTATION_0,
++                densityDpi),
++            WindowBounds(Rect(0, 0, height, width), Rect(0, inset, 0, 0), Surface.ROTATION_90,
++                densityDpi),
++            WindowBounds(Rect(0, 0, width, height), Rect(0, inset, 0, 0), Surface.ROTATION_180,
++                densityDpi),
++            WindowBounds(Rect(0, 0, height, width), Rect(0, inset, 0, 0), Surface.ROTATION_270,
++                densityDpi),
+         )
+     private lateinit var configuration: Configuration
+ 
+diff --git a/tests/multivalentTests/src/com/android/launcher3/util/launcheremulator/TestWindowManagerProxy.java b/tests/multivalentTests/src/com/android/launcher3/util/launcheremulator/TestWindowManagerProxy.java
+index d34dcb3..9e5b630 100644
+--- a/tests/multivalentTests/src/com/android/launcher3/util/launcheremulator/TestWindowManagerProxy.java
++++ b/tests/multivalentTests/src/com/android/launcher3/util/launcheremulator/TestWindowManagerProxy.java
+@@ -98,7 +98,7 @@
+         displayInfoContext.getDisplay().getDisplayInfo(displayInfo);
+         return new WindowBounds(
+                 new Rect(0, 0, displayInfo.getNaturalWidth(), displayInfo.getNaturalHeight()),
+-                /* insets = */ new Rect());
++                /* insets = */ new Rect(), displayInfo.logicalDensityDpi);
+     }
+ 
+     @Override

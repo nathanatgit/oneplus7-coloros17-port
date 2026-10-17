@@ -1,0 +1,19 @@
+From 032a88cc881eaf250a86143c811a4057c660b720 Mon Sep 17 00:00:00 2001
+From: chandu078 <chandudyavanapelli03@gmail.com>
+Date: Sun, 27 Sep 2026 12:16:42 +0000
+Subject: [PATCH] sepolicy: qti: Allow oplus display panel HAL to read display props
+
+avc: denied { read } for comm="vendor.oplus.ha" name="u:object_r:vendor_display_prop:s0" scontext=u:r:hal_oplus_displaypanelfeature_aidl:s0 tcontext=u:object_r:vendor_display_prop:s0 tclass=file permissive=0
+
+Change-Id: Id008405979dadb9eb0f0c60d5a858593c28544dc
+---
+
+diff --git a/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te b/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te
+index 16f50ca..33a9c5f 100644
+--- a/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te
++++ b/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te
+@@ -14,3 +14,4 @@
+ allow hal_oplus_displaypanelfeature_aidl graphics_device:chr_file rw_file_perms;
+ 
+ get_prop(hal_oplus_displaypanelfeature_aidl, boot_status_prop)
++get_prop(hal_oplus_displaypanelfeature_aidl, vendor_display_prop)

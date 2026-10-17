@@ -1,0 +1,69 @@
+From 62783f84fcea8e25b291b6eb675ab114532ae2e4 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Sun, 11 Oct 2026 21:29:06 -0400
+Subject: [PATCH] audio-ar: Bump VINTF fragments to current
+
+Linking latest_android_hardware_audio_[core|effect]_ndk_shared means
+we need to bump these to match.
+
+Test: atest vts_treble_vintf_vendor_test
+Change-Id: I8705a626c242cb3adf37a063010663ab64c79644
+---
+
+diff --git a/configs/audio-generic-modules.mk b/configs/audio-generic-modules.mk
+index 7dccd6c..bee1e61 100644
+--- a/configs/audio-generic-modules.mk
++++ b/configs/audio-generic-modules.mk
+@@ -1,4 +1,4 @@
+-LATEST_ANDROID_HARDWARE_AUDIO_EFFECT := android.hardware.audio.effect-V3-ndk
++LATEST_ANDROID_HARDWARE_AUDIO_EFFECT := android.hardware.audio.effect-V4-ndk
+ LATEST_ANDROID_HARDWARE_COMMON := android.hardware.common-V2-ndk
+ LATEST_ANDROID_MEDIA_ADUIO_COMMON_TYPES := android.media.audio.common.types-V3-ndk
+ LATEST_ANDROID_HARDWARE_COMMON_FMQ := android.hardware.common.fmq-V1-ndk
+diff --git a/hal/default/manifest_audiocorehal_default.xml b/hal/default/manifest_audiocorehal_default.xml
+index aae199f..e38512d 100644
+--- a/hal/default/manifest_audiocorehal_default.xml
++++ b/hal/default/manifest_audiocorehal_default.xml
+@@ -6,25 +6,25 @@
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>3</version>
++    <version>4</version>
+     <fqname>IConfig/default</fqname>
+   </hal>
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>3</version>
++    <version>4</version>
+     <fqname>IModule/default</fqname>
+   </hal>
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>3</version>
++    <version>4</version>
+     <fqname>IModule/r_submix</fqname>
+   </hal>
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>3</version>
++    <version>4</version>
+     <fqname>IModule/usb</fqname>
+   </hal>
+ </manifest>
+diff --git a/hal/effects/audioeffectservice_qti.xml b/hal/effects/audioeffectservice_qti.xml
+index 4b5124f..bcd8115 100644
+--- a/hal/effects/audioeffectservice_qti.xml
++++ b/hal/effects/audioeffectservice_qti.xml
+@@ -5,7 +5,7 @@
+ <manifest version="1.0" type="device">
+   <hal format="aidl">
+     <name>android.hardware.audio.effect</name>
+-    <version>3</version>
++    <version>4</version>
+     <fqname>IFactory/default</fqname>
+   </hal>
+ </manifest>

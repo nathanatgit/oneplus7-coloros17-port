@@ -1,0 +1,30 @@
+From 9ca30fbbf4aa0d3cc2afa750ba56eaf65a5e4712 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Tue, 29 Sep 2026 00:29:36 +0200
+Subject: [PATCH] LineageParts: KeyHandler: Eat key events regardless of their action
+
+OnePlus 'V' touchcreen gesture is sadly reusing KEY_MICMUTE, which
+triggers unwanted behavior on KeyEvent.ACTION_DOWN...
+
+Change-Id: Ib28d5205c7cf9c05bf0f315cdebfc4ec539e3f15
+---
+
+diff --git a/src/org/lineageos/lineageparts/gestures/KeyHandler.java b/src/org/lineageos/lineageparts/gestures/KeyHandler.java
+index 3157469..39fd445 100644
+--- a/src/org/lineageos/lineageparts/gestures/KeyHandler.java
++++ b/src/org/lineageos/lineageparts/gestures/KeyHandler.java
+@@ -143,11 +143,12 @@
+ 
+     public KeyEvent handleKeyEvent(final KeyEvent event) {
+         final int action = mActionMapping.get(event.getScanCode(), -1);
+-        if (action < 0 || event.getAction() != KeyEvent.ACTION_UP || !hasSetupCompleted()) {
++        if (action < 0 || !hasSetupCompleted()) {
+             return event;
+         }
+ 
+-        if (action != 0 && !mEventHandler.hasMessages(GESTURE_REQUEST)) {
++        if (action != 0 && event.getAction() == KeyEvent.ACTION_UP &&
++                !mEventHandler.hasMessages(GESTURE_REQUEST)) {
+             final Message msg = getMessageForAction(action);
+             final boolean proxWakeEnabled = LineageSettings.System.getInt(
+                     mContext.getContentResolver(),

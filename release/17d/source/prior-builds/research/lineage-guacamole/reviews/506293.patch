@@ -1,0 +1,540 @@
+From 1ffeba64016f31a2b6fcd4cdd42e7dfbd77d294e Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 15:54:30 +0200
+Subject: [PATCH] Canvas: Add filters screen
+
+Change-Id: I4f8143e8040a4fcc1559fe29eceb6e65cb1d94db
+---
+
+diff --git a/app/src/main/java/org/lineageos/canvas/ext/ImageAdjustments.kt b/app/src/main/java/org/lineageos/canvas/ext/ImageAdjustments.kt
+index bd66951..7c80213 100644
+--- a/app/src/main/java/org/lineageos/canvas/ext/ImageAdjustments.kt
++++ b/app/src/main/java/org/lineageos/canvas/ext/ImageAdjustments.kt
+@@ -39,6 +39,31 @@
+     )
+ }
+ 
++fun sepiaColorFilter(amount: Float): ColorFilter = ColorFilter.colorMatrix(
++    ColorMatrix(
++        floatArrayOf(
++            1f - 0.607f * amount, 0.769f * amount, 0.189f * amount, 0f, 0f,
++            0.349f * amount, 1f - 0.314f * amount, 0.168f * amount, 0f, 0f,
++            0.272f * amount, 0.534f * amount, 1f - 0.869f * amount, 0f, 0f,
++            0f, 0f, 0f, 1f, 0f,
++        ),
++    ),
++)
++
++fun greyColorFilter(saturation: Float): ColorFilter = ColorFilter.colorMatrix(
++    ColorMatrix(
++        floatArrayOf(
++            0.213f + 0.787f * saturation, 0.715f - 0.715f * saturation,
++            0.072f - 0.072f * saturation, 0f, 0f,
++            0.213f - 0.213f * saturation, 0.715f + 0.285f * saturation,
++            0.072f - 0.072f * saturation, 0f, 0f,
++            0.213f - 0.213f * saturation, 0.715f - 0.715f * saturation,
++            0.072f + 0.928f * saturation, 0f, 0f,
++            0f, 0f, 0f, 1f, 0f,
++        ),
++    ),
++)
++
+ fun ImageBitmap.adjustBrightness(value: Float): ImageBitmap {
+     if (value == 0f) return this
+ 
+@@ -90,3 +115,33 @@
+ 
+     return output
+ }
++
++fun ImageBitmap.applySepia(amount: Float): ImageBitmap =
++    if (amount == 0f) this else applyColorFilter(sepiaColorFilter(amount))
++
++fun ImageBitmap.applyGrey(saturation: Float): ImageBitmap =
++    if (saturation == 1f) this else applyColorFilter(greyColorFilter(saturation))
++
++private fun ImageBitmap.applyColorFilter(colorFilter: ColorFilter): ImageBitmap {
++    val output = ImageBitmap(
++        width = width,
++        height = height,
++        config = config,
++        hasAlpha = hasAlpha,
++        colorSpace = colorSpace,
++    )
++
++    CanvasDrawScope().draw(
++        density = Density(1f),
++        layoutDirection = LayoutDirection.Ltr,
++        canvas = Canvas(output),
++        size = Size(width.toFloat(), height.toFloat()),
++    ) {
++        drawImage(
++            image = this@applyColorFilter,
++            colorFilter = colorFilter,
++        )
++    }
++
++    return output
++}
+diff --git a/app/src/main/java/org/lineageos/canvas/models/Action.kt b/app/src/main/java/org/lineageos/canvas/models/Action.kt
+index a54a6b0..ad7cc38 100644
+--- a/app/src/main/java/org/lineageos/canvas/models/Action.kt
++++ b/app/src/main/java/org/lineageos/canvas/models/Action.kt
+@@ -32,6 +32,20 @@
+          * @param value The contrast value
+          */
+         data class Contrast(val value: Float) : Adjustment
++
++        /**
++         * Apply the sepia color matrix.
++         *
++         * @param amount 0 keeps the original colors; 1 applies full sepia.
++         */
++        data class Sepia(val amount: Float) : Adjustment
++
++        /**
++         * Apply the grey color matrix.
++         *
++         * @param saturation 0 is fully grey; 1 keeps the original colors.
++         */
++        data class Grey(val saturation: Float) : Adjustment
+     }
+ 
+     /**
+diff --git a/app/src/main/java/org/lineageos/canvas/models/EditMode.kt b/app/src/main/java/org/lineageos/canvas/models/EditMode.kt
+index 5719147..06f07c4 100644
+--- a/app/src/main/java/org/lineageos/canvas/models/EditMode.kt
++++ b/app/src/main/java/org/lineageos/canvas/models/EditMode.kt
+@@ -42,7 +42,12 @@
+     /**
+      * Contrast adjustment.
+      */
+-    CONTRAST(Category.ADJUSTMENTS);
++    CONTRAST(Category.ADJUSTMENTS),
++
++    /**
++     * Image filters.
++     */
++    FILTERS(Category.ADJUSTMENTS);
+ 
+     companion object {
+         private val groupedByCategory = entries.groupBy(EditMode::category)
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt
+index 0236ef8..31e2eb6 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt
+@@ -31,6 +31,7 @@
+ import androidx.compose.material.icons.filled.CropRotate
+ import androidx.compose.material.icons.filled.Draw
+ import androidx.compose.material.icons.filled.Exposure
++import androidx.compose.material.icons.filled.Filter
+ import androidx.compose.material.icons.filled.TextFields
+ import androidx.compose.material.icons.filled.Transform
+ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+@@ -316,6 +317,7 @@
+             EditMode.TEXT -> R.string.edit_mode_text
+             EditMode.BRIGHTNESS -> R.string.edit_mode_brightness
+             EditMode.CONTRAST -> R.string.edit_mode_contrast
++            EditMode.FILTERS -> R.string.edit_mode_filters
+         }
+     )
+     ToolbarTooltip(description) {
+@@ -332,6 +334,7 @@
+                     EditMode.TEXT -> Icons.Filled.TextFields
+                     EditMode.BRIGHTNESS -> Icons.Filled.BrightnessMedium
+                     EditMode.CONTRAST -> Icons.Filled.Contrast
++                    EditMode.FILTERS -> Icons.Filled.Filter
+                 },
+                 contentDescription = description,
+             )
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt
+index 8e5ad51..d6f2154 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt
+@@ -70,6 +70,7 @@
+                     EditMode.TEXT -> R.string.edit_mode_text
+                     EditMode.BRIGHTNESS -> R.string.edit_mode_brightness
+                     EditMode.CONTRAST -> R.string.edit_mode_contrast
++                    EditMode.FILTERS -> R.string.edit_mode_filters
+                 }
+             }?.let {
+                 Text(text = stringResource(it))
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/navigation/CanvasNavDisplay.kt b/app/src/main/java/org/lineageos/canvas/ui/navigation/CanvasNavDisplay.kt
+index 6de8b94..29e2b98 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/navigation/CanvasNavDisplay.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/navigation/CanvasNavDisplay.kt
+@@ -22,6 +22,7 @@
+ import org.lineageos.canvas.ui.screens.CropScreen
+ import org.lineageos.canvas.ui.screens.BrightnessScreen
+ import org.lineageos.canvas.ui.screens.ContrastScreen
++import org.lineageos.canvas.ui.screens.FiltersScreen
+ import org.lineageos.canvas.ui.screens.HighlighterScreen
+ import org.lineageos.canvas.ui.screens.MarkerScreen
+ import org.lineageos.canvas.ui.screens.RotationScreen
+@@ -119,6 +120,16 @@
+                     },
+                     onCancel = navigationBackStack::removeLastOrNull,
+                 )
++
++                EditMode.FILTERS -> FiltersScreen(
++                    imageBitmap = bitmapWithOverlayActions,
++                    cropRect = cropRect,
++                    onConfirm = { action ->
++                        action?.let(onAddAction)
++                        navigationBackStack.removeLastOrNull()
++                    },
++                    onCancel = navigationBackStack::removeLastOrNull,
++                )
+             }
+         }
+     }
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/screens/FiltersScreen.kt b/app/src/main/java/org/lineageos/canvas/ui/screens/FiltersScreen.kt
+new file mode 100644
+index 0000000..ed2c669
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/canvas/ui/screens/FiltersScreen.kt
+@@ -0,0 +1,281 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.canvas.ui.screens
++
++import androidx.annotation.StringRes
++import androidx.activity.compose.BackHandler
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.lazy.LazyRow
++import androidx.compose.foundation.lazy.items
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
++import androidx.compose.material.icons.filled.FilterBAndW
++import androidx.compose.material.icons.filled.FilterVintage
++import androidx.compose.material.icons.filled.Image
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Slider
++import androidx.compose.material3.Surface
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.alpha
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.ColorFilter
++import androidx.compose.ui.graphics.ImageBitmap
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.semantics.clearAndSetSemantics
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.selected
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.IntRect
++import androidx.compose.ui.unit.dp
++import org.lineageos.canvas.R
++import org.lineageos.canvas.ext.greyColorFilter
++import org.lineageos.canvas.ext.sepiaColorFilter
++import org.lineageos.canvas.models.Action
++import org.lineageos.canvas.ui.composables.CanvasBottomBar
++import org.lineageos.canvas.ui.composables.CanvasImage
++import org.lineageos.canvas.ui.composables.ToolbarTooltip
++
++private enum class FilterChoice(
++    @param:StringRes val label: Int,
++    val icon: ImageVector,
++    val defaultAmount: Float? = null,
++) {
++    ORIGINAL(R.string.filter_none, Icons.Filled.Image) {
++        override fun colorFilter(amount: Float): ColorFilter? = null
++        override fun action(amount: Float): Action.Adjustment? = null
++    },
++    GREY(R.string.filter_grey, Icons.Filled.FilterBAndW, 1f) {
++        override fun colorFilter(amount: Float) = greyColorFilter(1f - amount)
++        override fun action(amount: Float) =
++            amount.takeIf { it != 0f }?.let { Action.Adjustment.Grey(1f - it) }
++    },
++    SEPIA(R.string.filter_sepia, Icons.Filled.FilterVintage, 1f) {
++        override fun colorFilter(amount: Float) = sepiaColorFilter(amount)
++        override fun action(amount: Float) =
++            amount.takeIf { it != 0f }?.let(Action.Adjustment::Sepia)
++    };
++
++    val adjustable get() = defaultAmount != null
++
++    abstract fun colorFilter(amount: Float): ColorFilter?
++    abstract fun action(amount: Float): Action.Adjustment?
++}
++
++private data class FilterSelection(
++    val filter: FilterChoice,
++    val amount: Float = filter.defaultAmount ?: 0f,
++) {
++    val colorFilter get() = filter.colorFilter(amount)
++    val action get() = filter.action(amount)
++
++    fun withAmount(value: Float) = copy(amount = value.coerceIn(0f, 1f))
++}
++
++@Composable
++fun FiltersScreen(
++    imageBitmap: ImageBitmap,
++    cropRect: IntRect?,
++    onConfirm: (Action.Adjustment?) -> Unit,
++    onCancel: () -> Unit,
++) {
++    var selection by remember { mutableStateOf(FilterSelection(FilterChoice.ORIGINAL)) }
++    var showSlider by remember { mutableStateOf(false) }
++    val colorFilter = remember(selection) { selection.colorFilter }
++
++    BackHandler(enabled = showSlider) { showSlider = false }
++
++    Column(modifier = Modifier.fillMaxSize()) {
++        CanvasImage(
++            imageBitmap = imageBitmap,
++            cropRect = cropRect,
++            modifier = Modifier
++                .fillMaxWidth()
++                .weight(1f)
++                .padding(16.dp),
++            colorFilter = colorFilter,
++        )
++
++        if (showSlider) {
++            FilterSlider(
++                selection = selection,
++                onValueChange = { selection = selection.withAmount(it) },
++                onBack = { showSlider = false },
++            )
++        } else {
++            FilterRail(
++                selection = selection,
++                onFilterClick = { filter ->
++                    if (filter == selection.filter && filter.adjustable) {
++                        showSlider = true
++                    } else {
++                        selection = FilterSelection(filter)
++                    }
++                },
++            )
++        }
++
++        CanvasBottomBar(
++            onCancel = onCancel,
++            onConfirm = { onConfirm(selection.action) },
++        ) {
++            if (!showSlider) {
++                Text(
++                    text = stringResource(
++                        if (selection.filter == FilterChoice.ORIGINAL) {
++                            R.string.filter_select_hint
++                        } else {
++                            R.string.filter_tap_again_to_adjust
++                        }
++                    ),
++                    modifier = Modifier.fillMaxWidth(),
++                    style = MaterialTheme.typography.labelSmall,
++                    textAlign = TextAlign.Center,
++                )
++            }
++        }
++    }
++}
++
++@Composable
++private fun FilterRail(
++    selection: FilterSelection,
++    onFilterClick: (FilterChoice) -> Unit,
++) {
++    LazyRow(
++        modifier = Modifier
++            .fillMaxWidth()
++            .padding(horizontal = 16.dp, vertical = 8.dp),
++        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
++    ) {
++        items(
++            FilterChoice.entries
++        ) { filter ->
++            val description = stringResource(filter.label)
++            val amount = filter.defaultAmount?.let { default ->
++                if (filter == selection.filter) selection.amount else default
++            }
++            val isSelected = selection.filter == filter
++
++            ToolbarTooltip(description) {
++                Surface(
++                    onClick = { onFilterClick(filter) },
++                    modifier = Modifier
++                        .size(width = 88.dp, height = 88.dp)
++                        .semantics { selected = isSelected },
++                    shape = RoundedCornerShape(20.dp),
++                    color = if (isSelected) {
++                        MaterialTheme.colorScheme.primaryContainer
++                    } else {
++                        MaterialTheme.colorScheme.surfaceContainerHighest
++                    },
++                    contentColor = if (isSelected) {
++                        MaterialTheme.colorScheme.onPrimaryContainer
++                    } else {
++                        MaterialTheme.colorScheme.onSurface
++                    },
++                ) {
++                    Column(
++                        horizontalAlignment = Alignment.CenterHorizontally,
++                        verticalArrangement = Arrangement.Center,
++                    ) {
++                        Icon(
++                            imageVector = filter.icon,
++                            contentDescription = null,
++                        )
++                        Text(
++                            text = description,
++                            style = MaterialTheme.typography.labelMedium,
++                            maxLines = 1,
++                            overflow = TextOverflow.Ellipsis,
++                        )
++                        if (amount != null) {
++                            Text(
++                                text = stringResource(R.string.adjustment_percent, amount * 100),
++                                style = MaterialTheme.typography.labelSmall,
++                            )
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun FilterSlider(
++    selection: FilterSelection,
++    onValueChange: (Float) -> Unit,
++    onBack: () -> Unit,
++) {
++    val label = stringResource(selection.filter.label)
++    val backDescription = stringResource(R.string.back)
++
++    Row(
++        modifier = Modifier
++            .fillMaxWidth()
++            .padding(horizontal = 8.dp, vertical = 16.dp)
++            .clip(RoundedCornerShape(16.dp))
++            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        ToolbarTooltip(backDescription) {
++            IconButton(onClick = onBack) {
++                Icon(
++                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
++                    contentDescription = backDescription,
++                )
++            }
++        }
++
++        Slider(
++            value = selection.amount,
++            onValueChange = onValueChange,
++            valueRange = 0f..1f,
++            modifier = Modifier
++                .weight(1f)
++                .height(72.dp)
++                .semantics { contentDescription = label },
++        )
++
++        // We must take into account for 100% otherwise the slider will jump.
++        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
++            Text(
++                text = stringResource(R.string.adjustment_percent, 100f),
++                modifier = Modifier
++                    .alpha(0f)
++                    .clearAndSetSemantics {},
++            )
++            Text(
++                text = stringResource(R.string.adjustment_percent, selection.amount * 100),
++                modifier = Modifier.align(Alignment.CenterEnd),
++            )
++        }
++    }
++}
+diff --git a/app/src/main/java/org/lineageos/canvas/viewmodels/EditViewModel.kt b/app/src/main/java/org/lineageos/canvas/viewmodels/EditViewModel.kt
+index e6bd339..643189f 100644
+--- a/app/src/main/java/org/lineageos/canvas/viewmodels/EditViewModel.kt
++++ b/app/src/main/java/org/lineageos/canvas/viewmodels/EditViewModel.kt
+@@ -50,6 +50,8 @@
+ import org.lineageos.canvas.ext.rotateBy
+ import org.lineageos.canvas.ext.adjustBrightness
+ import org.lineageos.canvas.ext.adjustContrast
++import org.lineageos.canvas.ext.applyGrey
++import org.lineageos.canvas.ext.applySepia
+ import org.lineageos.canvas.ext.size
+ import org.lineageos.canvas.models.Action
+ import org.lineageos.canvas.models.HistoryList
+@@ -262,6 +264,8 @@
+     private fun ImageBitmap.applyAction(action: Action): ImageBitmap = when (action) {
+         is Action.Adjustment.Brightness -> adjustBrightness(action.value)
+         is Action.Adjustment.Contrast -> adjustContrast(action.value)
++        is Action.Adjustment.Grey -> applyGrey(action.saturation)
++        is Action.Adjustment.Sepia -> applySepia(action.amount)
+         is Action.Transformation.Crop -> crop(action.rect)
+         is Action.Transformation.Rotation -> rotateBy(action.rotation)
+         is Action.Drawing -> createEmptyBitmap(hasAlpha = true).draw {
+@@ -280,6 +284,14 @@
+                 is Action.Adjustment.Contrast -> {
+                     // Handled by the action replay pipeline
+                 }
++
++                is Action.Adjustment.Grey -> {
++                    // Handled by the action replay pipeline
++                }
++
++                is Action.Adjustment.Sepia -> {
++                    // Handled by the action replay pipeline
++                }
+             }
+ 
+             is Action.Transformation -> when (action) {
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index d431339..885b0db 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -32,6 +32,7 @@
+     <string name="edit_mode_text">Text</string>
+     <string name="edit_mode_brightness">Brightness</string>
+     <string name="edit_mode_contrast">Contrast</string>
++    <string name="edit_mode_filters">Filters</string>
+ 
+     <!-- Rotation -->
+     <string name="rotate_counterclockwise">Rotate counterclockwise</string>
+@@ -40,6 +41,13 @@
+     <!-- Adjustments -->
+     <string name="adjustment_percent">%1$.0f%%</string>
+ 
++    <!-- Filters -->
++    <string name="filter_none">Original</string>
++    <string name="filter_grey">Grey</string>
++    <string name="filter_sepia">Sepia</string>
++    <string name="filter_select_hint">Select a filter to preview</string>
++    <string name="filter_tap_again_to_adjust">Tap selected filter again to adjust</string>
++
+     <!-- Drawing colors -->
+     <string name="color_white">White</string>
+     <string name="color_black">Black</string>

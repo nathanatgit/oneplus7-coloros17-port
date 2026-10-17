@@ -1,0 +1,36 @@
+From aeb3fe411328bc836aed12f7ee338cccdc4f025f Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 16:11:00 +0530
+Subject: [PATCH] Settings: Supply footer button partner color config
+
+Change-Id: If20b65c43288118df8cad4066a021078b9a4d9dd
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/res/values-night/colors.xml b/res/values-night/colors.xml
+index e4d394d..386a763 100644
+--- a/res/values-night/colors.xml
++++ b/res/values-night/colors.xml
+@@ -124,5 +124,9 @@
+     <color name="sc_materialColorSurfaceContainer">@android:color/system_surface_container_dark</color>
+     <color name="sc_materialColorOutline">@android:color/system_outline_dark</color>
+     <color name="sc_materialColorOutlineVariant">@android:color/system_outline_variant_dark</color>
++
++    <color name="setup_compat_footer_primary_button_bg_color">@*android:color/system_primary_dark</color>
++    <color name="setup_compat_footer_primary_button_text_color">@*android:color/system_on_primary_dark</color>
++
+ </resources>
+ 
+diff --git a/res/values/colors.xml b/res/values/colors.xml
+index 57df61e..2f5a0b5 100644
+--- a/res/values/colors.xml
++++ b/res/values/colors.xml
+@@ -328,4 +328,8 @@
+     <color name="sc_materialColorSurfaceContainer">@android:color/system_surface_container_light</color>
+     <color name="sc_materialColorOutline">@android:color/system_outline_light</color>
+     <color name="sc_materialColorOutlineVariant">@android:color/system_outline_variant_light</color>
++
++    <color name="setup_compat_footer_primary_button_bg_color">@*android:color/system_primary_light</color>
++    <color name="setup_compat_footer_primary_button_text_color">@*android:color/system_on_primary_light</color>
++
+ </resources>

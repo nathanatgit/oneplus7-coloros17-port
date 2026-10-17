@@ -1,0 +1,100 @@
+From 950978822816329c0b5a924854e3801e4227b95b Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 24 Sep 2026 13:19:23 +0530
+Subject: [PATCH] SUW: Resolve locale levels off the main thread and cache them
+
+Assisted-By: LLM
+Change-Id: I184a76b88f6744c72efa1b77d06b4dd54a6d0e37
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+index 66b731a..539531c 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+@@ -29,6 +29,7 @@
+ import com.google.android.setupdesign.items.RecyclerItemAdapter
+ import com.google.android.setupdesign.items.SectionItem
+ import java.util.Locale
++import java.util.concurrent.ConcurrentHashMap
+ import java.util.concurrent.ExecutorService
+ import java.util.concurrent.Executors
+ import org.lineageos.setupwizard.R
+@@ -49,6 +50,9 @@
+         }
+ 
+     private val handler = Handler(Looper.getMainLooper())
++
++    private val levelLocales = ConcurrentHashMap<String, List<LocaleStore.LocaleInfo>>()
++    private val localeExecutor: ExecutorService by lazy { Executors.newSingleThreadExecutor() }
+     private val fetchSimLocaleExecutor: ExecutorService by lazy {
+         Executors.newSingleThreadExecutor()
+     }
+@@ -99,6 +103,7 @@
+         super.onDestroy()
+         handler.removeCallbacksAndMessages(null)
+         fetchSimLocaleExecutor.shutdownNow()
++        localeExecutor.shutdownNow()
+     }
+ 
+     override val layoutResId = R.layout.setup_locale
+@@ -112,18 +117,36 @@
+     private fun showLanguages() {
+         parentLanguage = null
+         regionsBackCallback.isEnabled = false
+-        show(levelLocales(parent = null), countryMode = false)
++        showLevel(parent = null, countryMode = false)
+     }
+ 
+     private fun showRegions(language: LocaleStore.LocaleInfo) {
+         parentLanguage = language
+         regionsBackCallback.isEnabled = true
+-        show(levelLocales(parent = language), countryMode = true)
++        showLevel(parent = language, countryMode = true)
++    }
++
++    private fun showLevel(parent: LocaleStore.LocaleInfo?, countryMode: Boolean) {
++        onLevelLocales(parent, countryMode) { show(it, countryMode) }
++    }
++
++    private fun onLevelLocales(
++        parent: LocaleStore.LocaleInfo?,
++        countryMode: Boolean,
++        onReady: (List<LocaleStore.LocaleInfo>) -> Unit,
++    ) {
++        localeExecutor.execute {
++            val locales = levelLocales(parent)
++            locales.forEach { if (countryMode) it.fullCountryNameNative else it.fullNameNative }
++            handler.post { if (!isDestroyed) onReady(locales) }
++        }
+     }
+ 
+     private fun levelLocales(parent: LocaleStore.LocaleInfo?): List<LocaleStore.LocaleInfo> =
+-        LocaleStore.getLevelLocales(this, emptySet(), parent, /* translatedOnly= */ true)
+-            .sortedWith(LocaleHelper.LocaleInfoComparator(Locale.getDefault(), parent != null))
++        levelLocales.getOrPut(parent?.id.orEmpty()) {
++            LocaleStore.getLevelLocales(this, emptySet(), parent, /* translatedOnly= */ true)
++                .sortedWith(LocaleHelper.LocaleInfoComparator(Locale.getDefault(), parent != null))
++        }
+ 
+     private fun show(locales: List<LocaleStore.LocaleInfo>, countryMode: Boolean) {
+         val (suggested, remaining) = locales.partition { it.isSuggested }
+@@ -160,10 +183,16 @@
+ 
+     private fun onItemSelected(item: LocaleItem) {
+         val localeInfo = item.localeInfo
+-        if (parentLanguage == null && levelLocales(parent = localeInfo).size > 1) {
+-            showRegions(localeInfo)
++        if (parentLanguage != null) {
++            selectLocale(localeInfo)
+             return
+         }
++        onLevelLocales(localeInfo, countryMode = true) { regions ->
++            if (regions.size > 1) showRegions(localeInfo) else selectLocale(localeInfo)
++        }
++    }
++
++    private fun selectLocale(localeInfo: LocaleStore.LocaleInfo) {
+         setupWizardApp.ignoreSimLocale = true
+         applyLocale(localeInfo.locale)
+     }

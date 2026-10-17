@@ -1,0 +1,206 @@
+From a46ef8ef687a59c3a530b39cc788992043dce429 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Mon, 05 Oct 2026 10:38:04 +0200
+Subject: [PATCH] interfaces: Fix OplusTouch V1 initialize() return type
+
+Stock returns OplusTouchStatus, which is wire compatible with int.
+
+Assisted-by: LLM
+Change-Id: Ica09b540511284926629b38befe3db72ae241044
+---
+
+diff --git a/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index 1c5fa98..386939d 100644
+--- a/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -7,10 +7,11 @@
+ package vendor.oplus.hardware.touch;
+ 
+ import vendor.oplus.hardware.touch.OplusTouchInfo;
++import vendor.oplus.hardware.touch.OplusTouchStatus;
+ 
+ @VintfStability
+ interface IOplusTouch {
+-    int initialize();
++    OplusTouchStatus initialize();
+     int isTouchNodeSupport(int deviceId, int nodeFlag);
+     String touchReadNodeFile(int deviceId, int nodeFlag);
+     int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+diff --git a/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchStatus.aidl b/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+new file mode 100644
+index 0000000..3f23c10
+--- /dev/null
++++ b/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+@@ -0,0 +1,14 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package vendor.oplus.hardware.touch;
++
++@VintfStability
++@Backing(type="int")
++enum OplusTouchStatus {
++    OK = 0,
++    FAILED = 1,
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/1/.hash b/interfaces/aidl_api/vendor.oplus.hardware.touch/1/.hash
+index bac29f9..c225fba 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/1/.hash
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/1/.hash
+@@ -1 +1 @@
+-96d841410c418efe125914cb06730209b5fb78fe
++e2e4bd7580996171b5cd0ab3a0027dbfc81864d4
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index aa93b5b..8887afd 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -24,7 +24,7 @@
+ package vendor.oplus.hardware.touch;
+ @VintfStability
+ interface IOplusTouch {
+-  int initialize();
++  vendor.oplus.hardware.touch.OplusTouchStatus initialize();
+   int isTouchNodeSupport(int deviceId, int nodeFlag);
+   String touchReadNodeFile(int deviceId, int nodeFlag);
+   int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/OplusTouchStatus.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+new file mode 100644
+index 0000000..fd9cf45
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/1/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.touch;
++@Backing(type="int") @VintfStability
++enum OplusTouchStatus {
++  OK = 0,
++  FAILED = 1,
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash
+index 142688c..dbfaa8a 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash
+@@ -1 +1 @@
+-ba896653ea356edaec80eb3dfeafefdc9b5c26ac
++bea5eef71e698c294c6a1ae9732f6ef73bfd04b2
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index 344aec5..b66027e 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -24,7 +24,7 @@
+ package vendor.oplus.hardware.touch;
+ @VintfStability
+ interface IOplusTouch {
+-  int initialize();
++  vendor.oplus.hardware.touch.OplusTouchStatus initialize();
+   int isTouchNodeSupport(int deviceId, int nodeFlag);
+   String touchReadNodeFile(int deviceId, int nodeFlag);
+   int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchStatus.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+new file mode 100644
+index 0000000..fd9cf45
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.touch;
++@Backing(type="int") @VintfStability
++enum OplusTouchStatus {
++  OK = 0,
++  FAILED = 1,
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index 7c08a26..16497b1 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -24,7 +24,7 @@
+ package vendor.oplus.hardware.touch;
+ @VintfStability
+ interface IOplusTouch {
+-  int initialize();
++  vendor.oplus.hardware.touch.OplusTouchStatus initialize();
+   int isTouchNodeSupport(int deviceId, int nodeFlag);
+   String touchReadNodeFile(int deviceId, int nodeFlag);
+   int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchStatus.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+new file mode 100644
+index 0000000..fd9cf45
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchStatus.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.touch;
++@Backing(type="int") @VintfStability
++enum OplusTouchStatus {
++  OK = 0,
++  FAILED = 1,
++}

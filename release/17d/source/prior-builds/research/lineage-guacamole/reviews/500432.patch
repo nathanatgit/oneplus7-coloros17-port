@@ -1,0 +1,39 @@
+From 6425e8e3bb9fbe9cbfb492927c775203dbbbcfb2 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 03:16:23 +0530
+Subject: [PATCH] Look at main app for partner color resources
+
+- Inspired from b479de499d14de8156f0e641742ac9bdea63e7e0
+
+Change-Id: Ia84a008d7cd49c739d7339baa0752a52a1eced6b
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java b/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
+index 0219d2a..ccfb1a6 100644
+--- a/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
++++ b/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
+@@ -346,9 +346,23 @@
+         result = resource.getColor(resId);
+       }
+       partnerResourceCache.put(resourceConfig, result);
++      return result;
+     } catch (NullPointerException exception) {
+       // fall through
+     }
++
++    Resources appResource = context.getResources();
++    int resIdApp = appResource.getIdentifier(resourceConfig.getResourceName(), "color",
++        context.getPackageName());
++
++    if (resIdApp != 0) {
++      if (Build.VERSION.SDK_INT >= VERSION_CODES.M) {
++        result = appResource.getColor(resIdApp, null);
++      } else {
++        result = appResource.getColor(resIdApp);
++      }
++      partnerResourceCache.put(resourceConfig, result);
++    }
+     return result;
+   }
+ 

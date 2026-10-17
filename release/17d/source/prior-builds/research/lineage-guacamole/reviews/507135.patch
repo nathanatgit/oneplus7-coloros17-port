@@ -1,0 +1,35 @@
+From e8d54f169338b16d545d175868645ead8c83e979 Mon Sep 17 00:00:00 2001
+From: dianlujitao <dianlujitao@lineageos.org>
+Date: Thu, 08 Oct 2026 23:45:48 +0100
+Subject: [PATCH] Messaging: Skip boot notifications when not the default SMS app
+
+Return early from BootAndPackageReplacedReceiver when Messaging does not
+hold the SMS role. This prevents boot and package replacement from
+reposting notifications for messages already read in another SMS app
+while the local message state remains stale.
+
+Change-Id: I53e6bca20ca81ad85cf5a3d27999186d88de6f70
+---
+
+diff --git a/src/com/android/messaging/receiver/BootAndPackageReplacedReceiver.java b/src/com/android/messaging/receiver/BootAndPackageReplacedReceiver.java
+index be0d296..ee3d0dc 100644
+--- a/src/com/android/messaging/receiver/BootAndPackageReplacedReceiver.java
++++ b/src/com/android/messaging/receiver/BootAndPackageReplacedReceiver.java
+@@ -25,6 +25,7 @@
+ import com.android.messaging.datamodel.action.UpdateMessageNotificationAction;
+ import com.android.messaging.util.BuglePrefsKeys;
+ import com.android.messaging.util.LogUtil;
++import com.android.messaging.util.PhoneUtils;
+ 
+ /**
+  * Receives notification of boot completion and package replacement
+@@ -32,6 +33,9 @@
+ public class BootAndPackageReplacedReceiver extends BroadcastReceiver {
+     @Override
+     public void onReceive(final Context context, final Intent intent) {
++        if (!PhoneUtils.getDefault().isDefaultSmsApp()) {
++            return;
++        }
+         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
+                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
+             // Repost unseen notifications

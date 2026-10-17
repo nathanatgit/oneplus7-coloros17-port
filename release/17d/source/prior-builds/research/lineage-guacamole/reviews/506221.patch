@@ -1,0 +1,21 @@
+From 0ccab57309445ecadc727f2d0b45e395b250b0ef Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 11:12:14 +0200
+Subject: [PATCH] Canvas: Increase drag handle hit area
+
+Change-Id: Icbd9da388b3c263034ba826636417b12e4afe706
+---
+
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt b/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt
+index a19633c..3cff26c 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/screens/CropScreen.kt
+@@ -105,7 +105,7 @@
+     val currentCropRect by rememberUpdatedState(cropRect)
+ 
+     val handleHitRadiusPx = with(LocalDensity.current) {
+-        maxOf(style.handleRadius + 8.dp, 24.dp).toPx()
++        maxOf(style.handleRadius + 8.dp, 40.dp).toPx()
+     }
+     val minimumCropSizePx = with(LocalDensity.current) { 100.dp.toPx() }
+ 

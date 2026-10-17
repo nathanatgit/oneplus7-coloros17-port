@@ -1,0 +1,65 @@
+From 36491a3fadd27e920fa658ecf5af3689d6e4f951 Mon Sep 17 00:00:00 2001
+From: Benjamin Wiegand <benjamin.lineageos@wiegand.pw>
+Date: Mon, 28 Sep 2026 21:32:55 -0700
+Subject: [PATCH] Launcher3: Make nav bar respect bottom of display cutout
+
+On devices with a bottom of display cutout (like smith) the Android 15
+pre-QPR2 behavior was to push the navigation bar above the cutout. This
+restores that behavior.
+
+This also affects 180 degree rotation on devices with a top of display
+cutout.
+
+Change-Id: I4a0549bb78553879a4d0c3d49929f0155ff27882
+---
+
+diff --git a/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java b/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java
+index 8f9af74..b4e2f6b 100644
+--- a/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java
++++ b/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java
+@@ -80,6 +80,7 @@
+ import android.provider.Settings.Secure;
+ import android.util.Log;
+ import android.util.Pair;
++import android.view.DisplayCutout;
+ import android.view.Gravity;
+ import android.view.Surface;
+ import android.view.View;
+@@ -393,6 +394,26 @@
+         FrameLayout bubbleBarContainer = mDragLayer.findViewById(R.id.taskbar_bubbles_container);
+         StashedHandleView bubbleHandleView = mDragLayer.findViewById(R.id.stashed_bubble_handle);
+ 
++        mDragLayer.setOnApplyWindowInsetsListener((v, insets) -> {
++            DisplayCutout cutout = insets.getDisplayCutout();
++            if (cutout == null || !isPhoneMode()) return insets;
++            v.setPadding(
++                    cutout.getSafeInsetLeft(), cutout.getSafeInsetTop(),
++                    cutout.getSafeInsetRight(), cutout.getSafeInsetBottom());
++            return insets;
++        });
++
++        mDragLayer.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
++            @Override
++            public void onViewAttachedToWindow(@NonNull View v) {
++                mDragLayer.removeOnAttachStateChangeListener(this);
++                mDragLayer.requestApplyInsets();
++            }
++
++            @Override
++            public void onViewDetachedFromWindow(@NonNull View v) {}
++        });
++
+         mAccessibilityDelegate = new TaskbarShortcutMenuAccessibilityDelegate(this);
+ 
+         // If Bubble bar is present, TaskbarControllers depends on it so build it first.
+@@ -880,6 +901,10 @@
+         windowLayoutParams.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+         windowLayoutParams.privateFlags =
+                 WindowManager.LayoutParams.PRIVATE_FLAG_NO_MOVE_ANIMATION;
++        if (isPhoneMode()) {
++            windowLayoutParams.privateFlags |=
++                    WindowManager.LayoutParams.PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT;
++        }
+         windowLayoutParams.accessibilityTitle = getString(
+                 isPhoneMode() ? R.string.taskbar_phone_a11y_title : R.string.taskbar_a11y_title);
+ 

@@ -1,0 +1,23 @@
+# OnePlus7Port: LineageOS sm8150 touchpanel driver reports screen-off gestures whose bit is set in
+# double_tap_enable_indep as scancode 246 + gesture type; double tap stays KEY_WAKEUP. ColorOS
+# (OplusScreenOffGestureManager) only handles KEYCODE_F4 and then reads the gesture type and points from
+# /proc/touchpanel/coordinate, so route every gesture scancode to F4.
+key 62    F4
+key 248   F4
+key 249   F4
+key 250   F4
+key 251   F4
+key 252   F4
+key 253   F4
+key 254   F4
+key 255   F4
+key 256   F4
+key 257   F4
+key 258   F4
+key 259   F4
+key 260   F4
+key 261   F4
+key 262   F4
+key 263   F4
+key 264   F4
+key 143   WAKEUP

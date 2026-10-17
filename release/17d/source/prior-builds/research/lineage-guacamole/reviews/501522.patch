@@ -1,0 +1,48 @@
+From 6c2a3a84facab437e695364cacfe9655baaa9fc6 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Mon, 07 Sep 2026 10:57:33 +0530
+Subject: [PATCH] release: Enable new Vision Settings in Accessibility
+
+Change-Id: I795491321c21326463869c00c7b77098bd0f66dd
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/release/aconfig/cp2a/com.android.settings.accessibility/Android.bp b/release/aconfig/cp2a/com.android.settings.accessibility/Android.bp
+new file mode 100644
+index 0000000..cf1e0c7
+--- /dev/null
++++ b/release/aconfig/cp2a/com.android.settings.accessibility/Android.bp
+@@ -0,0 +1,21 @@
++// Copyright 2025 Google Inc. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++aconfig_values {
++    name: "aconfig-values-lineage-cp2a-com.android.settings.accessibility-all",
++    package: "com.android.settings.accessibility",
++    srcs: [
++        "*.textproto",
++    ],
++}
+diff --git a/release/aconfig/cp2a/com.android.settings.accessibility/enable_setuplib_in_a11y_setup_page.textproto b/release/aconfig/cp2a/com.android.settings.accessibility/enable_setuplib_in_a11y_setup_page.textproto
+new file mode 100644
+index 0000000..74a0d7b
+--- /dev/null
++++ b/release/aconfig/cp2a/com.android.settings.accessibility/enable_setuplib_in_a11y_setup_page.textproto
+@@ -0,0 +1,6 @@
++flag_value {
++  package: "com.android.settings.accessibility"
++  name: "enable_setuplib_in_a11y_setup_page"
++  state: ENABLED
++  permission: READ_ONLY
++}

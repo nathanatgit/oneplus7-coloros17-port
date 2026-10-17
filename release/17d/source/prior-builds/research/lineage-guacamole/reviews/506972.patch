@@ -1,0 +1,50 @@
+From f2d29ab2d80ea179285cd818b756b44234d2bbb4 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Wed, 07 Oct 2026 23:49:47 +0100
+Subject: [PATCH] l2cap: Skip offload coex buffer cap when nothing is reserved
+
+l2c_link_set_br_coex_buf_cap() runs on every A2DP offload start and
+stop, even when no ACL buffers are reserved for coex. Its unsigned
+pending ack computation wraps around once controller_xmit_window
+exceeds num_lm_acl_bufs, zeroing the BR/EDR transmit window and
+deferring the offload start VSC until the link drops.
+
+Return early when no cap is active and none is requested, and
+saturate the pending ack computation.
+
+Fixes: 326d67508ecf ("Add L2CAP and A2DP offload coex mechanism for MTK")
+Assisted-by: ClaudeCode:claude-opus-5
+Change-Id: I46ff5151c81611412bee5d2f3be1089cdfa556cb
+---
+
+diff --git a/system/stack/l2cap/l2c_link.cc b/system/stack/l2cap/l2c_link.cc
+index ec73330..225553a 100644
+--- a/system/stack/l2cap/l2c_link.cc
++++ b/system/stack/l2cap/l2c_link.cc
+@@ -766,8 +766,25 @@
+  *
+  ******************************************************************************/
+ void l2c_link_set_br_coex_buf_cap(uint16_t bufs_to_reserve, tL2C_COEX_READY cb) {
++  /* No cap active and none requested: leave the window accounting untouched */
++  if (bufs_to_reserve == 0 && l2cb.num_lm_acl_bufs == l2cb.full_num_lm_acl_bufs &&
++      l2cb.pending_acks_until_coex_cb == 0) {
++    std::move(cb).Run(/* success= */ true);
++    return;
++  }
++
++  if (bufs_to_reserve > l2cb.full_num_lm_acl_bufs) {
++    bufs_to_reserve = l2cb.full_num_lm_acl_bufs;
++  }
+   uint16_t new_bufs_count = l2cb.full_num_lm_acl_bufs - bufs_to_reserve;
+-  uint16_t pending_acks = l2cb.num_lm_acl_bufs - l2cb.controller_xmit_window + l2cb.pending_acks_until_coex_cb;
++  /* controller_xmit_window may exceed num_lm_acl_bufs, avoid wrapping around */
++  uint16_t pending_acks = l2cb.pending_acks_until_coex_cb;
++  if (l2cb.num_lm_acl_bufs > l2cb.controller_xmit_window) {
++    pending_acks += l2cb.num_lm_acl_bufs - l2cb.controller_xmit_window;
++  } else if (l2cb.controller_xmit_window > l2cb.num_lm_acl_bufs) {
++    log::warn("xmit_window={} exceeds acl bufs={}", l2cb.controller_xmit_window,
++              l2cb.num_lm_acl_bufs);
++  }
+ 
+   log::debug(
+       "coex buf cap: total={} reserving={} available={} pending_acks={} xmit_window={}",

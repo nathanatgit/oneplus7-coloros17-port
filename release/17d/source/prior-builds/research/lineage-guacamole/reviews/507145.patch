@@ -1,0 +1,236 @@
+From 215345e9c1cabd74709b13b01ee9198e0bc090ae Mon Sep 17 00:00:00 2001
+From: Oliver Scott <olivercscott@gmail.com>
+Date: Mon, 28 Dec 2020 22:18:05 -0500
+Subject: [PATCH] SetupWizard: Add button to setup eSIM on missing SIM page
+
+Co-authored-by: Nick Reuter <nreuter85@gmail.com>
+Co-authored-by: Chirayu Desai <chirayudesai1@gmail.com>
+Co-authored-by: Michael Bestas <mkbestas@gmail.com>
+Change-Id: I61072d392a4eff5e5223782c2bda8c0d3ca45d1f
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/network/EuccRepository.kt b/app/src/main/java/org/lineageos/setupwizard/network/EuccRepository.kt
+new file mode 100644
+index 0000000..b35a4fd
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/network/EuccRepository.kt
+@@ -0,0 +1,89 @@
++/*
++ * SPDX-FileCopyrightText: 2024 The Android Open Source Project
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.network
++
++import android.content.Context
++import android.os.SystemProperties
++import android.telephony.TelephonyManager
++import android.telephony.euicc.EuiccManager
++import android.util.Log
++import org.lineageos.setupwizard.util.SetupWizardUtils
++
++class EuiccRepository @JvmOverloads constructor(private val context: Context) {
++
++    private val euiccManager = context.getSystemService(EuiccManager::class.java)
++    private val telephonyManager = context.getSystemService(TelephonyManager::class.java)
++
++    /**
++     * Whether to show the entry point to eUICC settings.
++     *
++     * We show the entry point on any device which supports eUICC as long as either the eUICC was
++     * ever provisioned (that is, at least one profile was ever downloaded onto it), or if the user
++     * has enabled development mode.
++     */
++    fun showEuiccSettings(): Boolean {
++        if (!SetupWizardUtils.hasTelephony(context)) {
++            Log.i(TAG, "showEuiccSettings: no telephony voice/data capabilities.")
++            return false
++        }
++        if (euiccManager == null || !euiccManager.isEnabled) {
++            Log.w(TAG, "EuiccManager is not enabled.")
++            return false
++        }
++        val ignoredCids =
++            SystemProperties.get(KEY_ESIM_CID_IGNORE).split(',').filter { it.isNotEmpty() }
++        val cid = SystemProperties.get(KEY_CID)
++        if (cid in ignoredCids) {
++            Log.i(TAG, "showEuiccSettings: cid ignored")
++            return false
++        }
++        val enabledEsimUiByDefault =
++            SystemProperties.getBoolean(KEY_ENABLE_ESIM_UI_BY_DEFAULT, true)
++        Log.i(TAG, "showEuiccSettings: enabledEsimUiByDefault=$enabledEsimUiByDefault")
++        return enabledEsimUiByDefault && isCurrentCountrySupported()
++    }
++
++    /**
++     * Loop through all the device logical slots to check whether the user's current country
++     * supports eSIM.
++     */
++    private fun isCurrentCountrySupported(): Boolean {
++        val euiccManager = euiccManager ?: return false
++        val telephonyManager = telephonyManager ?: return false
++        val visitedCountrySet = mutableSetOf<String>()
++        for (slotIndex in 0 until telephonyManager.getActiveModemCount()) {
++            val countryCode = telephonyManager.getNetworkCountryIso(slotIndex)
++            if (
++                countryCode.isNotEmpty() &&
++                    visitedCountrySet.add(countryCode) &&
++                    euiccManager.isSupportedCountry(countryCode)
++            ) {
++                Log.i(TAG, "isCurrentCountrySupported: $countryCode is supported")
++                return true
++            }
++        }
++        Log.i(TAG, "isCurrentCountrySupported: no country is supported")
++        return false
++    }
++
++    companion object {
++        private const val TAG = "EuiccRepository"
++
++        /** CID of the device. */
++        private const val KEY_CID: String = "ro.boot.cid"
++
++        /** CIDs of devices which should not show anything related to eSIM. */
++        private const val KEY_ESIM_CID_IGNORE: String = "ro.setupwizard.esim_cid_ignore"
++
++        /**
++         * System Property which is used to decide whether the default eSIM UI will be shown, the
++         * default value is false.
++         */
++        private const val KEY_ENABLE_ESIM_UI_BY_DEFAULT: String =
++            "esim.enable_esim_system_ui_by_default"
++    }
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt b/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
+index 79ddcae..e92c3c4 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
+@@ -8,16 +8,49 @@
+ 
+ import android.content.Intent
+ import android.os.Bundle
++import android.service.euicc.EuiccService.ACTION_PROVISION_EMBEDDED_SUBSCRIPTION
++import android.telephony.euicc.EuiccManager.EXTRA_FORCE_PROVISION
++import androidx.activity.result.ActivityResult
++import com.google.android.material.dialog.MaterialAlertDialogBuilder
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+ import org.lineageos.setupwizard.R
+-import org.lineageos.setupwizard.base.BaseSetupWizardActivity
++import org.lineageos.setupwizard.base.SubBaseActivity
+ import org.lineageos.setupwizard.util.SetupWizardUtils
+ 
+-class SimMissingActivity : BaseSetupWizardActivity() {
++class SimMissingActivity : SubBaseActivity() {
++
++    private val euiccAvailable: Boolean
++        get() = EuiccRepository(this).showEuiccSettings()
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
++        if (euiccAvailable) {
++            setDescriptionText(getString(R.string.esim_support_summary))
++            setNextText(R.string.setup_euicc)
++        } else {
++            setDescriptionText(getString(R.string.sim_missing_summary))
++        }
++    }
+ 
++    override fun onNextIntentResult(activityResult: ActivityResult) {
++        if (!SetupWizardUtils.simMissing(this) || !SetupWizardUtils.hasTelephony(this)) {
++            val resultCode = activityResult.resultCode
++            val data = activityResult.data
++            if (resultCode == RESULT_CANCELED && data!!.getBooleanExtra("onBackPressed", false)) {
++                finishAction(resultCode, data)
++            }
++        }
++    }
++
++    override fun onSubactivityResult(activityResult: ActivityResult) {
++        // We don't really care about the result, but if a SIM is no longer missing, we're done.
++        if (!SetupWizardUtils.simMissing(this)) {
++            // See comments in onStartSubactivity for an explanation.
++            finishAction(RESULT_SKIP, Intent().putExtra("onBackPressed", true))
++        }
++    }
++
++    override fun onStartSubactivity() {
+         if (!SetupWizardUtils.simMissing(this) || !SetupWizardUtils.hasTelephony(this)) {
+             // NetworkSetupActivity comes before us. DateTimeActivity comes after.
+             // If the user presses the back button on DateTimeActivity, we can only pass along
+@@ -27,13 +60,27 @@
+             // NetworkSetupActivity to be reached later is if the user went backwards. So, we
+             // finish this activity faking that the user pressed the back button, which is required
+             // for subactivities like NetworkSetupActivity to work properly on backward navigation.
++            // See also onSubactivityResult.
+             // TODO: Resolve all this.
+             finishAction(RESULT_SKIP, Intent().putExtra("onBackPressed", true))
+-            return
+         }
+ 
+-        setDescriptionText(getString(R.string.sim_missing_summary))
+-        setNextAllowed(true)
++        setNextAllowed(euiccAvailable)
++    }
++
++    override fun onNextPressed() {
++        launchEuiccSetup()
++    }
++
++    override fun onSkipPressed() {
++        MaterialAlertDialogBuilder(this)
++            .setTitle(R.string.sim_missing_skip_title)
++            .setMessage(R.string.sim_missing_skip_message)
++            .setPositiveButton(R.string.skip) { _, _ ->
++                finishAction(RESULT_SKIP, Intent().putExtra("onBackPressed", true))
++            }
++            .setNegativeButton(R.string.cancel, null)
++            .show()
+     }
+ 
+     override val layoutResId = R.layout.sim_missing_page
+@@ -41,4 +88,16 @@
+     override val titleResId = R.string.setup_sim_missing
+ 
+     override val iconResId = R.drawable.ic_sim
++
++    override val installFooterBar = true
++
++    override val showSkipButton = true
++
++    private fun launchEuiccSetup() {
++        startSubactivity(
++            Intent(ACTION_PROVISION_EMBEDDED_SUBSCRIPTION).apply {
++                putExtra(EXTRA_FORCE_PROVISION, true)
++            }
++        )
++    }
+ }
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 2e5dc45..ed0a970 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -14,6 +14,7 @@
+ 
+     <string name="activity_label_empty" />
+ 
++    <string name="cancel">Cancel</string>
+     <string name="next">Next</string>
+     <string name="finish">Finish</string>
+     <string name="skip">Skip</string>
+@@ -39,9 +40,13 @@
+     <string name="sim_locale_changed">%1$s SIM detected</string>
+ 
+     <!-- Missing SIM page -->
++    <string name="setup_euicc">Set up eSIM</string>
+     <string name="setup_sim_missing">SIM card missing</string>
++    <string name="esim_support_summary">Set up an eSIM or insert a SIM card. To insert a SIM card, read the instructions that came with your device.</string>
+     <string name="sim_missing_summary" product="tablet">A SIM card has not been detected in your tablet. To insert a SIM card, read the instructions that came with your device.</string>
+     <string name="sim_missing_summary" product="default">A SIM card has not been detected in your phone. To insert a SIM card, read the instructions that came with your device.</string>
++    <string name="sim_missing_skip_title">Skip setting up a SIM?</string>
++    <string name="sim_missing_skip_message">If you skip this step, you won\'t be connected to a mobile network until you set up a SIM in Settings.</string>
+ 
+     <!-- Date & time page -->
+     <string name="setup_datetime">Date &amp; time</string>

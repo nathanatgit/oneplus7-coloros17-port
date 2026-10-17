@@ -1,0 +1,217 @@
+From 5c103a0f8f3d253498096e0f956e83567b8684aa Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:40:00 +0300
+Subject: [PATCH] Merge tag 'LA.VENDOR.14.3.0.r1-23400-lanai.QSSI16.0' into staging/lineage-24.0_merge-LA.VENDOR.14.3.0.r1-23400-lanai.QSSI16.0
+
+LA.VENDOR.14.3.0.r1-23400-lanai.QSSI16.0
+
+* tag 'LA.VENDOR.14.3.0.r1-23400-lanai.QSSI16.0':
+  dataipa: Fix arbitrary SMMU mapping via MHI proxy QMI request
+  dataipa: validate EP state before WAN RT cleanup
+  dataipa: Fix to validate the NAT table entries during NAT table init
+  dataipa: update conditional check for tx napi
+  msm: ipa: Wait for interrupt mode before teardown
+  msm:ipa Fix a race condition
+  msm: ipa: fix to ignore EIO error from QMI during SSR
+  msm:ipa: Fix missing napi_disable before napi_del
+
+Change-Id: I053ca0bb040a832e376035ef14baa9ee424ebb37
+---
+
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c b/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+index 2e23c53..20183e9 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+@@ -2004,25 +2004,18 @@
+ 		/* Delete NAPI TX object. For WAN_PROD, it is deleted
+ 		 * in rmnet_ipa driver.
+ 		 */
+-		if (ipa3_ctx->tx_napi_enable &&
+-			(ep->client != IPA_CLIENT_APPS_WAN_PROD))
++		if (ep->sys->napi_tx_enable &&
++			(ep->client != IPA_CLIENT_APPS_WAN_PROD)) {
++			napi_disable(&ep->sys->napi_tx);
+ 			netif_napi_del(&ep->sys->napi_tx);
++		}
+ 	}
+ 
+-	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) {
+-		napi_disable(&ep->sys->napi_rx);
+-		netif_napi_del(&ep->sys->napi_rx);
+-	}
+-
+-	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_CONS && ep->sys)
+-		tasklet_kill(&ep->sys->tasklet);
+-
+ 	if ( ep->client == IPA_CLIENT_APPS_WAN_COAL_CONS ) {
+ 		stop_coalescing();
+ 		ipa3_force_close_coal(false, true);
+ 	}
+ 
+-
+ 	/* channel stop might fail on timeout if IPA is busy */
+ 	for (i = 0; i < IPA_GSI_CHANNEL_STOP_MAX_RETRY; i++) {
+ 		result = ipa_stop_gsi_channel(clnt_hdl);
+@@ -2055,6 +2048,14 @@
+ 	if (IPA_CLIENT_IS_PROD(ep->client))
+ 		atomic_set(&ep->sys->workqueue_flushed, 1);
+ 
++	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) {
++		napi_disable(&ep->sys->napi_rx);
++		netif_napi_del(&ep->sys->napi_rx);
++	}
++
++	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_CONS && ep->sys)
++		tasklet_kill(&ep->sys->tasklet);
++
+ 	/*
+ 	 * Tear down the default pipe before we reset the channel
+ 	 */
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c b/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c
+index 992c084..25f3468 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c
+@@ -322,6 +322,13 @@
+ 	*size_p = roundup(size + pa - *pa_p, PAGE_SIZE);
+ }
+ 
++/* true if [start, start + len) lies entirely within [base, base + size) */
++static inline bool imp_range_within(u64 base, u64 size, u64 start, u64 len)
++{
++	return start >= base && len <= size &&
++		(start - base) <= (size - len);
++}
++
+ static void __map_smmu_info(struct device *dev,
+ 	struct imp_iova_addr *partition, int num_mapping,
+ 	struct ipa_mhi_mem_addr_info_type_v01 *map_info,
+@@ -339,21 +346,42 @@
+ 		return;
+ 	}
+ 
++	if (num_mapping < 0 ||
++		num_mapping > QMI_IPA_REMOTE_MHI_MEMORY_MAPPING_NUM_MAX_V01) {
++		IMP_ERR("invalid num_mapping %d\n", num_mapping);
++		return;
++	}
++
+ 	for (i = 0; i < num_mapping; i++) {
+ 		int prot = IOMMU_READ | IOMMU_WRITE;
+ 		u32 ipa_base = ipa3_ctx->ipa_wrapper_base +
+ 			ipa3_ctx->ctrl->ipa_reg_base_ofst;
+ 		u32 ipa_size = ipa3_ctx->ipa_wrapper_size;
+ 
++		if (map_info[i].size == 0) {
++			IMP_ERR("invalid mapping size 0 for entry %d\n", i);
++			continue;
++		}
++
+ 		imp_smmu_round_to_page(map_info[i].iova, map_info[i].pa,
+ 			map_info[i].size, &iova_p, &pa_p, &size_p);
+ 
+-		if (map) {
+-			/* boundary check */
+-			WARN_ON(partition->base > iova_p ||
+-				(partition->base + partition->size) <
+-				(iova_p + size_p));
++		/*
++		 * Reject the mapping unless the iova lies fully within the
++		 * allowed partition and, for entries landing in the IPA
++		 * register aperture, the pa also lies fully within it.
++		 */
++		if (!imp_range_within(partition->base, partition->size,
++				iova_p, size_p) ||
++			(!imp_range_within(ipa_base, ipa_size,
++				pa_p, size_p))) {
++			IMP_ERR(
++				"rejecting oob mapping iova 0x%lx pa 0x%pa size %u\n",
++				iova_p, &pa_p, size_p);
++			continue;
++		}
+ 
++		if (map) {
+ 			/* for IPA uC MBOM we need to map with device type */
+ 			if (pa_p - ipa_base < ipa_size)
+ 				prot |= IOMMU_MMIO;
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c b/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
+index d352fbb..e5d19d1 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ /*
+  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+  */
+ 
+ #include <linux/device.h>
+@@ -1616,8 +1617,9 @@
+ 		return -EPERM;
+ 	}
+ 
+-	if (init->table_entries == 0) {
+-		IPAERR_RL("Table entries is zero\n");
++	if (init->table_entries == 0 ||
++		init->table_entries == U16_MAX) {
++		IPAERR_RL("Table entries is %d\n", init->table_entries);
+ 		return -EPERM;
+ 	}
+ 
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c b/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
+index 976a27f..399aaa1 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
+@@ -2,7 +2,7 @@
+ /*
+  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+  *
+- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+  */
+ 
+ #include <linux/module.h>
+@@ -1891,8 +1891,9 @@
+ 	/* Initialize modem IPA-driver */
+ 	IPAWANDBG("send ipa3_qmi_init_modem_send_sync_msg to modem\n");
+ 	rc = ipa3_qmi_init_modem_send_sync_msg();
++	IPAWANERR("send ipa3_qmi_init_modem_send_sync_msg to modem rc:%d\n", rc);
+ 	if ((rc == -ENETRESET) || (rc == -ENODEV) || (rc == -ECONNRESET) ||
+-		atomic_read(&ipa3_ctx->is_ssr)) {
++		(rc == -EIO) ||  ((rc != 0) && (atomic_read(&ipa3_ctx->is_ssr)))) {
+ 		IPAWANERR(
+ 		"ipa3_qmi_init_modem_send_sync_msg failed due to SSR!\n");
+ 		/* Cleanup when ipa3_wwan_remove is called */
+diff --git a/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c b/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c
+index 6e3bd53..25292d4 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c
++++ b/drivers/platform/msm/ipa/ipa_v3/rmnet_ipa.c
+@@ -2,7 +2,7 @@
+ /*
+  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
+  *
+- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
++ * CCopyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+  */
+ 
+ /*
+@@ -3728,6 +3728,7 @@
+ static int ipa3_wwan_remove(struct platform_device *pdev)
+ {
+ 	int ret, j;
++	int ep_wan;
+ 
+ 	IPAWANINFO("rmnet_ipa started deinitialization\n");
+ 	mutex_lock(&rmnet_ipa3_ctx->pipe_handle_guard);
+@@ -3785,8 +3786,10 @@
+ 		(ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) !=
+ 		IPA_EP_NOT_ALLOCATED))
+ 		ipa3_del_low_lat_rt_rule();
+-	if (ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS) !=
+-		IPA_EP_NOT_ALLOCATED) {
++
++	ep_wan = ipa_get_ep_mapping(IPA_CLIENT_APPS_WAN_CONS);
++	if (ep_wan != IPA_EP_NOT_ALLOCATED &&
++		ipa3_ctx->ep[ep_wan].valid) {
+ 		ipa3_del_dflt_wan_rt_tables();
+ 		ipa3_del_a7_qmap_hdr();
+ 	}

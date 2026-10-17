@@ -1,0 +1,42 @@
+From e488c7d280f95ee8cc9a4a60a2c3525b3f181ef9 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Tue, 29 Sep 2026 14:17:53 -0400
+Subject: [PATCH] toolbox/modprobe: Select performance for LoadParallelMode based on bootconfig
+
+Select performance for LoadParallelMode based on bootconfig, this is
+the same behavior as the first stage ramdisk.
+
+Change-Id: I38d682e4b7c319670fbcb742b64eab214a4d771d
+---
+
+diff --git a/toolbox/modprobe.cpp b/toolbox/modprobe.cpp
+index 41a89f9..a97bc62 100644
+--- a/toolbox/modprobe.cpp
++++ b/toolbox/modprobe.cpp
+@@ -25,6 +25,7 @@
+ #include <android-base/file.h>
+ #include <android-base/logging.h>
+ #include <android-base/macros.h>
++#include <android-base/properties.h>
+ #include <android-base/strings.h>
+ #include <android-base/stringprintf.h>
+ #include <modprobe/modprobe.h>
+@@ -306,9 +307,16 @@
+ 
+     Modprobe m(mod_dirs, modules_load_file.empty() ? "modules.load" : modules_load_file, blocklist);
+     if (mode == AddModulesMode && !modules_load_file.empty()) {
++        auto parallel_mode = Modprobe::LoadParallelMode::NORMAL;
++        auto boot_parallel_mode =
++                android::base::GetProperty("ro.boot.load_modules_parallel", "");
++        if (boot_parallel_mode == "performance")
++            parallel_mode = Modprobe::LoadParallelMode::PERFORMANCE;
++        else if (boot_parallel_mode == "conservative")
++            parallel_mode = Modprobe::LoadParallelMode::CONSERVATIVE;
++
+         bool retval = (parallel) ? m.LoadModulesParallel(std::thread::hardware_concurrency(),
+-                                                         Modprobe::LoadParallelMode::NORMAL,
+-                                                         false)
++                                                         parallel_mode, false)
+                                  : m.LoadListedModules(false);
+ 
+         if (!retval) {

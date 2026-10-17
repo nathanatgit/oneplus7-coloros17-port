@@ -1,0 +1,45 @@
+From 09f1513f0026da163b25ac395c3fda1e05bad680 Mon Sep 17 00:00:00 2001
+From: AnierinB <anierin@evolution-x.org>
+Date: Wed, 16 Sep 2026 00:08:04 +0000
+Subject: [PATCH] build: Exclude already overriden AOSP apps from LineageOS builds
+
+LineageOS apps can and actually override the AOSP equivalent ones.
+However, if some product excludes any of them, the AOSP equivalent
+would still be included and that's not desirable.
+
+Change-Id: I243cec7da76d00c70b81f353d1a5b279242690cb
+Signed-off-by: AnierinB <anierin@evolution-x.org>
+---
+
+diff --git a/target/product/handheld_product.mk b/target/product/handheld_product.mk
+index ae7cbe0..3a94711 100644
+--- a/target/product/handheld_product.mk
++++ b/target/product/handheld_product.mk
+@@ -22,13 +22,8 @@
+ 
+ # /product packages
+ PRODUCT_PACKAGES += \
+-    Browser2 \
+-    Calendar \
+-    Camera2 \
+     Contacts \
+     DeskClock \
+-    Gallery2 \
+-    Music \
+     preinstalled-packages-platform-handheld-product.xml \
+     QuickSearchBox \
+     SettingsIntelligence \
+@@ -36,7 +31,12 @@
+ 
+ ifeq ($(LINEAGE_BUILD),)
+ PRODUCT_PACKAGES += \
+-    LatinIME
++    Browser2 \
++    Calendar \
++    Camera2 \
++    Gallery2 \
++    LatinIME \
++    Music
+ endif
+ 
+ PRODUCT_PACKAGES_DEBUG += \

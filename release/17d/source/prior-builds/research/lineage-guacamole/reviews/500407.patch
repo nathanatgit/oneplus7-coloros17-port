@@ -1,0 +1,75 @@
+From d78cca9a72fc0a95f3f96f1ae65b60bca6ea56bf Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 17 Sep 2026 00:14:56 +0530
+Subject: [PATCH] Revert "Import pixel setupwizard overlay resources"
+
+This reverts commit e609beb164f7c68b522d6119cee967eb5f01a34c.
+
+Change-Id: I59f96942cdb3363379597d13655aa84f151745c4
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/main/res/values-land/dimens.xml b/main/res/values-land/dimens.xml
+deleted file mode 100644
+index 57c9372..0000000
+--- a/main/res/values-land/dimens.xml
++++ /dev/null
+@@ -1,9 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<resources>
+-    <dimen name="setup_compat_footer_button_min_height">36.0dip</dimen>
+-    <dimen name="setup_compat_footer_button_padding_bottom">0.0dip</dimen>
+-    <dimen name="setup_compat_footer_button_padding_top">0.0dip</dimen>
+-    <dimen name="setup_design_content_padding_top">32.0dip</dimen>
+-    <dimen name="setup_design_layout_margin_end">32.0dip</dimen>
+-    <dimen name="setup_design_layout_margin_start">32.0dip</dimen>
+-</resources>
+diff --git a/main/res/values/config.xml b/main/res/values/config.xml
+index 523ae29..af537e6 100644
+--- a/main/res/values/config.xml
++++ b/main/res/values/config.xml
+@@ -26,44 +26,6 @@
+     <!-- Whether to hide the footer bar when the IME is shown. -->
+     <bool name="suc_footer_bar_hide_when_ime_shown">false</bool>
+ 
+-    <!-- Pixel theme -->
+-    <string name="setup_design_layout_gravity">start</string>
+-    <integer name="setup_design_header_auto_size_max_line_of_max_size">2</integer>
+-    <dimen name="setup_compat_footer_button_min_height">56.0dip</dimen>
+-    <dimen name="setup_compat_footer_button_padding_bottom">6.0dip</dimen>
+-    <dimen name="setup_compat_footer_button_padding_top">6.0dip</dimen>
+-    <dimen name="setup_compat_footer_button_radius">26.0dip</dimen>
+-    <dimen name="setup_compat_footer_button_text_size">14.0sp</dimen>
+-    <dimen name="setup_design_content_info_icon_margin_end">16.0dip</dimen>
+-    <dimen name="setup_design_content_info_icon_size">18.0dip</dimen>
+-    <dimen name="setup_design_content_info_line_spacing_extra">8.0sp</dimen>
+-    <dimen name="setup_design_content_info_padding_bottom">16.0dip</dimen>
+-    <dimen name="setup_design_content_info_padding_top">16.0dip</dimen>
+-    <dimen name="setup_design_content_info_text_size">16.0sp</dimen>
+-    <dimen name="setup_design_content_padding_top">8.0dip</dimen>
+-    <dimen name="setup_design_content_text_size">18.0sp</dimen>
+-    <dimen name="setup_design_description_text_margin_bottom">0.0dip</dimen>
+-    <dimen name="setup_design_description_text_margin_top">24.0dip</dimen>
+-    <dimen name="setup_design_description_text_size">18.0sp</dimen>
+-    <dimen name="setup_design_header_auto_size_line_spacing_extra">8.0sp</dimen>
+-    <dimen name="setup_design_header_auto_size_max_text_size">36.0sp</dimen>
+-    <dimen name="setup_design_header_auto_size_min_text_size">28.0sp</dimen>
+-    <dimen name="setup_design_header_container_margin_bottom">24.0dip</dimen>
+-    <dimen name="setup_design_header_text_margin_bottom">0.0dip</dimen>
+-    <dimen name="setup_design_header_text_margin_top">24.0dip</dimen>
+-    <dimen name="setup_design_header_text_size">36.0sp</dimen>
+-    <dimen name="setup_design_icon_margin_top">32.0dip</dimen>
+-    <dimen name="setup_design_icon_size">48.0dip</dimen>
+-    <dimen name="setup_design_items_min_height">72.0dip</dimen>
+-    <dimen name="setup_design_items_padding_bottom">16.0dip</dimen>
+-    <dimen name="setup_design_items_padding_top">16.0dip</dimen>
+-    <dimen name="setup_design_items_summary_margin_top">4.0dip</dimen>
+-    <dimen name="setup_design_items_summary_text_size">14.0sp</dimen>
+-    <dimen name="setup_design_items_title_text_size">20.0sp</dimen>
+-    <dimen name="setup_design_layout_margin_end">24.0dip</dimen>
+-    <dimen name="setup_design_layout_margin_start">40.0dip</dimen>
+-    <bool name="setup_design_header_auto_size_enabled">true</bool>
+-    <bool name="setup_design_items_divider_shown">false</bool>
+     <bool name="setup_compat_light_navigation_bar">true</bool>
+     <bool name="setup_compat_light_status_bar">true</bool>
+ </resources>

@@ -1,0 +1,20 @@
+From 6baaef78dd01fa8bbd9571d7063f990493b90a3a Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Wed, 19 Aug 2026 20:13:38 -0400
+Subject: [PATCH] core: Select parrot VINTF fragment for taro (cape|waipio)
+
+Change-Id: Id3b4923e078442adbb75a56b996252c799121fae
+---
+
+diff --git a/hal/core/Android.bp b/hal/core/Android.bp
+index b611e2e..28d4a01 100644
+--- a/hal/core/Android.bp
++++ b/hal/core/Android.bp
+@@ -11,6 +11,7 @@
+ 
+     vintf_fragments: select(soong_config_variable("ANDROID", "target_board_platform"), {
+         "parrot": ["configs/parrot/manifest_audio_qti_services.xml"],
++        "taro": ["configs/parrot/manifest_audio_qti_services.xml"],
+         default: [],
+     }),
+ 

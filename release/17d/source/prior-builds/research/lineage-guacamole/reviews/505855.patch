@@ -1,0 +1,86 @@
+From c21084f7e569779a995f3c40f586ffc33941e5bd Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Wed, 19 Aug 2026 16:32:10 -0400
+Subject: [PATCH] pal: Fix compile errors on android-16.0.0_r4
+
+Change-Id: I1626f5034e1f0f9109879d047905d616f3ffe5a1
+---
+
+diff --git a/device/src/Bluetooth.cpp b/device/src/Bluetooth.cpp
+index 391a078..01b85fa 100644
+--- a/device/src/Bluetooth.cpp
++++ b/device/src/Bluetooth.cpp
+@@ -2168,8 +2168,8 @@
+                     rm->a2dpResume(param_a2dp->dev_id);
+                 }
+             }
+-            break;
+         }
++        break;
+     }
+     case PAL_PARAM_ID_BT_A2DP_TWS_CONFIG:
+     {
+@@ -2267,9 +2267,9 @@
+                 } else {
+                     rm->a2dpCaptureResume(param_a2dp->dev_id);
+                 }
+-             }
+-             break;
+-       }
++            }
++        }
++        break;
+     }
+     case PAL_PARAM_ID_SET_SINK_METADATA:
+         if (deviceAttr.id == PAL_DEVICE_IN_BLUETOOTH_BLE) {
+@@ -2544,9 +2544,9 @@
+         streamMapStr = match.suffix().str();
+     }
+ 
+-    PAL_DBG(LOG_TAG, "stream map out size: %d, stream map in size: %d", steamMapOut.size(), steamMapIn.size());
++    PAL_DBG(LOG_TAG, "stream map out size: %zu, stream map in size: %zu", steamMapOut.size(), steamMapIn.size());
+     if ((steamMapOut.size() == 0) || (steamMapIn.size() == 0)) {
+-        PAL_ERR(LOG_TAG, "invalid size steamMapOut.size %d, steamMapIn.size %d",
++        PAL_ERR(LOG_TAG, "invalid size steamMapOut.size %zu, steamMapIn.size %zu",
+                 steamMapOut.size(), steamMapIn.size());
+         return;
+     }
+diff --git a/device/src/DisplayPort.cpp b/device/src/DisplayPort.cpp
+index 724520e..03b95fa 100644
+--- a/device/src/DisplayPort.cpp
++++ b/device/src/DisplayPort.cpp
+@@ -523,7 +523,7 @@
+         return -EINVAL;
+     }
+ 
+-    PAL_DBG(LOG_TAG,"controller/stream: %ld/%ld", deviceValues[0], deviceValues[1]);
++    PAL_DBG(LOG_TAG,"controller/stream: %d/%d", deviceValues[0], deviceValues[1]);
+ 
+     return mixer_ctl_set_array(ctl, deviceValues, ARRAY_SIZE(deviceValues));
+ }
+diff --git a/device/src/SpeakerProtection.cpp b/device/src/SpeakerProtection.cpp
+index 43b78c0..7c4d941 100644
+--- a/device/src/SpeakerProtection.cpp
++++ b/device/src/SpeakerProtection.cpp
+@@ -1727,7 +1727,7 @@
+     if (isDynamicCalTriggered) {
+         PAL_DBG(LOG_TAG, "Dynamic Calibration triggered");
+     } else if (*sec < minIdleTime) {
+-        PAL_DBG(LOG_TAG, "Device not idle for minimum time. %lu", sec);
++        PAL_DBG(LOG_TAG, "Device not idle for minimum time. %lu", *sec);
+         spkrCalibrateWait();
+         PAL_DBG(LOG_TAG, "Waited for device to be idle for min time");
+         return false;
+diff --git a/session/src/PayloadBuilder.cpp b/session/src/PayloadBuilder.cpp
+index 15bb633..dac56d4 100644
+--- a/session/src/PayloadBuilder.cpp
++++ b/session/src/PayloadBuilder.cpp
+@@ -3069,7 +3069,7 @@
+ 
+     /*scaling the volume by PLAYBACK_VOLUME_MAX factor*/
+     voldB = (long)(vol * (PLAYBACK_VOLUME_MAX*1.0));
+-    PAL_VERBOSE(LOG_TAG,"volume sent:%f \n",voldB);
++    PAL_VERBOSE(LOG_TAG,"volume sent:%ld \n",voldB);
+ 
+     switch (static_cast<uint32_t>(tag)) {
+     case TAG_STREAM_VOLUME:

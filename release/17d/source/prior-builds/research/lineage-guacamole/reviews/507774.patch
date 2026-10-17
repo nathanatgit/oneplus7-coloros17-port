@@ -1,0 +1,25 @@
+From 9517519bd41993a6770d11d0d34bab972b622848 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Tue, 13 Oct 2026 13:31:10 +0200
+Subject: [PATCH] fixup! Launcher3: allow disabling workspace edit
+
+Fixes: https://github.com/LineageOS/issues/issues/775
+Assisted-by: LLM
+Change-Id: Id1e732c554622f2a133b2c1e5e046ed3482ee4f4
+---
+
+diff --git a/src/com/android/launcher3/dragndrop/DragController.java b/src/com/android/launcher3/dragndrop/DragController.java
+index e9eb3f5..1bb9ca3 100644
+--- a/src/com/android/launcher3/dragndrop/DragController.java
++++ b/src/com/android/launcher3/dragndrop/DragController.java
+@@ -664,7 +664,9 @@
+         }
+ 
+         if (!Utilities.isWorkspaceEditAllowed(mActivity.getDragLayer().getContext())) {
+-            cancelDrag();
++            if (mDragDriver != null) {
++                cancelDrag();
++            }
+             return false;
+         }
+ 

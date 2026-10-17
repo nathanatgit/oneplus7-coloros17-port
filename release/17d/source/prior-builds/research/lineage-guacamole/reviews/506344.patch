@@ -1,0 +1,793 @@
+From fc71008c55ef958e16f39f796ea8e4308f924058 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Sun, 04 Oct 2026 23:12:24 +0530
+Subject: [PATCH] LatinIME: Use generic split layout for tablets in landscape
+
+Apply the split geometry transformer to every alphabet and symbols
+keyboard instead of relying on hand-written split rows that only
+existed for QWERTY. Split is only used on tablets in landscape.
+
+Drop the old QWERTY-only split rows, which used a small gap and two
+separate space keys.
+
+Assisted-by: LLM
+Change-Id: I71b1c915cf0e3916b9451dfaf1d1ac288d2f551c
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/res/xml-sw600dp-land/row_qwerty4.xml b/java/res/xml-sw600dp-land/row_qwerty4.xml
+index 0fdb5c6..c0bef7d 100644
+--- a/java/res/xml-sw600dp-land/row_qwerty4.xml
++++ b/java/res/xml-sw600dp-land/row_qwerty4.xml
+@@ -21,54 +21,23 @@
+ <merge
+     xmlns:latin="http://schemas.android.com/apk/res/com.android.inputmethod.latin"
+ >
+-    <switch>
+-        <!-- Split the 4th row for split layouts -->
+-        <case
+-            latin:isSplitLayout="true"
+-        >
+-            <Row
+-                latin:keyWidth="7.0%p"
+-                latin:backgroundType="functional"
+-            >
+-                <Key
+-                    latin:keyStyle="toSymbolKeyStyle" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_comma" />
+-                <!-- Space key. -->
+-                <include
+-                    latin:keyboardLayout="@xml/key_space_3kw"
+-                    latin:backgroundType="normal" />
+-                <Spacer
+-                    latin:keyWidth="28.0%p" />
+-                <Key
+-                    latin:keyStyle="spaceKeyStyle"
+-                    latin:keyWidth="21.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_period" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_emoji" />
+-            </Row>
+-        </case>
+-        <default>
+-            <Row
+-                latin:keyWidth="9.0%p"
+-                latin:backgroundType="functional"
+-            >
+-                <Key
+-                    latin:keyStyle="toSymbolKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_comma" />
+-                <!-- Space key. -->
+-                <include
+-                    latin:keyXPos="19.0%p"
+-                    latin:keyboardLayout="@xml/key_space_7kw"
+-                    latin:backgroundType="normal" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_period" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_emoji" />
+-            </Row>
+-        </default>
+-    </switch>
++    <Row
++        latin:keyWidth="9.0%p"
++        latin:backgroundType="functional"
++    >
++        <Key
++            latin:keyStyle="toSymbolKeyStyle"
++            latin:keyWidth="10.0%p" />
++        <include
++            latin:keyboardLayout="@xml/key_comma" />
++        <!-- Space key. -->
++        <include
++            latin:keyXPos="19.0%p"
++            latin:keyboardLayout="@xml/key_space_7kw"
++            latin:backgroundType="normal" />
++        <include
++            latin:keyboardLayout="@xml/key_period" />
++        <include
++            latin:keyboardLayout="@xml/key_emoji" />
++    </Row>
+ </merge>
+diff --git a/java/res/xml-sw600dp-land/rows_qwerty.xml b/java/res/xml-sw600dp-land/rows_qwerty.xml
+index 84013b8..3f620d8 100644
+--- a/java/res/xml-sw600dp-land/rows_qwerty.xml
++++ b/java/res/xml-sw600dp-land/rows_qwerty.xml
+@@ -26,107 +26,37 @@
+     <include latin:keyboardLayout="@xml/row_number_keys" />
+     <!-- First row -->
+     <Row>
+-        <switch>
+-            <!-- Split keyboard layout for the first row -->
+-            <case
+-                latin:isSplitLayout="true"
+-            >
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty1_left5"
+-                    latin:keyWidth="7.0%p" />
+-                <Spacer
+-                    latin:keyWidth="20.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty1_right5"
+-                    latin:keyWidth="7.0%p" />
+-                <Key
+-                    latin:keyStyle="deleteKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-            </case>
+-            <!-- Regular layout for the first row -->
+-            <default>
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty1"
+-                    latin:keyWidth="9.0%p" />
+-                <Key
+-                    latin:keyStyle="deleteKeyStyle"
+-                    latin:keyWidth="fillRight" />
+-            </default>
+-        </switch>
++        <include
++            latin:keyboardLayout="@xml/rowkeys_qwerty1"
++            latin:keyWidth="9.0%p" />
++        <Key
++            latin:keyStyle="deleteKeyStyle"
++            latin:keyWidth="fillRight" />
+     </Row>
+     <!-- Second row -->
+     <Row>
+-        <switch>
+-            <!-- Split keyboard layout for the second row -->
+-            <case
+-                latin:isSplitLayout="true"
+-            >
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty2_left5"
+-                    latin:keyXPos="4.0%p"
+-                    latin:keyWidth="7.0%p" />
+-                <Spacer
+-                    latin:keyWidth="23.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty2_right4"
+-                    latin:keyWidth="7.0%p" />
+-                <Key
+-                    latin:keyStyle="enterKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-            </case>
+-            <!-- Regular layout for the second row -->
+-            <default>
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty2"
+-                    latin:keyXPos="4.5%p"
+-                    latin:keyWidth="9.0%p" />
+-                <Key
+-                    latin:keyStyle="enterKeyStyle"
+-                    latin:keyWidth="fillRight" />
+-            </default>
+-        </switch>
++        <include
++            latin:keyboardLayout="@xml/rowkeys_qwerty2"
++            latin:keyXPos="4.5%p"
++            latin:keyWidth="9.0%p" />
++        <Key
++            latin:keyStyle="enterKeyStyle"
++            latin:keyWidth="fillRight" />
+     </Row>
+     <!-- Third row -->
+     <Row>
+-        <switch>
+-            <!-- Split keyboard layout for the third row -->
+-            <case
+-                latin:isSplitLayout="true"
+-            >
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty3_left4"
+-                    latin:keyWidth="7.0%p" />
+-                <Spacer
+-                    latin:keyWidth="17.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty3_right3"
+-                    latin:keyWidth="7.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/keys_exclamation_question"
+-                    latin:keyWidth="7.0%p" />
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-            </case>
+-            <!-- Regular layout for the third row -->
+-            <default>
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty3"
+-                    latin:keyWidth="9.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/keys_exclamation_question"
+-                    latin:keyWidth="9.0%p" />
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="fillRight" />
+-            </default>
+-        </switch>
++        <Key
++            latin:keyStyle="shiftKeyStyle"
++            latin:keyWidth="10.0%p" />
++        <include
++            latin:keyboardLayout="@xml/rowkeys_qwerty3"
++            latin:keyWidth="9.0%p" />
++        <include
++            latin:keyboardLayout="@xml/keys_exclamation_question"
++            latin:keyWidth="9.0%p" />
++        <Key
++            latin:keyStyle="shiftKeyStyle"
++            latin:keyWidth="fillRight" />
+     </Row>
+     <!-- Fourth row -->
+     <include
+diff --git a/java/res/xml-sw600dp/row_qwerty4.xml b/java/res/xml-sw600dp/row_qwerty4.xml
+index bcfd2cb..ed7150d 100644
+--- a/java/res/xml-sw600dp/row_qwerty4.xml
++++ b/java/res/xml-sw600dp/row_qwerty4.xml
+@@ -21,54 +21,23 @@
+ <merge
+     xmlns:latin="http://schemas.android.com/apk/res/com.android.inputmethod.latin"
+ >
+-    <switch>
+-        <!-- Split the 4th row for split layouts -->
+-        <case
+-            latin:isSplitLayout="true"
+-        >
+-            <Row
+-                latin:keyWidth="8.0%p"
+-                latin:backgroundType="functional"
+-            >
+-                <Key
+-                    latin:keyStyle="toSymbolKeyStyle" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_comma" />
+-                <!-- Space key. -->
+-                <include
+-                    latin:keyboardLayout="@xml/key_space_3kw"
+-                    latin:backgroundType="normal" />
+-                <Spacer
+-                    latin:keyWidth="20.0%p" />
+-                <Key
+-                    latin:keyStyle="spaceKeyStyle"
+-                    latin:keyWidth="24.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_period" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_emoji" />
+-            </Row>
+-        </case>
+-        <default>
+-            <Row
+-                latin:keyWidth="9.0%p"
+-                latin:backgroundType="functional"
+-            >
+-                <Key
+-                    latin:keyStyle="toSymbolKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_comma" />
+-                <!-- Space key. -->
+-                <include
+-                    latin:keyXPos="19.0%p"
+-                    latin:keyboardLayout="@xml/key_space_7kw"
+-                    latin:backgroundType="normal" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_period" />
+-                <include
+-                    latin:keyboardLayout="@xml/key_emoji" />
+-            </Row>
+-        </default>
+-    </switch>
++    <Row
++        latin:keyWidth="9.0%p"
++        latin:backgroundType="functional"
++    >
++        <Key
++            latin:keyStyle="toSymbolKeyStyle"
++            latin:keyWidth="10.0%p" />
++        <include
++            latin:keyboardLayout="@xml/key_comma" />
++        <!-- Space key. -->
++        <include
++            latin:keyXPos="19.0%p"
++            latin:keyboardLayout="@xml/key_space_7kw"
++            latin:backgroundType="normal" />
++        <include
++            latin:keyboardLayout="@xml/key_period" />
++        <include
++            latin:keyboardLayout="@xml/key_emoji" />
++    </Row>
+ </merge>
+diff --git a/java/res/xml-sw600dp/rows_qwerty.xml b/java/res/xml-sw600dp/rows_qwerty.xml
+index 0750d63..a732d84 100644
+--- a/java/res/xml-sw600dp/rows_qwerty.xml
++++ b/java/res/xml-sw600dp/rows_qwerty.xml
+@@ -29,107 +29,37 @@
+          the available space. -->
+     <!-- First row -->
+     <Row>
+-        <switch>
+-            <!-- Split keyboard layout for the first row -->
+-            <case
+-                latin:isSplitLayout="true"
+-            >
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty1_left5"
+-                    latin:keyWidth="8.0%p" />
+-                <Spacer
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty1_right5"
+-                    latin:keyWidth="8.0%p" />
+-                <Key
+-                    latin:keyStyle="deleteKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-            </case>
+-            <!-- Regular layout for the first row -->
+-            <default>
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty1"
+-                    latin:keyWidth="9.0%p" />
+-                <Key
+-                    latin:keyStyle="deleteKeyStyle"
+-                    latin:keyWidth="fillRight" />
+-            </default>
+-        </switch>
++        <include
++            latin:keyboardLayout="@xml/rowkeys_qwerty1"
++            latin:keyWidth="9.0%p" />
++        <Key
++            latin:keyStyle="deleteKeyStyle"
++            latin:keyWidth="fillRight" />
+     </Row>
+     <!-- Second row -->
+     <Row>
+-        <switch>
+-            <!-- Split keyboard layout for the second row -->
+-            <case
+-                latin:isSplitLayout="true"
+-            >
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty2_left5"
+-                    latin:keyXPos="4.0%p"
+-                    latin:keyWidth="8.0%p" />
+-                <Spacer
+-                    latin:keyWidth="14.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty2_right4"
+-                    latin:keyWidth="8.0%p" />
+-                <Key
+-                    latin:keyStyle="enterKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-            </case>
+-            <!-- Regular layout for the second row -->
+-            <default>
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty2"
+-                    latin:keyXPos="4.5%p"
+-                    latin:keyWidth="9.0%p" />
+-                <Key
+-                    latin:keyStyle="enterKeyStyle"
+-                    latin:keyWidth="fillRight" />
+-            </default>
+-        </switch>
++        <include
++            latin:keyboardLayout="@xml/rowkeys_qwerty2"
++            latin:keyXPos="4.5%p"
++            latin:keyWidth="9.0%p" />
++        <Key
++            latin:keyStyle="enterKeyStyle"
++            latin:keyWidth="fillRight" />
+     </Row>
+     <!-- Third row -->
+     <Row>
+-        <switch>
+-            <!-- Split keyboard layout for the third row -->
+-            <case
+-                latin:isSplitLayout="true"
+-            >
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty3_left4"
+-                    latin:keyWidth="8.0%p" />
+-                <Spacer
+-                    latin:keyWidth="8.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty3_right3"
+-                    latin:keyWidth="8.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/keys_exclamation_question"
+-                    latin:keyWidth="8.0%p" />
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-            </case>
+-            <!-- Regular layout for the third row -->
+-            <default>
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="10.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/rowkeys_qwerty3"
+-                    latin:keyWidth="9.0%p" />
+-                <include
+-                    latin:keyboardLayout="@xml/keys_exclamation_question"
+-                    latin:keyWidth="9.0%p" />
+-                <Key
+-                    latin:keyStyle="shiftKeyStyle"
+-                    latin:keyWidth="fillRight" />
+-            </default>
+-        </switch>
++        <Key
++            latin:keyStyle="shiftKeyStyle"
++            latin:keyWidth="10.0%p" />
++        <include
++            latin:keyboardLayout="@xml/rowkeys_qwerty3"
++            latin:keyWidth="9.0%p" />
++        <include
++            latin:keyboardLayout="@xml/keys_exclamation_question"
++            latin:keyWidth="9.0%p" />
++        <Key
++            latin:keyStyle="shiftKeyStyle"
++            latin:keyWidth="fillRight" />
+     </Row>
+     <!-- Fourth row -->
+     <include
+diff --git a/java/res/xml/keyboard_layout_set_qwerty.xml b/java/res/xml/keyboard_layout_set_qwerty.xml
+index 7c9a140..8215170 100644
+--- a/java/res/xml/keyboard_layout_set_qwerty.xml
++++ b/java/res/xml/keyboard_layout_set_qwerty.xml
+@@ -23,8 +23,7 @@
+     <Element
+         latin:elementName="alphabet"
+         latin:elementKeyboard="@xml/kbd_qwerty"
+-        latin:enableProximityCharsCorrection="true"
+-        latin:supportsSplitLayout="true" />
++        latin:enableProximityCharsCorrection="true" />
+     <Element
+         latin:elementName="symbols"
+         latin:elementKeyboard="@xml/kbd_symbols" />
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+index e9b7628..0c93efb 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+@@ -201,7 +201,7 @@
+         // The KeyboardId is an internal key for a Keyboard object.
+ 
+         mParams.mIsSplitLayoutEnabled = mParams.mIsSplitLayoutEnabledByUser
+-                && elementParams.mSupportsSplitLayout;
++                && keyboardLayoutSetElementId <= KeyboardId.ELEMENT_SYMBOLS_SHIFTED;
+         final KeyboardId id = new KeyboardId(keyboardLayoutSetElementId, mParams);
+         try {
+             return getKeyboard(elementParams, id);
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+index 0e813ae..cfd7f3f 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+@@ -38,6 +38,7 @@
+ import com.android.inputmethod.latin.R;
+ import com.android.inputmethod.latin.RichInputMethodManager;
+ import com.android.inputmethod.latin.WordComposer;
++import com.android.inputmethod.latin.common.Constants;
+ import com.android.inputmethod.latin.define.ProductionFlags;
+ import com.android.inputmethod.latin.settings.Settings;
+ import com.android.inputmethod.latin.settings.SettingsValues;
+@@ -132,7 +133,9 @@
+         builder.setLanguageSwitchKeyEnabled(mLatinIME.shouldShowLanguageSwitchKey());
+         builder.setEmojiKeyEnabled(settingsValues.mShowsEmojiKey);
+         builder.setSplitLayoutEnabledByUser(ProductionFlags.IS_SPLIT_KEYBOARD_SUPPORTED
+-                && settingsValues.mIsSplitKeyboardEnabled);
++                && settingsValues.mIsSplitKeyboardEnabled
++                && !Constants.isPhone(Settings.readScreenMetrics(res))
++                && res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE);
+         mKeyboardLayoutSet = builder.build();
+         try {
+             mState.onLoadKeyboard(currentAutoCapsState, currentRecapitalizeState);
+diff --git a/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java b/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java
+index 35928d6..80858db 100644
+--- a/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java
++++ b/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java
+@@ -875,6 +875,9 @@
+     }
+ 
+     private void endKeyboard() {
++        if (mParams.mId.mIsSplitLayout) {
++            mParams.applySplitLayout(false /* duplicateCenterKeys */);
++        }
+         mParams.removeRedundantMoreKeys();
+         // {@link #parseGridRows(XmlPullParser,boolean)} may populate keyboard rows higher than
+         // previously expected.
+diff --git a/java/src/com/android/inputmethod/keyboard/internal/KeyboardParams.java b/java/src/com/android/inputmethod/keyboard/internal/KeyboardParams.java
+index 738d6a4..669f676 100644
+--- a/java/src/com/android/inputmethod/keyboard/internal/KeyboardParams.java
++++ b/java/src/com/android/inputmethod/keyboard/internal/KeyboardParams.java
+@@ -24,6 +24,7 @@
+ 
+ import java.util.ArrayList;
+ import java.util.Comparator;
++import java.util.List;
+ import java.util.SortedSet;
+ import java.util.TreeSet;
+ 
+@@ -153,6 +154,17 @@
+         }
+     }
+ 
++    public void applySplitLayout(final boolean duplicateCenterKeys) {
++        final SplitKeyboardTransformer transformer = new SplitKeyboardTransformer(
++                mLeftPadding, mOccupiedWidth - mRightPadding, duplicateCenterKeys);
++        final List<Key> splitKeys = transformer.transform(new ArrayList<>(mSortedKeys));
++        clearKeys();
++        mAltCodeKeysWhileTyping.clear();
++        for (final Key key : splitKeys) {
++            onAddKey(key);
++        }
++    }
++
+     private int mMaxHeightCount = 0;
+     private int mMaxWidthCount = 0;
+     private final SparseIntArray mHeightHistogram = new SparseIntArray();
+diff --git a/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java b/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
+new file mode 100644
+index 0000000..5be55cf
+--- /dev/null
++++ b/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
+@@ -0,0 +1,178 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.keyboard;
++
++import android.view.inputmethod.EditorInfo;
++import android.view.inputmethod.InputMethodSubtype;
++
++import androidx.test.filters.SmallTest;
++
++import com.android.inputmethod.latin.common.Constants;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++import java.util.Locale;
++
++@SmallTest
++public class SplitKeyboardLayoutTests extends KeyboardLayoutSetTestsBase {
++    @Override
++    protected int getKeyboardThemeForTests() {
++        return KeyboardTheme.THEME_ID_LXX_LIGHT;
++    }
++
++    private Keyboard build(final Locale locale, final String layout, final int elementId,
++            final boolean split) {
++        final InputMethodSubtype subtype = getSubtype(locale, layout);
++        final EditorInfo editorInfo = new EditorInfo();
++        final KeyboardLayoutSet layoutSet = createKeyboardLayoutSet(subtype, editorInfo,
++                false /* voiceInputKeyEnabled */, false /* languageSwitchKeyEnabled */, split);
++        return layoutSet.getKeyboard(elementId);
++    }
++
++    private static List<String> describeKeys(final Keyboard keyboard) {
++        final ArrayList<String> keys = new ArrayList<>();
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.isSpacer()) continue;
++            keys.add(key.getCode() + ":" + key.getLabel() + ":" + key.getIconId());
++        }
++        Collections.sort(keys);
++        return keys;
++    }
++
++    private void assertSplit(final Locale locale, final String layout, final int elementId) {
++        final Keyboard plain = build(locale, layout, elementId, false);
++        final Keyboard split = build(locale, layout, elementId, true);
++        final String name = layout + "/" + elementId;
++        assertTrue(name + " id", split.mId.mIsSplitLayout);
++        assertFalse(name + " plain id", plain.mId.mIsSplitLayout);
++        assertSameKeys(name, plain, split);
++        assertHalves(name, split);
++        assertNoOverlapInRows(name, split);
++    }
++
++    private static void assertSameKeys(final String name, final Keyboard plain,
++            final Keyboard split) {
++        assertEquals(name + " keys", describeKeys(plain), describeKeys(split));
++    }
++
++    private static void assertHalves(final String name, final Keyboard keyboard) {
++        final float mid = keyboard.mOccupiedWidth / 2.0f;
++        int spaceKeys = 0;
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.isSpacer()) continue;
++            final int left = key.getX();
++            final int right = key.getX() + key.getWidth();
++            if (key.getCode() == Constants.CODE_SPACE) {
++                spaceKeys++;
++                assertTrue(name + " space spans mid", left < mid && right > mid);
++                continue;
++            }
++            assertTrue(name + " key " + key + " crosses mid", right <= mid || left >= mid);
++        }
++        assertEquals(name + " space key count", 1, spaceKeys);
++    }
++
++    private static void assertNoOverlapInRows(final String name, final Keyboard keyboard) {
++        Key prev = null;
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.isSpacer()) continue;
++            if (prev != null && prev.getY() == key.getY()) {
++                assertTrue(name + " overlap " + prev + " / " + key,
++                        prev.getX() + prev.getWidth() <= key.getX());
++            }
++            prev = key;
++        }
++    }
++
++    private void assertInnerEdgesAligned(final Locale locale, final String layout,
++            final int elementId) {
++        final Keyboard keyboard = build(locale, layout, elementId, true);
++        final float mid = keyboard.mOccupiedWidth / 2.0f;
++        final HashSet<Integer> spaceRows = new HashSet<>();
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.getCode() == Constants.CODE_SPACE) spaceRows.add(key.getY());
++        }
++        final Map<Integer, Integer> leftEdges = new HashMap<>();
++        final Map<Integer, Integer> rightEdges = new HashMap<>();
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.isSpacer() || spaceRows.contains(key.getY())) continue;
++            final int y = key.getY();
++            if (key.getX() + key.getWidth() <= mid) {
++                final Integer edge = leftEdges.get(y);
++                leftEdges.put(y, Math.max(edge == null ? 0 : edge, key.getX() + key.getWidth()));
++            } else {
++                final Integer edge = rightEdges.get(y);
++                rightEdges.put(y, Math.min(edge == null ? Integer.MAX_VALUE : edge, key.getX()));
++            }
++        }
++        final String name = layout + "/" + elementId;
++        final int left = Collections.min(leftEdges.values());
++        final int right = Collections.min(rightEdges.values());
++        for (final int edge : leftEdges.values()) {
++            assertTrue(name + " left inner edges " + leftEdges, Math.abs(edge - left) <= 1);
++        }
++        for (final int edge : rightEdges.values()) {
++            assertTrue(name + " right inner edges " + rightEdges, Math.abs(edge - right) <= 1);
++        }
++    }
++
++    public void testInnerEdgesAligned() {
++        assertInnerEdgesAligned(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET);
++        assertInnerEdgesAligned(Locale.FRENCH, "azerty", KeyboardId.ELEMENT_ALPHABET);
++        assertInnerEdgesAligned(Locale.US, "qwerty", KeyboardId.ELEMENT_SYMBOLS);
++    }
++
++    public void testQwertySplit() {
++        assertSplit(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET);
++        assertSplit(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED);
++    }
++
++    public void testAzertySplit() {
++        assertSplit(Locale.FRENCH, "azerty", KeyboardId.ELEMENT_ALPHABET);
++    }
++
++    public void testQwertzSplit() {
++        assertSplit(Locale.GERMAN, "qwertz", KeyboardId.ELEMENT_ALPHABET);
++    }
++
++    public void testDvorakSplit() {
++        assertSplit(Locale.US, "dvorak", KeyboardId.ELEMENT_ALPHABET);
++    }
++
++    public void testSymbolsSplit() {
++        assertSplit(Locale.US, "qwerty", KeyboardId.ELEMENT_SYMBOLS);
++        assertSplit(Locale.US, "qwerty", KeyboardId.ELEMENT_SYMBOLS_SHIFTED);
++    }
++
++    public void testNumberPadNeverSplit() {
++        final InputMethodSubtype subtype = getSubtype(Locale.US, "qwerty");
++        final EditorInfo editorInfo = new EditorInfo();
++        editorInfo.inputType = android.text.InputType.TYPE_CLASS_NUMBER;
++        final Keyboard keyboard = createKeyboardLayoutSet(subtype, editorInfo, false, false,
++                true /* splitLayoutEnabled */).getKeyboard(KeyboardId.ELEMENT_ALPHABET);
++        assertFalse(keyboard.mId.mIsSplitLayout);
++    }
++
++    public void testSplitAndUnsplitKeyboardIdsDiffer() {
++        final Keyboard plain = build(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET, false);
++        final Keyboard split = build(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET, true);
++        assertFalse(plain.mId.equals(split.mId));
++        assertNotSame(plain, split);
++    }
++
++    public void testAltCodeKeysWhileTypingContainOnlySplitKeys() {
++        final Keyboard split = createKeyboardLayoutSet(getSubtype(Locale.US, "qwerty"),
++                new EditorInfo(), false /* voiceInputKeyEnabled */,
++                true /* languageSwitchKeyEnabled */, true /* splitLayoutEnabled */)
++                .getKeyboard(KeyboardId.ELEMENT_ALPHABET);
++        assertFalse("no alt-code keys", split.mAltCodeKeysWhileTyping.isEmpty());
++        final List<Key> sorted = split.getSortedKeys();
++        for (final Key key : split.mAltCodeKeysWhileTyping) {
++            assertTrue("stale alt-code key " + key, sorted.contains(key));
++        }
++    }
++}
+diff --git a/tests/src/com/android/inputmethod/keyboard/layout/tests/TestsSplitLayoutQwertyEnglishUS.java b/tests/src/com/android/inputmethod/keyboard/layout/tests/TestsSplitLayoutQwertyEnglishUS.java
+deleted file mode 100644
+index a69a357..0000000
+--- a/tests/src/com/android/inputmethod/keyboard/layout/tests/TestsSplitLayoutQwertyEnglishUS.java
++++ /dev/null
+@@ -1,62 +0,0 @@
+-/*
+- * Copyright (C) 2014 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.inputmethod.keyboard.layout.tests;
+-
+-import android.view.inputmethod.EditorInfo;
+-import android.view.inputmethod.InputMethodSubtype;
+-
+-import androidx.test.filters.SmallTest;
+-
+-import com.android.inputmethod.keyboard.KeyboardLayoutSet;
+-import com.android.inputmethod.keyboard.layout.LayoutBase;
+-import com.android.inputmethod.keyboard.layout.Qwerty;
+-import com.android.inputmethod.keyboard.layout.customizer.EnglishCustomizer;
+-import com.android.inputmethod.keyboard.layout.expected.ExpectedKey;
+-
+-import java.util.Locale;
+-
+-/**
+- * en_US: English (United States)/qwerty - split layout
+- */
+-@SmallTest
+-public class TestsSplitLayoutQwertyEnglishUS extends LayoutTestsBase {
+-    private static final Locale LOCALE = new Locale("en", "US");
+-    private static final LayoutBase LAYOUT = new Qwerty(new EnglishSplitCustomizer(LOCALE));
+-
+-    @Override
+-    protected KeyboardLayoutSet createKeyboardLayoutSet(final InputMethodSubtype subtype,
+-            final EditorInfo editorInfo, final boolean voiceInputKeyEnabled,
+-            final boolean languageSwitchKeyEnabled, final boolean splitLayoutEnabled) {
+-        return super.createKeyboardLayoutSet(subtype, editorInfo, voiceInputKeyEnabled,
+-            languageSwitchKeyEnabled, true /* splitLayoutEnabled */);
+-    }
+-
+-    @Override
+-    LayoutBase getLayout() { return LAYOUT; }
+-
+-    private static class EnglishSplitCustomizer extends EnglishCustomizer {
+-        EnglishSplitCustomizer(Locale locale) { super(locale); }
+-
+-        @Override
+-        public ExpectedKey[] getSpaceKeys(final boolean isPhone) {
+-            if (isPhone) {
+-                return super.getSpaceKeys(isPhone);
+-            }
+-            return joinKeys(LANGUAGE_SWITCH_KEY, SPACE_KEY, SPACE_KEY);
+-        }
+-    }
+-}

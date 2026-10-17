@@ -1,0 +1,20 @@
+From c76471421051f46afff0b996c4fffd98265a802c Mon Sep 17 00:00:00 2001
+From: Nolen Johnson <johnsonnolen@gmail.com>
+Date: Sun, 27 Sep 2026 12:38:39 -0400
+Subject: [PATCH] config: Build Gallery2 until Glimpse can edit images
+
+Change-Id: I2161f319994756acee74de0c1bcddd29ee44af8e
+---
+
+diff --git a/config/common_mobile.mk b/config/common_mobile.mk
+index 8d7c887..2c7e496 100644
+--- a/config/common_mobile.mk
++++ b/config/common_mobile.mk
+@@ -17,6 +17,7 @@
+ PRODUCT_PACKAGES += \
+     AvatarPicker \
+     Backgrounds \
++    Gallery2 \
+     Glimpse \
+     LatinIME
+ 

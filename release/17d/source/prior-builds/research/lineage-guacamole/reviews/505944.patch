@@ -1,0 +1,65 @@
+From 3d4f5b4d2c830af9216bdf886518e8304497493f Mon Sep 17 00:00:00 2001
+From: NayanChavare <nayanjinal23@gmail.com>
+Date: Fri, 02 Oct 2026 15:49:42 +0530
+Subject: [PATCH] Settings: Register broadcast receiver onStart in NfcAndPaymentFragmentController
+
+The correct way to balance unregistering it onStop is to use onStart,
+onResume is wrong.
+
+Change-Id: I20ef8ea7f10064ab304f7763b724f0f6090aa7b4
+---
+
+diff --git a/src/com/android/settings/connecteddevice/NfcAndPaymentFragmentController.java b/src/com/android/settings/connecteddevice/NfcAndPaymentFragmentController.java
+index 02bd993..d42196a 100644
+--- a/src/com/android/settings/connecteddevice/NfcAndPaymentFragmentController.java
++++ b/src/com/android/settings/connecteddevice/NfcAndPaymentFragmentController.java
+@@ -30,7 +30,7 @@
+ import com.android.settings.R;
+ import com.android.settings.core.BasePreferenceController;
+ import com.android.settingslib.core.lifecycle.LifecycleObserver;
+-import com.android.settingslib.core.lifecycle.events.OnResume;
++import com.android.settingslib.core.lifecycle.events.OnStart;
+ import com.android.settingslib.core.lifecycle.events.OnStop;
+ 
+ /**
+@@ -38,7 +38,7 @@
+  */
+ // LINT.IfChange
+ public class NfcAndPaymentFragmentController extends BasePreferenceController
+-        implements LifecycleObserver, OnResume, OnStop {
++        implements LifecycleObserver, OnStart, OnStop {
+     private final NfcAdapter mNfcAdapter;
+     private final PackageManager mPackageManager;
+     private final UserManager mUserManager;
+@@ -99,6 +99,15 @@
+     }
+ 
+     @Override
++    public void onStart() {
++        if (!isNfcAvailable()) {
++            return;
++        }
++
++        mContext.registerReceiver(mReceiver, mIntentFilter);
++    }
++
++    @Override
+     public void onStop() {
+         if (!isNfcAvailable()) {
+             return;
+@@ -107,15 +116,6 @@
+         mContext.unregisterReceiver(mReceiver);
+     }
+ 
+-    @Override
+-    public void onResume() {
+-        if (!isNfcAvailable()) {
+-            return;
+-        }
+-
+-        mContext.registerReceiver(mReceiver, mIntentFilter);
+-    }
+-
+     private boolean isNfcAvailable() {
+         return mNfcAdapter != null;
+     }

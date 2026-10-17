@@ -1,0 +1,66 @@
+From ff9d2cd0e4960d3f1cb9cc001a7318b6968061b8 Mon Sep 17 00:00:00 2001
+From: Benjamin Wiegand <benjamin.lineageos@wiegand.pw>
+Date: Tue, 29 Sep 2026 16:28:43 -0700
+Subject: [PATCH] Launcher3: Fix bottom insets
+
+now accounts for:
+- default landscape screens (nav bar at bottom)
+- bottom of display cutout
+
+Change-Id: I59d47e9fd8f5c1177a342c7e5af75f48de857eb4
+---
+
+diff --git a/src/com/android/launcher3/util/window/WindowManagerProxy.java b/src/com/android/launcher3/util/window/WindowManagerProxy.java
+index 2189dc4..1052591 100644
+--- a/src/com/android/launcher3/util/window/WindowManagerProxy.java
++++ b/src/com/android/launcher3/util/window/WindowManagerProxy.java
+@@ -126,6 +126,14 @@
+     }
+ 
+     /**
++     * Returns whether the context's display is landscape by default.
++     */
++    private boolean isDefaultLandscape(Context context) {
++        CachedDisplayInfo info = getDisplayInfo(context).normalize(this);
++        return info.size.x > info.size.y;
++    }
++
++    /**
+      * Returns the real bounds for the provided display after applying any insets normalization
+      */
+     public WindowBounds getRealBounds(Context displayInfoContext, CachedDisplayInfo info) {
+@@ -163,6 +171,7 @@
+ 
+         WindowInsets.Builder insetsBuilder = new WindowInsets.Builder(oldInsets);
+         Insets navInsets = oldInsets.getInsets(WindowInsets.Type.navigationBars());
++        Insets cutoutInsets = oldInsets.getInsets(WindowInsets.Type.displayCutout());
+ 
+         Resources systemRes = context.getResources();
+         Configuration config = systemRes.getConfiguration();
+@@ -170,17 +179,20 @@
+         boolean isLargeScreen = config.smallestScreenWidthDp > MIN_TABLET_WIDTH;
+         boolean isGesture = isGestureNav(context);
+         boolean isPortrait = config.screenHeightDp > config.screenWidthDp;
++        boolean isDefaultLandscape = isDefaultLandscape(context);
++
++        int navBarHeight = getDimenByName(systemRes,
++                isPortrait ? NAVBAR_HEIGHT : NAVBAR_HEIGHT_LANDSCAPE);
+ 
+         int bottomNav = isLargeScreen
+                 ? isTaskbarEnabled(context) ? 0 : getDimenByName(systemRes, NAVBAR_HEIGHT)
+-                : (isPortrait
+-                        ? getDimenByName(systemRes, NAVBAR_HEIGHT)
+-                        : (isGesture
+-                                ? getDimenByName(systemRes, NAVBAR_HEIGHT_LANDSCAPE)
+-                                : 0));
++                : ((isPortrait != isDefaultLandscape || isGesture
++                        ? navBarHeight
++                        : 0)
++                + cutoutInsets.bottom);
+         int leftNav = navInsets.left;
+         int rightNav = navInsets.right;
+-        if (!isLargeScreen && !isGesture && !isPortrait) {
++        if (!isLargeScreen && !isGesture && isPortrait == isDefaultLandscape) {
+             // In 3-button landscape/seascape, Launcher should always have nav insets regardless if
+             // it's initiated from fullscreen apps.
+             int navBarWidth = getDimenByName(systemRes, NAVBAR_LANDSCAPE_LEFT_RIGHT_SIZE);

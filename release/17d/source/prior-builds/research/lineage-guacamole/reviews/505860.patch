@@ -1,0 +1,63 @@
+From e48bbb9e7d74be9884763a98786b4bdfc12f3389 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Tue, 29 Sep 2026 14:27:22 -0400
+Subject: [PATCH] core: Add getFlushFromFrameSupport and mark unsupported
+
+Change-Id: Iec7680411f8d138d2774d25f9f881e530071bcfa
+---
+
+diff --git a/hal/core/Module.cpp b/hal/core/Module.cpp
+index 75b6e51..d1406a3 100644
+--- a/hal/core/Module.cpp
++++ b/hal/core/Module.cpp
+@@ -561,6 +561,12 @@
+     return ndk::ScopedAStatus::ok();
+ }
+ 
++ndk::ScopedAStatus Module::getFlushFromFrameSupport(
++        const ::aidl::android::media::audio::common::AudioPortConfig& in_config __unused,
++        ::aidl::android::media::audio::common::FlushFromFrameSupport* _aidl_return __unused) {
++    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
++}
++
+ ndk::ScopedAStatus Module::connectExternalDevice(const AudioPort& in_templateIdAndAdditionalData,
+                                                  AudioPort* _aidl_return) {
+     LOG(DEBUG) << __func__
+diff --git a/hal/core/Stream.cpp b/hal/core/Stream.cpp
+index f84d7d4..29d729a 100644
+--- a/hal/core/Stream.cpp
++++ b/hal/core/Stream.cpp
+@@ -333,6 +333,9 @@
+                 populateReplyWrongState(&reply, command);
+             }
+             break;
++        case Tag::flushFromFrame:
++            reply.status = STATUS_INVALID_OPERATION;
++            break;
+     }
+     reply.state = mState;
+     LOG(severity) << __func__ << ": writing reply " << reply.toString();
+@@ -681,6 +684,9 @@
+                 populateReplyWrongState(&reply, command);
+             }
+             break;
++        case Tag::flushFromFrame:
++            reply.status = STATUS_INVALID_OPERATION;
++            break;
+     }
+     reply.state = mState;
+ 
+diff --git a/hal/core/include/qti-audio-core/Module.h b/hal/core/include/qti-audio-core/Module.h
+index f9d2ca6..45600d9 100644
+--- a/hal/core/include/qti-audio-core/Module.h
++++ b/hal/core/include/qti-audio-core/Module.h
+@@ -59,6 +59,9 @@
+             std::shared_ptr<::aidl::android::hardware::audio::core::IBluetoothLe>* _aidl_return)
+             override;
+     ndk::ScopedAStatus prepareToDisconnectExternalDevice(int32_t in_portId) override;
++    ndk::ScopedAStatus getFlushFromFrameSupport(
++            const ::aidl::android::media::audio::common::AudioPortConfig& in_config,
++            ::aidl::android::media::audio::common::FlushFromFrameSupport* _aidl_return) override;
+     ndk::ScopedAStatus connectExternalDevice(
+             const ::aidl::android::media::audio::common::AudioPort& in_templateIdAndAdditionalData,
+             ::aidl::android::media::audio::common::AudioPort* _aidl_return) override;

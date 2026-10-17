@@ -1,0 +1,51 @@
+From a0f3ada220c573a2252bcb506407b04dfb9b3de0 Mon Sep 17 00:00:00 2001
+From: klozz <carlosj@klozz.dev>
+Date: Sat, 19 Sep 2026 23:08:37 -0600
+Subject: [PATCH] power-libperfmgr: Preserve session state on thread updates
+
+setThreadsFromPowerSession() temporarily deactivates a session while
+replacing its thread list and updating task profiles.
+
+Previously, the session was always reactivated afterwards, even when it
+was already paused. This caused resume() to see the session as active
+and emit "cannot resume, already active" warnings.
+
+Preserve the previous active state and restore it once the thread update
+is complete.
+
+Signed-off-by: klozz <carlosj@klozz.dev>
+Change-Id: Iee97ef7912fcf95586dba53cecd7271f5b429e70
+---
+
+diff --git a/power-libperfmgr/aidl/PowerSessionManager.cpp b/power-libperfmgr/aidl/PowerSessionManager.cpp
+index 7e09df3..7052ed3 100644
+--- a/power-libperfmgr/aidl/PowerSessionManager.cpp
++++ b/power-libperfmgr/aidl/PowerSessionManager.cpp
+@@ -195,6 +195,18 @@
+         int64_t sessionId, const std::vector<int32_t> &threadIds) {
+     std::vector<pid_t> addedThreads;
+     std::vector<pid_t> removedThreads;
++    bool wasActive = false;
++
++    {
++        std::lock_guard<std::mutex> lock(mSessionTaskMapMutex);
++        auto sessValPtr = mSessionTaskMap.findSession(sessionId);
++        if (sessValPtr == nullptr) {
++            return;
++        }
++
++        wasActive = sessValPtr->isActive;
++    }
++
+     forceSessionActive(sessionId, false);
+     {
+         std::lock_guard<std::mutex> lock(mSessionTaskMapMutex);
+@@ -213,7 +225,7 @@
+             ALOGE("Failed to remove task profiles for tid:%d", tid);
+         }
+     }
+-    forceSessionActive(sessionId, true);
++    forceSessionActive(sessionId, wasActive);
+ }
+ 
+ template <class HintManagerT>

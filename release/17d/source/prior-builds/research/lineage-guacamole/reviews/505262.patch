@@ -1,0 +1,22 @@
+From 48fbe44efdbd301a72fa9c52d8fe193cde60ed04 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Mon, 28 Sep 2026 09:39:40 +0200
+Subject: [PATCH] Settings: Hide extra information from face_enroll_introduction
+
+Change-Id: Iac672a8b1a8e3abf2c22a765539ab023a9ea582f
+---
+
+diff --git a/res/layout/face_enroll_introduction.xml b/res/layout/face_enroll_introduction.xml
+index 37c2812..1a2070e 100644
+--- a/res/layout/face_enroll_introduction.xml
++++ b/res/layout/face_enroll_introduction.xml
+@@ -58,7 +58,8 @@
+         <LinearLayout
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+-            android:orientation="vertical">
++            android:orientation="vertical"
++            android:visibility="gone">
+ 
+             <!-- Keep in mind -->
+             <TextView

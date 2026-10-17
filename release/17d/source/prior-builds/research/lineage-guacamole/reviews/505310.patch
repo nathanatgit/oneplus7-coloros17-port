@@ -1,0 +1,21 @@
+From 6e6f3dd8d41abbc99c30ce91e78d6cf5515607d0 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Mon, 28 Sep 2026 15:10:06 +0100
+Subject: [PATCH] vintf: Bump vendor.oplus.hardware.stability.oplus_project to V3
+
+Change-Id: I4547150fed6cf192e18d9fe5d8963600890ca3ca
+---
+
+diff --git a/vintf/device_framework_matrix.xml b/vintf/device_framework_matrix.xml
+index e1c71f7..0e93fc7 100644
+--- a/vintf/device_framework_matrix.xml
++++ b/vintf/device_framework_matrix.xml
+@@ -280,7 +280,7 @@
+     </hal>
+     <hal format="aidl" optional="true">
+         <name>vendor.oplus.hardware.stability.oplus_project</name>
+-        <version>1-2</version>
++        <version>1-3</version>
+         <interface>
+             <name>IOplusProject</name>
+             <instance>default</instance>

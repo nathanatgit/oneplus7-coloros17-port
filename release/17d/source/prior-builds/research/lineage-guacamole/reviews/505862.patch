@@ -1,0 +1,33 @@
+From 5a44e9e84f5bb70aea8916503ca194d210e890ce Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Mon, 03 Aug 2026 10:28:52 -0400
+Subject: [PATCH] display: Make sure panel supports HDR before advertising
+
+If a panel does not hook up the bindings for HDR then HWC should not
+advertise HDR capabilities.
+
+Note that devices should still set ro.surface_flinger.has_HDR_display
+if the device supports DP alt mode, which can be hooked up to an HDR
+display.
+
+Test: Internal display does not advertise HDR, external HDR one does
+Change-Id: I2be74b143b82a3b2f9fac6a8beaf72b8f074e0eb
+---
+
+diff --git a/sdm/libs/core/display_builtin.cpp b/sdm/libs/core/display_builtin.cpp
+index 419fd0e..f40f404 100644
+--- a/sdm/libs/core/display_builtin.cpp
++++ b/sdm/libs/core/display_builtin.cpp
+@@ -2541,9 +2541,9 @@
+   // Checking library support for HDR10+
+   comp_manager_->GetHDRCapability(&hdr_plus_supported, &dolby_vision_supported);
+ 
+-  fixed_info->hdr_supported = hw_resource_info.has_hdr;
+-  // Built-in displays always support HDR10+ when the target supports HDR
+-  fixed_info->hdr_plus_supported = hw_resource_info.has_hdr && hdr_plus_supported;
++  fixed_info->hdr_supported = hw_resource_info.has_hdr && hw_panel_info_.hdr_enabled;
++  // Built-in displays always support HDR10+ when the display and target supports HDR
++  fixed_info->hdr_plus_supported = fixed_info->hdr_supported && hdr_plus_supported;
+   fixed_info->dolby_vision_supported = hw_resource_info.has_hdr && dolby_vision_supported;
+   // Populate luminance values only if hdr will be supported on that display
+   fixed_info->max_luminance = fixed_info->hdr_supported ? hw_panel_info_.peak_luminance: 0;

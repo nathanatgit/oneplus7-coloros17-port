@@ -1,0 +1,155 @@
+From 5b3187c4bf5c3e6459e4aa61ed916cdfe97bd8e7 Mon Sep 17 00:00:00 2001
+From: Omkar Chandorkar <gotenksIN@aospa.co>
+Date: Sat, 29 Aug 2026 18:20:43 +0000
+Subject: [PATCH] Settings: Start-align UDFPS enroll skip button on low sensors
+
+The GlifExpressive footer stretches a lone secondary button
+edge-to-edge, which overlaps a low-positioned UDFPS sensor in
+portrait. Keep the real themed footer button and start-align it
+instead of replacing it.
+
+[jyotiraditya]: Reworked this to operate directly on the existing
+FooterBarMixin button via LayoutParams/gravity instead of adding a
+custom skip view, dimens, and style, and cleaned up naming.
+
+Co-authored-by: Jyotiraditya Panda <jyotiraditya@aospa.co>
+Change-Id: Ib7705fbb2d1190a55a94753bc2781929891193ee
+Signed-off-by: Jyotiraditya Panda <jyotiraditya@aospa.co>
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/src/com/android/settings/biometrics/BiometricUtils.java b/src/com/android/settings/biometrics/BiometricUtils.java
+index 10547ec..c0b4c24 100644
+--- a/src/com/android/settings/biometrics/BiometricUtils.java
++++ b/src/com/android/settings/biometrics/BiometricUtils.java
+@@ -30,14 +30,18 @@
+ import android.content.Intent;
+ import android.content.IntentSender;
+ import android.hardware.biometrics.BiometricManager;
++import android.hardware.biometrics.SensorLocationInternal;
+ import android.hardware.biometrics.SensorProperties;
+ import android.hardware.face.FaceManager;
+ import android.hardware.face.FaceSensorPropertiesInternal;
++import android.hardware.fingerprint.FingerprintSensorPropertiesInternal;
+ import android.os.Bundle;
+ import android.os.storage.StorageManager;
+ import android.text.BidiFormatter;
+ import android.text.SpannableStringBuilder;
+ import android.util.Log;
++import android.view.Display;
++import android.view.DisplayInfo;
+ import android.view.Surface;
+ 
+ import androidx.annotation.NonNull;
+@@ -57,6 +61,7 @@
+ import com.android.settings.password.SetupChooseLockGeneric;
+ import com.android.settingslib.activityembedding.ActivityEmbeddingUtils;
+ import com.android.settingslib.widget.SettingsThemeHelper;
++import com.android.systemui.biometrics.UdfpsUtils;
+ 
+ import com.google.android.setupcompat.util.WizardManagerHelper;
+ import com.google.android.setupdesign.util.ThemeHelper;
+@@ -591,4 +596,36 @@
+         return hostActivity.isInMultiWindowMode() &&
+                 !ActivityEmbeddingUtils.isActivityEmbedded(hostActivity);
+     }
++
++    /**
++     * Returns {@code true} if the device has a low-positioned UDFPS sensor. On low-positioned
++     * UDFPS devices, the sensor is close to the bottom of the screen, which causes the standard
++     * Setup Wizard footer button to overlap the enrollment UI.
++     *
++     * @param context Context that we use to get the display this context is associated with
++     * @param prop The fingerprint sensor properties to check, or {@code null} if unavailable
++     * @return True if the UDFPS sensor is positioned in the bottom quarter of the screen.
++     */
++    public static boolean isUdfpsLocationLow(@NonNull Context context,
++            @Nullable FingerprintSensorPropertiesInternal prop) {
++        if (prop == null || !prop.isAnyUdfpsType()) {
++            return false;
++        }
++
++        final DisplayInfo displayInfo = new DisplayInfo();
++        context.getDisplay().getDisplayInfo(displayInfo);
++        final int naturalHeight = displayInfo.getNaturalHeight();
++        if (naturalHeight <= 0) {
++            return false;
++        }
++
++        final SensorLocationInternal location = prop.getLocation();
++        if (location == null) {
++            return false;
++        }
++
++        final float scaleFactor = new UdfpsUtils().getScaleFactor(displayInfo);
++        final float scaledSensorY = location.sensorLocationY * scaleFactor;
++        return (scaledSensorY / naturalHeight) >= 0.75f;
++    }
+ }
+diff --git a/src/com/android/settings/biometrics/fingerprint/FingerprintEnrollEnrolling.java b/src/com/android/settings/biometrics/fingerprint/FingerprintEnrollEnrolling.java
+index c9ef6f2..13ea521 100644
+--- a/src/com/android/settings/biometrics/fingerprint/FingerprintEnrollEnrolling.java
++++ b/src/com/android/settings/biometrics/fingerprint/FingerprintEnrollEnrolling.java
+@@ -32,6 +32,7 @@
+ import android.content.res.ColorStateList;
+ import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.graphics.Color;
+ import android.graphics.PorterDuff;
+ import android.graphics.PorterDuffColorFilter;
+ import android.graphics.drawable.Animatable2;
+@@ -47,14 +48,18 @@
+ import android.os.Vibrator;
+ import android.text.TextUtils;
+ import android.util.Log;
++import android.view.Gravity;
+ import android.view.MotionEvent;
+ import android.view.OrientationEventListener;
+ import android.view.Surface;
+ import android.view.View;
++import android.view.ViewGroup.LayoutParams;
+ import android.view.accessibility.AccessibilityEvent;
+ import android.view.accessibility.AccessibilityManager;
+ import android.view.animation.AnimationUtils;
+ import android.view.animation.Interpolator;
++import android.widget.Button;
++import android.widget.LinearLayout;
+ import android.widget.ProgressBar;
+ import android.widget.RelativeLayout;
+ import android.widget.ScrollView;
+@@ -279,6 +284,9 @@
+         // density. Otherwise, the lottie will overlap with the settings header text.
+         boolean isLandscape = BiometricUtils.isReverseLandscape(getApplicationContext())
+                 || BiometricUtils.isLandscape(getApplicationContext());
++        final boolean startAlign = mCanAssumeUdfps
++                && BiometricUtils.isUdfpsLocationLow(this, props.get(0))
++                && !isLandscape;
+ 
+         updateOrientation((isLandscape
+                 ? Configuration.ORIENTATION_LANDSCAPE : Configuration.ORIENTATION_PORTRAIT));
+@@ -297,11 +305,23 @@
+                         .build()
+         );
+ 
+-        // If it's udfps, set the background color only for secondary button if necessary.
+         if (mCanAssumeUdfps) {
++            if (startAlign) {
++                // Start-align the secondary button instead of stretching it over the sensor.
++                final LinearLayout buttonContainer = mFooterBarMixin.getButtonContainer();
++                buttonContainer.post(() -> {
++                    buttonContainer.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
++                    final Button secondaryButtonView = mFooterBarMixin.getSecondaryButtonView();
++                    final LayoutParams lp = secondaryButtonView.getLayoutParams();
++                    lp.width = LayoutParams.WRAP_CONTENT;
++                    secondaryButtonView.setLayoutParams(lp);
++                    secondaryButtonView.setMinHeight(0);
++                });
++            }
++            // Keep the footer bar transparent so it doesn't overlap the UDFPS sensor.
+             mShouldSetFooterBarBackground = false;
+             ((UdfpsEnrollEnrollingView) getLayout()).setSecondaryButtonBackground(
+-                    getBackgroundColor());
++                    Color.TRANSPARENT);
+         }
+ 
+         final LayerDrawable fingerprintDrawable = mProgressBar != null

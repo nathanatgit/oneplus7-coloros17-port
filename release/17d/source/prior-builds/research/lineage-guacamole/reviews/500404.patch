@@ -1,0 +1,22 @@
+From 125033af6668e7063f12791730f83acd32ac782c Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Mon, 31 Aug 2026 23:56:09 +0530
+Subject: [PATCH] config: Enable glif_expressive for SUW
+
+Change-Id: I15e386625676deaf4b93845a6da9b2b49f28f4d0
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/config/common.mk b/config/common.mk
+index 64b433b..d1a2dbb 100644
+--- a/config/common.mk
++++ b/config/common.mk
+@@ -272,7 +272,7 @@
+ 
+ # SetupWizard
+ PRODUCT_PRODUCT_PROPERTIES += \
+-    setupwizard.theme=glif_v4 \
++    setupwizard.theme=glif_expressive \
+     setupwizard.feature.day_night_mode_enabled=true
+ 
+ PRODUCT_ENFORCE_RRO_EXCLUDED_OVERLAYS += vendor/lineage/overlay/no-rro

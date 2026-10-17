@@ -1,0 +1,11 @@
+version: 3.0.3
+apkFileName: ims-los24.apk
+sdkInfo:
+  minSdkVersion: 29
+doNotCompress:
+- arsc
+- dex
+- png
+- res/drawable-hdpi-v4/volte_icon
+- res/drawable-mdpi-v4/volte_icon
+- res/drawable-xhdpi-v4/volte_icon

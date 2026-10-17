@@ -1,0 +1,21 @@
+From a70a65ad3962f66aa68aa8fb690f307e06c70149 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 21:52:47 +0530
+Subject: [PATCH] SUW: Couple androidx.leanback
+
+Change-Id: Iaca2e207e2c9cd2b1782f458a59382dd18b10966
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/Android.bp b/app/Android.bp
+index d6269e0..636155a 100644
+--- a/app/Android.bp
++++ b/app/Android.bp
+@@ -24,6 +24,7 @@
+ 
+     static_libs: [
+         "androidx.activity_activity",
++        "androidx.leanback_leanback",
+         "SettingsLib",
+         "setupcompat",
+         "setupdesign",

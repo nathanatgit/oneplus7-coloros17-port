@@ -1,0 +1,27 @@
+From 4b53b34da5d62dd036dba2c84e55dc61d081398c Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Thu, 20 Aug 2026 09:57:38 -0400
+Subject: [PATCH] common: Do not enable SMMU proxy for parrot/taro even if UM_6_6
+
+This config does not correlate to the target's kernel version, it is a
+feature implemented by TZ (TrustedCameraDriver) so no matter what you
+put kernel at, it cannot be enabled for these targets.
+
+Change-Id: I86210a9b56b8fb6647c477a72754d32bef2f939c
+---
+
+diff --git a/BoardConfigQcom.mk b/BoardConfigQcom.mk
+index 1877711..c83b99e 100644
+--- a/BoardConfigQcom.mk
++++ b/BoardConfigQcom.mk
+@@ -303,8 +303,10 @@
+ 
+ # Enable SMMU proxy on UM platforms that support it
+ ifneq ($(filter $(UM_6_1_FAMILY) $(UM_6_6_FAMILY) $(UM_6_12_FAMILY),$(TARGET_BOARD_PLATFORM)),)
++ifeq ($(filter parrot taro,$(TARGET_BOARD_PLATFORM)),)
+     SOONG_CONFIG_qtidisplay_smmu_proxy := true
+ endif
++endif
+ 
+ # Expose UBWCP headers to UM platforms that require it
+ ifneq ($(filter $(UM_6_1_FAMILY) $(UM_6_6_FAMILY) $(UM_6_12_FAMILY),$(TARGET_BOARD_PLATFORM)),)

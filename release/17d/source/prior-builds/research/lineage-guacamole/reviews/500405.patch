@@ -1,0 +1,24 @@
+From b5020bb489ed5f7be705300377fb6b1cf0f17c65 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Mon, 31 Aug 2026 23:56:19 +0530
+Subject: [PATCH] overlay: Default to navBar gesture
+
+Change-Id: I6bdb4ecc02057be180ddf360d3cf48bc25755705
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/overlay/common/frameworks/base/core/res/res/values/config.xml b/overlay/common/frameworks/base/core/res/res/values/config.xml
+index 8ef82b4..dd2cad7 100644
+--- a/overlay/common/frameworks/base/core/res/res/values/config.xml
++++ b/overlay/common/frameworks/base/core/res/res/values/config.xml
+@@ -178,4 +178,10 @@
+ 
+     <!-- Whether glanceable hub is enabled by default. -->
+     <bool name="config_glanceableHubEnabledByDefault">true</bool>
++
++    <!-- Controls the navigation bar interaction mode:
++         0: 3 button mode (back, home, overview buttons)
++         1: 2 button mode (back, home buttons + swipe up for overview)
++         2: gestures only for back, home and overview -->
++    <integer name="config_navBarInteractionMode">2</integer>
+ </resources>

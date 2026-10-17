@@ -1,0 +1,79 @@
+From 8c1c74f1eabb37680aa4aa1749113456d37ca4dd Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Wed, 30 Sep 2026 14:53:37 +0530
+Subject: [PATCH] SUW: Start setup in gesture navigation
+
+- Post this the user configured option gets applied
+  during NavigationSettings.
+
+Change-Id: Ie8bfad5dd8b6b42732c5470b063b3145fbe42855
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/SetupWizardActivity.kt b/app/src/main/java/org/lineageos/setupwizard/SetupWizardActivity.kt
+index 35003a2..20d7796 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/SetupWizardActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/SetupWizardActivity.kt
+@@ -26,6 +26,7 @@
+             return
+         }
+         SetupWizardUtils.enableComponent(this, WizardManager::class.java)
++        SetupWizardUtils.enableGesturalNavigation(this)
+         val scriptUri =
+             when {
+                 SetupWizardUtils.isOwner() -> R.string.lineage_wizard_script_uri
+diff --git a/app/src/main/java/org/lineageos/setupwizard/util/SetupWizardUtils.kt b/app/src/main/java/org/lineageos/setupwizard/util/SetupWizardUtils.kt
+index 99e5db8..69d99cd 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/util/SetupWizardUtils.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/util/SetupWizardUtils.kt
+@@ -32,11 +32,14 @@
+ import android.telephony.TelephonyManager
+ import android.telephony.TelephonyManager.PHONE_TYPE_GSM
+ import android.util.Log
++import android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL
++import android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+ import java.io.File
+ import lineageos.hardware.LineageHardwareManager
+ import lineageos.providers.LineageSettings
+ import org.json.JSONObject
++import org.lineageos.internal.util.DeviceKeysConstants.KEY_MASK_APP_SWITCH
+ import org.lineageos.setupwizard.DISABLE_NAV_KEYS
+ import org.lineageos.setupwizard.ENABLE_RECOVERY_UPDATE
+ import org.lineageos.setupwizard.KEY_SEND_METRICS
+@@ -142,6 +145,35 @@
+     fun isPackageInstalled(context: Context, packageName: String): Boolean =
+         runCatching { context.packageManager.getPackageInfo(packageName, GET_ACTIVITIES) }.isSuccess
+ 
++    fun enableGesturalNavigation(context: Context) {
++        if (isManagedProfile(context)) {
++            return
++        }
++        if (!isPackageInstalled(context, NAV_BAR_MODE_GESTURAL_OVERLAY)) {
++            return
++        }
++        val deviceKeys =
++            context.resources.getInteger(
++                org.lineageos.platform.internal.R.integer.config_deviceHardwareKeys
++            )
++        if ((deviceKeys and KEY_MASK_APP_SWITCH) != 0) {
++            return
++        }
++        val navigationMode =
++            Settings.Secure.getInt(context.contentResolver, Settings.Secure.NAVIGATION_MODE, 0)
++        if (navigationMode == NAV_BAR_MODE_GESTURAL) {
++            return
++        }
++        val overlayManager =
++            IOverlayManager.Stub.asInterface(ServiceManager.getService(Context.OVERLAY_SERVICE))
++        runCatching {
++            overlayManager.setEnabledExclusiveInCategory(
++                NAV_BAR_MODE_GESTURAL_OVERLAY,
++                UserHandle.USER_CURRENT,
++            )
++        }
++    }
++
+     private fun restoreWallpaperColorSource(contentResolver: ContentResolver) {
+         val overlayPackages =
+             Settings.Secure.getString(

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.android.settingslib.widget.DrawableStateLinearLayout android:theme="?expressivePreferenceTheme" android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:filterTouchesWhenObscured="false" style="?expressivePreferenceRootLayoutStyle"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout android:gravity="center_vertical" android:orientation="horizontal" android:clipToPadding="false" android:layout_width="match_parent" android:layout_height="wrap_content" android:baselineAligned="false" android:minHeight="72.0dp">
+        <include layout="@layout/settingslib_expressive_preference_icon_frame" />
+        <include layout="@layout/settingslib_expressive_preference_text_frame" />
+        <LinearLayout android:gravity="center" android:orientation="vertical" android:id="@android:id/widget_frame" android:layout_width="wrap_content" android:layout_height="match_parent" android:minWidth="@dimen/settingslib_expressive_space_medium3" android:paddingStart="0.0dp" android:paddingEnd="0.0dp" />
+    </LinearLayout>
+    <include layout="@layout/settingslib_expressive_preference_footer" />
+</com.android.settingslib.widget.DrawableStateLinearLayout>

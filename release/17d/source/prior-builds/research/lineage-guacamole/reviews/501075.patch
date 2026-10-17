@@ -1,0 +1,41 @@
+From c7df2c602722204b02356c7d3690fd0f2d3fc925 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 03 Sep 2026 11:26:54 +0530
+Subject: [PATCH] [1/2] overlay: Seed the LineageOS palette for first boot
+
+ThemeOverlayController seeds the palette from theming_defaults when the
+device boots into the setup wizard. The default entry points at
+home_wallpaper, but on a first boot it is read before the wallpaper
+engine connects, so getWallpaperColors() returns null and the seed falls
+back to GOOGLE_BLUE. The real colors arrive later and are then
+deferred until setup completes, so the whole wizard renders blue.
+
+Point the entry at the color the default wallpaper produces so the seed
+no longer races the wallpaper engine. Past first boot the palette is
+already read from the wallpaper, so nothing else changes.
+
+Test: Re-build, flash, Check Teal palette on first boot
+
+Change-Id: I88b764fa6df0715bb47c78b3212ce5908aaf1c8d
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/overlay/common/frameworks/base/core/res/res/values/config.xml b/overlay/common/frameworks/base/core/res/res/values/config.xml
+index dd2cad7..1f9c68e 100644
+--- a/overlay/common/frameworks/base/core/res/res/values/config.xml
++++ b/overlay/common/frameworks/base/core/res/res/values/config.xml
+@@ -184,4 +184,14 @@
+          1: 2 button mode (back, home buttons + swipe up for overview)
+          2: gestures only for back, home and overview -->
+     <integer name="config_navBarInteractionMode">2</integer>
++
++    <!-- The default list of possible CMF Names|Style|ColorSource. This array can be
++         overridden device-specific resources. A wildcard (fallback) must be supplied.
++         Name   - Read from `ro.boot.hardware.color` sysprop. Fallback (*) required.
++         Styles - frameworks/libs/systemui/monet/src/com/android/systemui/monet/Style.java
++         Color  - `home_wallpaper` (for color extraction) or a comma-separated list of
++                  hexadecimal int (#FFcc99,#aabbcc). -->
++    <string-array name="theming_defaults" translatable="false">
++        <item>*|TONAL_SPOT|#63a3ad</item>
++    </string-array>
+ </resources>

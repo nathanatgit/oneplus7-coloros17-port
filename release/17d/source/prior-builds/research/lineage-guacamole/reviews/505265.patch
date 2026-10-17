@@ -1,0 +1,39 @@
+From b11b98572010e6f8b5312901d1ec89b2c31352da Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Mon, 28 Sep 2026 10:43:13 +0200
+Subject: [PATCH] Settings: Make face attention support configurable
+
+The require attention toggle only works if the face HAL implements
+REQUIRE_ATTENTION, which can't be queried at runtime.
+
+Assisted-by: LLM
+Change-Id: I67bdc789a3c3c6cf66a843c4796b75044855a8cd
+---
+
+diff --git a/res/values/lineage_config.xml b/res/values/lineage_config.xml
+index b511f12..1d8b168 100644
+--- a/res/values/lineage_config.xml
++++ b/res/values/lineage_config.xml
+@@ -38,6 +38,9 @@
+     <!-- Whether to show min refresh rate in display settings -->
+     <bool name="config_show_min_refresh_rate_switch">false</bool>
+ 
++    <!-- Whether the face HAL supports the require attention feature -->
++    <bool name="config_face_attention_supported">true</bool>
++
+     <!-- Descriptors of game controllers to hide from GameControllerListFragment. -->
+     <string-array name="config_hidden_game_controller_descriptors" translatable="false">
+     </string-array>
+diff --git a/src/com/android/settings/biometrics/face/FaceFeatureProviderImpl.java b/src/com/android/settings/biometrics/face/FaceFeatureProviderImpl.java
+index d93b8b0..2403772 100644
+--- a/src/com/android/settings/biometrics/face/FaceFeatureProviderImpl.java
++++ b/src/com/android/settings/biometrics/face/FaceFeatureProviderImpl.java
+@@ -81,7 +81,7 @@
+ 
+     @Override
+     public boolean isAttentionSupported(Context context) {
+-        return true;
++        return context.getResources().getBoolean(R.bool.config_face_attention_supported);
+     }
+ 
+     @Override

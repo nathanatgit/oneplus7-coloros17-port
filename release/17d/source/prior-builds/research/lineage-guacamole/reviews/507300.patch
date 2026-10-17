@@ -1,0 +1,101 @@
+From 07768b889b53278ab70ae0d35e8a3bca0b810691 Mon Sep 17 00:00:00 2001
+From: ChrisCatto <chriscatto@proton.me>
+Date: Sat, 10 Oct 2026 01:46:15 +0300
+Subject: [PATCH] compat: Provide libui-v32
+
+Change-Id: I7d562732083fbc0e26c379df843de634e959551f
+Signed-off-by: ChrisCatto <chriscatto@proton.me>
+---
+
+diff --git a/Android.bp b/Android.bp
+index 19009a8..8c61b3f 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -482,6 +482,45 @@
+ }
+ 
+ cc_prebuilt_library_shared {
++    name: "libui-v32",
++    vendor: true,
++    strip: {
++        none: true,
++    },
++    shared_libs: [
++        "android.hardware.graphics.common-V7-ndk",
++        "android.hardware.graphics.allocator@2.0",
++        "android.hardware.graphics.allocator@3.0",
++        "android.hardware.graphics.allocator@4.0",
++        "android.hardware.graphics.common@1.2",
++        "android.hardware.graphics.mapper@2.0",
++        "android.hardware.graphics.mapper@2.1",
++        "android.hardware.graphics.mapper@3.0",
++        "android.hardware.graphics.mapper@4.0",
++        "libbase",
++        "libcutils",
++        "libgralloctypes",
++        "libhidlbase",
++        "libsync",
++        "libutils",
++        "liblog",
++        "libc++",
++        "libc",
++        "libm",
++        "libdl",
++    ],
++    target: {
++        android_arm: {
++            srcs: ["vndk/v32/arm/libui-v32.so"],
++        },
++        android_arm64: {
++            srcs: ["vndk/v32/arm64/libui-v32.so"],
++        },
++    },
++    compile_multilib: "both",
++}
++
++cc_prebuilt_library_shared {
+     name: "libui-v34",
+     vendor: true,
+     strip: {
+diff --git a/vndk/copy_libs.py b/vndk/copy_libs.py
+index 686354a..5444bb4 100755
+--- a/vndk/copy_libs.py
++++ b/vndk/copy_libs.py
+@@ -11,6 +11,7 @@
+ for vndk_version, libs in {
+     "v32": [
+         "libhidlbase",
++        "libui",
+         "libutils",
+     ],
+     "v33": [
+@@ -58,6 +59,17 @@
+                             ]
+                         )
+ 
++                    if vndk_version == "v32" and lib == "libui":
++                        subprocess.run(
++                            [
++                                PATCHELF_PATH,
++                                "--replace-needed",
++                                "android.hardware.graphics.common-V2-ndk_platform.so",
++                                "android.hardware.graphics.common-V7-ndk.so",
++                                lib_dest,
++                            ]
++                        )
++
+                     if vndk_version == "v34" and lib == "libui":
+                         subprocess.run(
+                             [
+diff --git a/vndk/v32/arm/libui-v32.so b/vndk/v32/arm/libui-v32.so
+new file mode 100755
+index 0000000..e1de096
+--- /dev/null
++++ b/vndk/v32/arm/libui-v32.so
+Binary files differ
+diff --git a/vndk/v32/arm64/libui-v32.so b/vndk/v32/arm64/libui-v32.so
+new file mode 100755
+index 0000000..ab3fe90
+--- /dev/null
++++ b/vndk/v32/arm64/libui-v32.so
+Binary files differ

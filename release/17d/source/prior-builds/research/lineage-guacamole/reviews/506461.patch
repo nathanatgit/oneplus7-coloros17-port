@@ -1,0 +1,258 @@
+From e6995709c8b1c290e9669f55c259239dd61007b4 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Tue, 06 Oct 2026 15:20:44 +0200
+Subject: [PATCH] folio-daemon: RIP
+
+No one should use this, all devices where this was "useful" replaced it
+with I7db5e50b0e633faaf06fb417303adc7b974551b3.
+
+Change-Id: I5e8a17e6efa32c19646086df1308a44517888d1b
+---
+
+diff --git a/folio-daemon/Android.bp b/folio-daemon/Android.bp
+deleted file mode 100644
+index aa34619..0000000
+--- a/folio-daemon/Android.bp
++++ /dev/null
+@@ -1,25 +0,0 @@
+-cc_binary {
+-    name: "folio-daemon",
+-
+-    init_rc: ["folio_daemon.rc"],
+-
+-    shared_libs: [
+-        "libandroid",
+-        "libcutils",
+-        "liblog",
+-    ],
+-
+-    srcs: ["main.cpp"],
+-
+-    cflags: [
+-        "-DLOG_TAG=\"folio-daemon\"",
+-        "-DLOG_NDEBUG=0",
+-    ] + [
+-        "-Wall",
+-        "-Werror",
+-    ],
+-
+-    owner: "google",
+-
+-    system_ext_specific: true,
+-}
+diff --git a/folio-daemon/folio_daemon.rc b/folio-daemon/folio_daemon.rc
+deleted file mode 100644
+index ad3a3b9..0000000
+--- a/folio-daemon/folio_daemon.rc
++++ /dev/null
+@@ -1,11 +0,0 @@
+-service folio-daemon /system_ext/bin/folio-daemon
+-    class late_start
+-    user system
+-    group system uhid
+-    disabled
+-
+-on property:init.svc.zygote=running
+-    start folio-daemon
+-
+-on property:init.svc.zygote=stopped
+-    stop folio-daemon
+diff --git a/folio-daemon/main.cpp b/folio-daemon/main.cpp
+deleted file mode 100644
+index 7522f5c..0000000
+--- a/folio-daemon/main.cpp
++++ /dev/null
+@@ -1,161 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: 2017 The Android Open Source Project
+- * SPDX-FileCopyrightText: 2023-2025 The LineageOS Project
+- * SPDX-License-Identifier: Apache-2.0
+- */
+-
+-#include <android/looper.h>
+-#include <android/sensor.h>
+-#include <cutils/log.h>
+-#include <errno.h>
+-#include <fcntl.h>
+-#include <linux/input.h>
+-#include <linux/uinput.h>
+-#include <string.h>
+-#include <time.h>
+-#include <unistd.h>
+-
+-// Hall-effect sensor type
+-#define SENSOR_TYPE 33171002
+-
+-#define RETRY_LIMIT 120
+-#define RETRY_PERIOD 30          // 30 seconds
+-#define WARN_PERIOD (time_t)300  // 5 minutes
+-
+-/*
+- * This simple daemon listens for events from the Hall-effect sensor and writes
+- * the appropriate SW_LID event to a uinput node. This allows the screen to be
+- * locked with a magnetic folio case.
+- */
+-int main(void) {
+-    int uinputFd;
+-    int err;
+-    struct uinput_user_dev uidev;
+-    ASensorManager* sensorManager = nullptr;
+-    ASensorRef hallSensor;
+-    ALooper* looper;
+-    ASensorEventQueue* eventQueue = nullptr;
+-    time_t lastWarn = 0;
+-    int attemptCount = 0;
+-
+-    ALOGI("Started");
+-
+-    uinputFd = TEMP_FAILURE_RETRY(open("/dev/uinput", O_WRONLY | O_NONBLOCK));
+-    if (uinputFd < 0) {
+-        ALOGE("Unable to open uinput node: %s", strerror(errno));
+-        goto out;
+-    }
+-
+-    err = TEMP_FAILURE_RETRY(ioctl(uinputFd, UI_SET_EVBIT, EV_SW)) |
+-          TEMP_FAILURE_RETRY(ioctl(uinputFd, UI_SET_EVBIT, EV_SYN)) |
+-          TEMP_FAILURE_RETRY(ioctl(uinputFd, UI_SET_SWBIT, SW_LID));
+-    if (err != 0) {
+-        ALOGE("Unable to enable SW_LID events: %s", strerror(errno));
+-        goto out;
+-    }
+-
+-    memset(&uidev, 0, sizeof(uidev));
+-    snprintf(uidev.name, UINPUT_MAX_NAME_SIZE, "uinput-folio");
+-    uidev.id.bustype = BUS_VIRTUAL;
+-    uidev.id.vendor = 0;
+-    uidev.id.product = 0;
+-    uidev.id.version = 0;
+-
+-    err = TEMP_FAILURE_RETRY(write(uinputFd, &uidev, sizeof(uidev)));
+-    if (err < 0) {
+-        ALOGE("Write user device to uinput node failed: %s", strerror(errno));
+-        goto out;
+-    }
+-
+-    err = TEMP_FAILURE_RETRY(ioctl(uinputFd, UI_DEV_CREATE));
+-    if (err < 0) {
+-        ALOGE("Unable to create uinput device: %s", strerror(errno));
+-        goto out;
+-    }
+-
+-    ALOGI("Successfully registered uinput-folio for SW_LID events");
+-
+-    // Get Hall-effect sensor events from the NDK
+-    sensorManager = ASensorManager_getInstanceForPackage(nullptr);
+-    looper = ALooper_forThread();
+-    if (looper == nullptr) {
+-        looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
+-    }
+-
+-    eventQueue = ASensorManager_createEventQueue(sensorManager, looper, 0, NULL, NULL);
+-
+-    /*
+-     * As long as we are unable to get the sensor handle, periodically retry
+-     * and emit an error message at a low frequency to prevent high CPU usage
+-     * and log spam. If we simply exited with an error here, we would be
+-     * immediately restarted and fail in the same way indefinitely.
+-     */
+-    while (true) {
+-        time_t now = time(NULL);
+-        hallSensor = ASensorManager_getDefaultSensorEx(sensorManager, SENSOR_TYPE, true);
+-        if (hallSensor != nullptr) {
+-            break;
+-        }
+-
+-        if (++attemptCount >= RETRY_LIMIT) {
+-            ALOGE("Retries exhausted; exiting");
+-            goto out;
+-        } else if (now > lastWarn + WARN_PERIOD) {
+-            ALOGE("Unable to get Hall-effect sensor");
+-            lastWarn = now;
+-        }
+-
+-        sleep(RETRY_PERIOD);
+-    }
+-
+-    err = ASensorEventQueue_registerSensor(eventQueue, hallSensor, 0, 0);
+-    if (err < 0) {
+-        ALOGE("Unable to register for Hall-effect sensor events");
+-        goto out;
+-    }
+-
+-    ALOGI("Starting polling loop");
+-
+-    // Polling loop
+-    while (ALooper_pollOnce(-1, NULL, NULL, NULL) > ALOOPER_POLL_TIMEOUT) {
+-        ASensorEvent sensorEvent;
+-        while (ASensorEventQueue_getEvents(eventQueue, &sensorEvent, 1) > 0) {
+-            // 0 means closed; 1 means open
+-            int isClosed = sensorEvent.data[0] > 0.0f ? 0 : 1;
+-            struct input_event event;
+-            event.type = EV_SW;
+-            event.code = SW_LID;
+-            event.value = isClosed;
+-            err = TEMP_FAILURE_RETRY(write(uinputFd, &event, sizeof(event)));
+-            if (err < 0) {
+-                ALOGE("Write EV_SW to uinput node failed: %s", strerror(errno));
+-                goto out;
+-            }
+-
+-            // Force a flush with an EV_SYN
+-            event.type = EV_SYN;
+-            event.code = SYN_REPORT;
+-            event.value = 0;
+-            err = TEMP_FAILURE_RETRY(write(uinputFd, &event, sizeof(event)));
+-            if (err < 0) {
+-                ALOGE("Write EV_SYN to uinput node failed: %s", strerror(errno));
+-                goto out;
+-            }
+-
+-            ALOGI("Sent lid %s event", isClosed ? "closed" : "open");
+-        }
+-    }
+-
+-out:
+-    // Clean up
+-    if (sensorManager != nullptr && eventQueue != nullptr) {
+-        ASensorManager_destroyEventQueue(sensorManager, eventQueue);
+-    }
+-
+-    if (uinputFd >= 0) {
+-        close(uinputFd);
+-    }
+-
+-    // The loop can only be exited via failure or signal
+-    return 1;
+-}
+diff --git a/sepolicy/qti/private/file_contexts b/sepolicy/qti/private/file_contexts
+index 9cb8102..0b4d671 100644
+--- a/sepolicy/qti/private/file_contexts
++++ b/sepolicy/qti/private/file_contexts
+@@ -1,5 +1,2 @@
+-# Folio daemon
+-/system_ext/bin/folio-daemon    u:object_r:folio_daemon_exec:s0
+-
+ # Horae
+ /system_ext/bin/horae    u:object_r:horae_exec:s0
+diff --git a/sepolicy/qti/private/folio_daemon.te b/sepolicy/qti/private/folio_daemon.te
+deleted file mode 100644
+index 6f2122d..0000000
+--- a/sepolicy/qti/private/folio_daemon.te
++++ /dev/null
+@@ -1,16 +0,0 @@
+-type folio_daemon, domain, coredomain;
+-type folio_daemon_exec, system_file_type, exec_type, file_type;
+-
+-init_daemon_domain(folio_daemon)
+-
+-binder_use(folio_daemon)
+-
+-binder_call(folio_daemon, system_server)
+-
+-allow folio_daemon permission_service:service_manager find;
+-allow folio_daemon sensorservice_service:service_manager find;
+-allow folio_daemon virtual_device_native_service:service_manager find;
+-
+-allow folio_daemon system_server:unix_stream_socket rw_socket_perms_no_ioctl;
+-
+-allow folio_daemon uhid_device:chr_file rw_file_perms;

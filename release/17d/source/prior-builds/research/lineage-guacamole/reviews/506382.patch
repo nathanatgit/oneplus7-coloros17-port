@@ -1,0 +1,50 @@
+From 724e4d93e5583c3ad893f03d298e1840a045d25d Mon Sep 17 00:00:00 2001
+From: nift4 <nift4@posteo.net>
+Date: Tue, 29 Sep 2026 11:36:33 +0200
+Subject: [PATCH] OplusDoze: Remove help dialog
+
+This help dialog was added to explain a power-saving feature that would
+cause the feature to appear to not work if there are no notifications,
+but it appears this optimization never actually existed, and even if it
+did; it got removed in cm-14.0 with commit
+Ieebf13f88c02d5036a09b5ef83ca1b53bd6771ac. The dialog now talks about
+some option that doesn't exist, and says that doze gestures won't work
+if there are no notifications, which isn't true, so kill it.
+
+Change-Id: Ic4159e691e5401c3bdd46cfbc8a5b0b52c885c53
+---
+
+diff --git a/packages/Doze/src/org/lineageos/settings/doze/DozeSettingsFragment.kt b/packages/Doze/src/org/lineageos/settings/doze/DozeSettingsFragment.kt
+index 52da853..aafb9b5 100644
+--- a/packages/Doze/src/org/lineageos/settings/doze/DozeSettingsFragment.kt
++++ b/packages/Doze/src/org/lineageos/settings/doze/DozeSettingsFragment.kt
+@@ -5,11 +5,9 @@
+ 
+ package org.lineageos.settings.doze
+ 
+-import android.content.Context
+ import android.os.Bundle
+ import android.os.Handler
+ import android.os.Looper
+-import androidx.appcompat.app.AlertDialog
+ import androidx.preference.ListPreference
+ import androidx.preference.Preference
+ import androidx.preference.PreferenceCategory
+@@ -29,17 +27,6 @@
+     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+         setPreferencesFromResource(R.xml.doze_settings, rootKey)
+ 
+-        val prefs = requireActivity().getSharedPreferences("doze_settings", Context.MODE_PRIVATE)
+-        if (savedInstanceState == null && !prefs.getBoolean("first_help_shown", false)) {
+-            AlertDialog.Builder(requireContext())
+-                .setTitle(R.string.doze_settings_help_title)
+-                .setMessage(R.string.doze_settings_help_text)
+-                .setNegativeButton(R.string.dialog_ok) { _, _ ->
+-                    prefs.edit().putBoolean("first_help_shown", true).apply()
+-                }
+-                .show()
+-        }
+-
+         val dozeEnabled = Utils.isDozeEnabled(requireContext())
+         val switchBar = findPreference<MainSwitchPreference>(Utils.DOZE_ENABLE)!!
+         switchBar.onPreferenceChangeListener = this

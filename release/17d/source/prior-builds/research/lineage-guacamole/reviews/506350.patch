@@ -1,0 +1,2890 @@
+From 7c61e70cafb1d63ead3c728b5ddb5783d00088b0 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 22:54:36 +0530
+Subject: [PATCH] LatinIME: Migrate settings to AndroidX and Material 3 Expressive
+
+Move the settings, spell checker and dictionary settings screens from
+the deprecated framework preference framework to AndroidX preferences
+hosted in an AppCompat activity with a collapsing toolbar, following
+the Material 3 Expressive settings setup used by Twelve.
+
+Dialog preferences now use preference dialog fragments, toggles render
+as Material switches, dialogs use the Material alert dialog builder,
+and the add-on dictionaries list shows a persistent action button
+instead of the tap-to-reveal button switcher.
+
+Assisted-by: LLM
+Change-Id: Ie7a85aa452270dec57c5e8d93574ac49c4b50ad0
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/build.gradle b/build.gradle
+index fca6043..3295735 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -99,7 +99,7 @@
+ dependencies {
+     implementation 'com.google.code.findbugs:jsr305:3.0.2'
+     implementation 'androidx.viewpager2:viewpager2:1.0.0'
+-    implementation 'com.google.android.material:material:1.9.0'
++    implementation 'com.google.android.material:material:1.14.0-alpha09'
+     implementation 'androidx.preference:preference:1.2.1'
+ 
+     testImplementation 'junit:junit:4.12'
+diff --git a/java/Android.bp b/java/Android.bp
+index 054065e..4d46234 100644
+--- a/java/Android.bp
++++ b/java/Android.bp
+@@ -47,6 +47,10 @@
+         "androidx.legacy_legacy-support-v4",
+         "androidx.recyclerview_recyclerview",
+         "androidx.viewpager2_viewpager2",
++        "androidx.activity_activity",
++        "androidx.appcompat_appcompat",
++        "androidx.preference_preference",
++        "com.google.android.material_material",
+     ],
+ 
+     // Do not compress dictionary files to mmap dict data runtime
+diff --git a/java/AndroidManifest.xml b/java/AndroidManifest.xml
+index fa4c8da..992748c 100644
+--- a/java/AndroidManifest.xml
++++ b/java/AndroidManifest.xml
+@@ -127,7 +127,7 @@
+         </activity>
+ 
+         <activity android:name=".settings.SettingsActivity"
+-             android:theme="@style/platformSettingsTheme"
++             android:theme="@style/Theme.SettingsLib"
+              android:label="@string/english_ime_settings"
+              android:exported="true">
+             <intent-filter>
+@@ -136,7 +136,7 @@
+         </activity>
+ 
+         <activity android:name=".spellcheck.SpellCheckerSettingsActivity"
+-             android:theme="@style/platformSettingsTheme"
++             android:theme="@style/Theme.SettingsLib"
+              android:label="@string/android_spell_checker_settings"
+              android:exported="true">
+             <intent-filter>
+@@ -145,7 +145,7 @@
+         </activity>
+ 
+         <activity android:name="com.android.inputmethod.dictionarypack.DictionarySettingsActivity"
+-             android:theme="@style/platformSettingsTheme"
++             android:theme="@style/Theme.SettingsLib"
+              android:label="@string/dictionary_settings_title"
+              android:uiOptions="splitActionBarWhenNarrow"
+              android:exported="true">
+@@ -165,6 +165,7 @@
+ 
+         <!-- Unexported activity used for tests. -->
+         <activity android:name=".settings.TestFragmentActivity"
++             android:theme="@style/Theme.SettingsLib"
+              android:exported="false"/>
+ 
+         <!-- Broadcast receivers -->
+diff --git a/java/proguard.flags b/java/proguard.flags
+index 0ebca04..e4a6484 100644
+--- a/java/proguard.flags
++++ b/java/proguard.flags
+@@ -47,3 +47,6 @@
+ # TODO: remove once used in code.
+ -keep class com.android.inputmethod.keyboard.KeyboardLayout { *; }
+ 
++-keep public class * extends androidx.fragment.app.Fragment {
++    public <init>();
++}
+diff --git a/java/res/color/settingslib_switch_thumb_icon.xml b/java/res/color/settingslib_switch_thumb_icon.xml
+new file mode 100644
+index 0000000..b1e6c5b
+--- /dev/null
++++ b/java/res/color/settingslib_switch_thumb_icon.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<selector xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:color="?attr/colorPrimary" android:state_checked="true" />
++    <item android:color="?attr/colorSurfaceContainerHighest" />
++</selector>
+diff --git a/java/res/drawable/ic_check.xml b/java/res/drawable/ic_check.xml
+new file mode 100644
+index 0000000..5e70dff
+--- /dev/null
++++ b/java/res/drawable/ic_check.xml
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!--
++     SPDX-FileCopyrightText: Material Design Authors / Google LLC
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:tint="#000000"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M382,720L154,492L211,435L382,606L749,239L806,296L382,720Z" />
++
++</vector>
+diff --git a/java/res/drawable/ic_close.xml b/java/res/drawable/ic_close.xml
+new file mode 100644
+index 0000000..fd6892a
+--- /dev/null
++++ b/java/res/drawable/ic_close.xml
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!--
++     SPDX-FileCopyrightText: Material Design Authors / Google LLC
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:tint="#000000"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M256,760L200,704L424,480L200,256L256,200L480,424L704,200L760,256L536,480L760,704L704,760L480,536L256,760Z" />
++
++</vector>
+diff --git a/java/res/drawable/settingslib_switch_thumb_icon.xml b/java/res/drawable/settingslib_switch_thumb_icon.xml
+new file mode 100644
+index 0000000..613202c
+--- /dev/null
++++ b/java/res/drawable/settingslib_switch_thumb_icon.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<selector xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:state_checked="true" android:drawable="@drawable/ic_check" />
++    <item android:drawable="@drawable/ic_close" />
++</selector>
+diff --git a/java/res/layout/activity_settings.xml b/java/res/layout/activity_settings.xml
+new file mode 100644
+index 0000000..2536f0f
+--- /dev/null
++++ b/java/res/layout/activity_settings.xml
+@@ -0,0 +1,48 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<androidx.coordinatorlayout.widget.CoordinatorLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:id="@+id/coordinatorLayout"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent">
++
++    <com.google.android.material.appbar.AppBarLayout
++        android:id="@+id/appBarLayout"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:fitsSystemWindows="true"
++        app:liftOnScrollTargetViewId="@+id/settings">
++
++        <com.google.android.material.appbar.CollapsingToolbarLayout
++            style="?attr/collapsingToolbarLayoutLargeStyle"
++            android:layout_width="match_parent"
++            android:layout_height="179dp"
++            app:expandedTitleMarginBottom="31dp"
++            app:expandedTitleMarginStart="24dp"
++            app:expandedTitleTextAppearance="?attr/textAppearanceDisplaySmall"
++            app:layout_scrollFlags="scroll|exitUntilCollapsed|snap"
++            app:titleCollapseMode="fade"
++            app:toolbarId="@id/toolbar">
++
++            <com.google.android.material.appbar.MaterialToolbar
++                android:id="@+id/toolbar"
++                android:layout_width="match_parent"
++                android:layout_height="?actionBarSize"
++                android:elevation="0dp"
++                app:layout_collapseMode="pin" />
++
++        </com.google.android.material.appbar.CollapsingToolbarLayout>
++
++    </com.google.android.material.appbar.AppBarLayout>
++
++    <FrameLayout
++        android:id="@+id/settings"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent"
++        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
++
++</androidx.coordinatorlayout.widget.CoordinatorLayout>
+diff --git a/java/res/layout/dictionary_line.xml b/java/res/layout/dictionary_line.xml
+index bb1843d..e8fc819 100644
+--- a/java/res/layout/dictionary_line.xml
++++ b/java/res/layout/dictionary_line.xml
+@@ -17,95 +17,81 @@
+ ** limitations under the License.
+ */
+ -->
+-<!-- TODO: Remove paddingRight, layout_marginLeft, layout_marginRight for API version 17+ -->
+ <LinearLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:minHeight="?android:attr/listPreferredItemHeight"
+-    android:gravity="center_vertical"
+-    android:paddingRight="?android:attr/scrollbarSize"
+-    android:paddingEnd="?android:attr/scrollbarSize"
+-    android:background="?android:attr/selectableItemBackground"
+     android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+-    android:layout_marginLeft="15dip"
+-    android:layout_marginStart="15dip"
+-    android:layout_marginRight="6dip"
+-    android:layout_marginEnd="6dip"
+-    android:layout_marginTop="6dip"
+-    android:layout_marginBottom="6dip"
+-    android:layout_weight="1">
++    android:minHeight="?android:attr/listPreferredItemHeightSmall"
++    android:gravity="center_vertical"
++    android:paddingStart="?android:attr/listPreferredItemPaddingStart"
++    android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
++    android:paddingTop="12dp"
++    android:paddingBottom="12dp">
+ 
+-  <LinearLayout
+-      android:layout_width="match_parent"
+-      android:layout_height="wrap_content"
+-      android:layout_weight="1"
+-      android:orientation="vertical">
+-
+-    <TextView
+-        android:id="@android:id/title"
+-        android:layout_marginLeft="5dip"
+-        android:layout_marginStart="5dip"
+-        android:layout_width="wrap_content"
++    <LinearLayout
++        android:layout_width="0dp"
+         android:layout_height="wrap_content"
+-        android:singleLine="true"
+-        android:textAppearance="?android:attr/textAppearanceMedium"
+-        android:ellipsize="marquee"
+-        android:fadingEdge="horizontal" />
++        android:layout_weight="1"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@android:id/title"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:singleLine="true"
++            android:ellipsize="marquee"
++            android:textAppearance="?android:attr/textAppearanceListItem" />
++
++        <FrameLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content">
++
++            <TextView
++                android:id="@android:id/summary"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:maxLines="1"
++                android:textAppearance="?android:attr/textAppearanceListItemSecondary"
++                android:textColor="?android:attr/textColorSecondary" />
++
++            <com.android.inputmethod.dictionarypack.DictionaryDownloadProgressBar
++                android:id="@+id/dictionary_line_progress_bar"
++                style="?android:attr/progressBarStyleHorizontal"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:gravity="center" />
++
++        </FrameLayout>
++    </LinearLayout>
+ 
+     <FrameLayout
+-        android:layout_width="match_parent"
++        android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:layout_marginStart="5dip"
+-        android:layout_marginLeft="5dip">
++        android:layout_marginStart="16dp">
+ 
+-      <TextView
+-          android:id="@android:id/summary"
+-          android:layout_width="match_parent"
+-          android:layout_height="wrap_content"
+-          android:textAppearance="?android:attr/textAppearanceSmall"
+-          android:textColor="?android:attr/textColorSecondary"
+-          android:maxLines="1" />
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/dict_install_button"
++            style="@style/Widget.Material3.Button"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:singleLine="true"
++            android:text="@string/install_dict" />
+ 
+-      <com.android.inputmethod.dictionarypack.DictionaryDownloadProgressBar
+-          android:id="@+id/dictionary_line_progress_bar"
+-          style="@android:style/Widget.Holo.ProgressBar.Horizontal"
+-          android:layout_width="match_parent"
+-          android:layout_height="match_parent"
+-          android:gravity="center" />
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/dict_cancel_button"
++            style="@style/Widget.Material3.Button.TonalButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:singleLine="true"
++            android:text="@string/cancel_download_dict" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/dict_delete_button"
++            style="@style/Widget.Material3.Button.TonalButton"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:singleLine="true"
++            android:text="@string/delete_dict" />
+ 
+     </FrameLayout>
+-  </LinearLayout>
+-
+-  <com.android.inputmethod.dictionarypack.ButtonSwitcher
+-      android:id="@+id/wordlist_button_switcher"
+-      android:layout_weight="0"
+-      android:layout_marginStart="13dip"
+-      android:layout_marginLeft="13dip"
+-      android:layout_width="wrap_content"
+-      android:layout_height="wrap_content">
+-    <Button
+-        android:id="@+id/dict_install_button"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_gravity="right|center_vertical"
+-        android:singleLine="true"
+-        android:textAppearance="?android:attr/textAppearanceMedium"
+-        android:text="@string/install_dict" />
+-    <Button
+-        android:id="@+id/dict_cancel_button"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_gravity="right|center_vertical"
+-        android:singleLine="true"
+-        android:textAppearance="?android:attr/textAppearanceMedium"
+-        android:text="@string/cancel_download_dict" />
+-    <Button
+-        android:id="@+id/dict_delete_button"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_gravity="right|center_vertical"
+-        android:singleLine="true"
+-        android:textAppearance="?android:attr/textAppearanceMedium"
+-        android:text="@string/delete_dict" />
+-  </com.android.inputmethod.dictionarypack.ButtonSwitcher>
+ </LinearLayout>
+diff --git a/java/res/layout/radio_button_preference_widget.xml b/java/res/layout/radio_button_preference_widget.xml
+index ee9cda1..09afbd2 100644
+--- a/java/res/layout/radio_button_preference_widget.xml
++++ b/java/res/layout/radio_button_preference_widget.xml
+@@ -14,7 +14,7 @@
+      limitations under the License.
+ -->
+ 
+-<RadioButton
++<com.google.android.material.radiobutton.MaterialRadioButton
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:id="@+id/radio_button"
+     android:layout_width="wrap_content"
+diff --git a/java/res/layout/seek_bar_dialog.xml b/java/res/layout/seek_bar_dialog.xml
+index e723ad9..e211c70 100644
+--- a/java/res/layout/seek_bar_dialog.xml
++++ b/java/res/layout/seek_bar_dialog.xml
+@@ -20,6 +20,7 @@
+ 
+ <LinearLayout
+         xmlns:android="http://schemas.android.com/apk/res/android"
++        xmlns:app="http://schemas.android.com/apk/res-auto"
+         android:orientation="vertical"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+@@ -33,11 +34,13 @@
+         <TextView android:id="@+id/seek_bar_dialog_value"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+-            android:textSize="20sp"/>
++            android:textAppearance="?android:attr/textAppearanceLarge"/>
+     </LinearLayout>
+-    <SeekBar
++    <com.google.android.material.slider.Slider
+         android:id="@+id/seek_bar_dialog_bar"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+-        android:layout_margin="10dp"/>
++        android:layout_margin="10dp"
++        android:stepSize="1"
++        app:labelBehavior="gone"/>
+ </LinearLayout>
+diff --git a/java/res/layout/settingslib_switch.xml b/java/res/layout/settingslib_switch.xml
+new file mode 100644
+index 0000000..011fcbb
+--- /dev/null
++++ b/java/res/layout/settingslib_switch.xml
+@@ -0,0 +1,13 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<com.google.android.material.materialswitch.MaterialSwitch
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@android:id/switch_widget"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
++    android:background="@null"
++    android:clickable="false"
++    android:focusable="false" />
+diff --git a/java/res/layout/settingslib_switch_compat.xml b/java/res/layout/settingslib_switch_compat.xml
+new file mode 100644
+index 0000000..54e1ade
+--- /dev/null
++++ b/java/res/layout/settingslib_switch_compat.xml
+@@ -0,0 +1,13 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<com.google.android.material.materialswitch.MaterialSwitch
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@+id/switchWidget"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
++    android:background="@null"
++    android:clickable="false"
++    android:focusable="false" />
+diff --git a/java/res/values/platform-theme.xml b/java/res/values/platform-theme.xml
+index 0eee05c..dc3b1e0 100644
+--- a/java/res/values/platform-theme.xml
++++ b/java/res/values/platform-theme.xml
+@@ -20,6 +20,5 @@
+ 
+ <resources xmlns:android="http://schemas.android.com/apk/res/android">
+     <style name="platformActivityTheme" parent="@android:style/Theme.DeviceDefault" />
+-    <style name="platformSettingsTheme" parent="@android:style/Theme.DeviceDefault.Settings" />
+     <style name="platformDialogTheme" parent="@android:style/Theme.DeviceDefault.Dialog" />
+ </resources>
+diff --git a/java/res/values/themes_settingslib.xml b/java/res/values/themes_settingslib.xml
+new file mode 100644
+index 0000000..ad58662
+--- /dev/null
++++ b/java/res/values/themes_settingslib.xml
+@@ -0,0 +1,52 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <!-- Settings activity theme. -->
++    <style name="Theme.SettingsLib" parent="Theme.Material3Expressive.DayNight.NoActionBar">
++        <item name="android:listPreferredItemPaddingLeft">24dp</item>
++        <item name="android:listPreferredItemPaddingStart">24dp</item>
++        <item name="alertDialogTheme">@style/Theme.SettingsLib.AlertDialog</item>
++        <item name="materialAlertDialogTheme">@style/Theme.SettingsLib.AlertDialog</item>
++        <item name="materialSwitchStyle">@style/Widget.SettingsLib.MaterialSwitch</item>
++        <item name="preferenceTheme">@style/Theme.SettingsLib.PreferenceTheme</item>
++    </style>
++
++    <!-- Settings alert dialog theme. -->
++    <style name="Theme.SettingsLib.AlertDialog"
++        parent="ThemeOverlay.Material3Expressive.MaterialAlertDialog">
++        <item name="android:colorBackground">?attr/colorSurface</item>
++        <item name="dialogCornerRadius">16dp</item>
++    </style>
++
++    <!-- Settings preference style. -->
++    <style name="Theme.SettingsLib.PreferenceTheme" parent="PreferenceThemeOverlay">
++        <item name="android:divider">@android:color/transparent</item>
++        <item name="android:dividerHeight">0dp</item>
++        <item name="android:listPreferredItemPaddingLeft">32dp</item>
++        <item name="android:listPreferredItemPaddingStart">32dp</item>
++        <item name="android:tint">?attr/colorOnSurface</item>
++        <item name="switchPreferenceCompatStyle">@style/Theme.SettingsLib.SwitchPreferenceCompat
++        </item>
++        <item name="switchPreferenceStyle">@style/Theme.SettingsLib.SwitchPreference</item>
++    </style>
++
++    <style name="Theme.SettingsLib.SwitchPreference"
++        parent="@style/Preference.SwitchPreference.Material">
++        <item name="widgetLayout">@layout/settingslib_switch</item>
++    </style>
++
++    <style name="Theme.SettingsLib.SwitchPreferenceCompat"
++        parent="@style/Preference.SwitchPreferenceCompat.Material">
++        <item name="widgetLayout">@layout/settingslib_switch_compat</item>
++    </style>
++
++    <!-- MaterialSwitch style -->
++    <style name="Widget.SettingsLib.MaterialSwitch"
++        parent="Widget.Material3.CompoundButton.MaterialSwitch">
++        <item name="thumbIcon">@drawable/settingslib_switch_thumb_icon</item>
++        <item name="thumbIconTint">@color/settingslib_switch_thumb_icon</item>
++    </style>
++</resources>
+diff --git a/java/res/xml/prefs.xml b/java/res/xml/prefs.xml
+index b5c34f9..1af1c74 100644
+--- a/java/res/xml/prefs.xml
++++ b/java/res/xml/prefs.xml
+@@ -18,32 +18,32 @@
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:latin="http://schemas.android.com/apk/res/com.android.inputmethod.latin"
+     android:key="english_ime_settings">
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.PreferencesSettingsFragment"
+         android:title="@string/settings_screen_preferences"
+         android:key="screen_preferences"
+         android:icon="@drawable/ic_settings_preferences" />
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.AccountsSettingsFragment"
+         android:title="@string/settings_screen_accounts"
+         android:key="screen_accounts"
+         android:icon="@drawable/ic_settings_privacy" />
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.AppearanceSettingsFragment"
+         android:title="@string/settings_screen_appearance"
+         android:key="screen_appearance"
+         android:icon="@drawable/ic_settings_appearance" />
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.GestureSettingsFragment"
+         android:title="@string/settings_screen_gesture"
+         android:key="screen_gesture"
+         android:icon="@drawable/ic_settings_gesture" />
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.CorrectionSettingsFragment"
+         android:title="@string/settings_screen_correction"
+         android:key="screen_correction"
+         android:icon="@drawable/ic_settings_spellcheck" />
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.AdvancedSettingsFragment"
+         android:title="@string/settings_screen_advanced"
+         android:key="screen_advanced"
+diff --git a/java/res/xml/prefs_screen_advanced.xml b/java/res/xml/prefs_screen_advanced.xml
+index 484896e..a7358d4 100644
+--- a/java/res/xml/prefs_screen_advanced.xml
++++ b/java/res/xml/prefs_screen_advanced.xml
+@@ -63,7 +63,7 @@
+         android:title="@string/prefs_keyboard_height_scale"
+         latin:minValue="50"
+         latin:maxValue="120" /> <!-- percentage -->
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.DebugSettingsFragment"
+         android:key="screen_debug"
+         android:title="Debug settings"
+diff --git a/java/res/xml/prefs_screen_appearance.xml b/java/res/xml/prefs_screen_appearance.xml
+index 3341839..5c3a285 100644
+--- a/java/res/xml/prefs_screen_appearance.xml
++++ b/java/res/xml/prefs_screen_appearance.xml
+@@ -18,11 +18,11 @@
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:key="screen_appearance"
+     android:title="@string/settings_screen_appearance">
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.ThemeSettingsFragment"
+         android:key="screen_theme"
+         android:title="@string/settings_screen_theme" />
+-    <PreferenceScreen
++    <Preference
+         android:fragment="com.android.inputmethod.latin.settings.CustomInputStyleSettingsFragment"
+         android:key="custom_input_styles"
+         android:title="@string/custom_input_styles_title" />
+diff --git a/java/res/xml/prefs_screen_correction.xml b/java/res/xml/prefs_screen_correction.xml
+index a943dc1..687a3cb 100644
+--- a/java/res/xml/prefs_screen_correction.xml
++++ b/java/res/xml/prefs_screen_correction.xml
+@@ -19,12 +19,12 @@
+     xmlns:latin="http://schemas.android.com/apk/res/com.android.inputmethod.latin"
+     android:title="@string/settings_screen_correction"
+     android:key="screen_correction">
+-    <PreferenceScreen
++    <Preference
+         android:key="edit_personal_dictionary"
+         android:title="@string/edit_personal_dictionary">
+         <intent android:action="android.settings.USER_DICTIONARY_SETTINGS" />
+-    </PreferenceScreen>
+-    <PreferenceScreen
++    </Preference>
++    <Preference
+         android:key="configure_dictionaries_key"
+         android:title="@string/configure_dictionaries_title">
+         <intent
+@@ -34,7 +34,7 @@
+                 android:name="clientId"
+                 android:value="@string/dictionary_pack_client_id" />
+         </intent>
+-    </PreferenceScreen>
++    </Preference>
+     <CheckBoxPreference
+         android:key="pref_key_block_potentially_offensive"
+         android:title="@string/prefs_block_potentially_offensive_title"
+diff --git a/java/src/com/android/inputmethod/dictionarypack/ButtonSwitcher.java b/java/src/com/android/inputmethod/dictionarypack/ButtonSwitcher.java
+deleted file mode 100644
+index 0fa72c3..0000000
+--- a/java/src/com/android/inputmethod/dictionarypack/ButtonSwitcher.java
++++ /dev/null
+@@ -1,170 +0,0 @@
+-/**
+- * Copyright (C) 2013 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+- * use this file except in compliance with the License. You may obtain a copy
+- * of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+- * License for the specific language governing permissions and limitations
+- * under the License.
+- */
+-
+-package com.android.inputmethod.dictionarypack;
+-
+-import android.animation.Animator;
+-import android.animation.AnimatorListenerAdapter;
+-import android.content.Context;
+-import android.util.AttributeSet;
+-import android.view.View;
+-import android.view.ViewPropertyAnimator;
+-import android.widget.Button;
+-import android.widget.FrameLayout;
+-
+-import com.android.inputmethod.latin.R;
+-
+-/**
+- * A view that handles buttons inside it according to a status.
+- */
+-public class ButtonSwitcher extends FrameLayout {
+-    public static final int NOT_INITIALIZED = -1;
+-    public static final int STATUS_NO_BUTTON = 0;
+-    public static final int STATUS_INSTALL = 1;
+-    public static final int STATUS_CANCEL = 2;
+-    public static final int STATUS_DELETE = 3;
+-    // One of the above
+-    private int mStatus = NOT_INITIALIZED;
+-    private int mAnimateToStatus = NOT_INITIALIZED;
+-
+-    // Animation directions
+-    public static final int ANIMATION_IN = 1;
+-    public static final int ANIMATION_OUT = 2;
+-
+-    private Button mInstallButton;
+-    private Button mCancelButton;
+-    private Button mDeleteButton;
+-    private DictionaryListInterfaceState mInterfaceState;
+-    private OnClickListener mOnClickListener;
+-
+-    public ButtonSwitcher(Context context, AttributeSet attrs) {
+-        super(context, attrs);
+-    }
+-
+-    public ButtonSwitcher(Context context, AttributeSet attrs, int defStyle) {
+-        super(context, attrs, defStyle);
+-    }
+-
+-    public void reset(final DictionaryListInterfaceState interfaceState) {
+-        mStatus = NOT_INITIALIZED;
+-        mAnimateToStatus = NOT_INITIALIZED;
+-        mInterfaceState = interfaceState;
+-    }
+-
+-    @Override
+-    protected void onLayout(final boolean changed, final int left, final int top, final int right,
+-            final int bottom) {
+-        super.onLayout(changed, left, top, right, bottom);
+-        mInstallButton = (Button)findViewById(R.id.dict_install_button);
+-        mCancelButton = (Button)findViewById(R.id.dict_cancel_button);
+-        mDeleteButton = (Button)findViewById(R.id.dict_delete_button);
+-        setInternalOnClickListener(mOnClickListener);
+-        setButtonPositionWithoutAnimation(mStatus);
+-        if (mAnimateToStatus != NOT_INITIALIZED) {
+-            // We have been asked to animate before we were ready, so we took a note of it.
+-            // We are now ready: launch the animation.
+-            animateButtonPosition(mStatus, mAnimateToStatus);
+-            mStatus = mAnimateToStatus;
+-            mAnimateToStatus = NOT_INITIALIZED;
+-        }
+-    }
+-
+-    private Button getButton(final int status) {
+-        switch(status) {
+-        case STATUS_INSTALL:
+-            return mInstallButton;
+-        case STATUS_CANCEL:
+-            return mCancelButton;
+-        case STATUS_DELETE:
+-            return mDeleteButton;
+-        default:
+-            return null;
+-        }
+-    }
+-
+-    public void setStatusAndUpdateVisuals(final int status) {
+-        if (mStatus == NOT_INITIALIZED) {
+-            setButtonPositionWithoutAnimation(status);
+-            mStatus = status;
+-        } else {
+-            if (null == mInstallButton) {
+-                // We may come here before we have been layout. In this case we don't know our
+-                // size yet so we can't start animations so we need to remember what animation to
+-                // start once layout has gone through.
+-                mAnimateToStatus = status;
+-            } else {
+-                animateButtonPosition(mStatus, status);
+-                mStatus = status;
+-            }
+-        }
+-    }
+-
+-    private void setButtonPositionWithoutAnimation(final int status) {
+-        // This may be called by setStatus() before the layout has come yet.
+-        if (null == mInstallButton) return;
+-        final int width = getWidth();
+-        // Set to out of the screen if that's not the currently displayed status
+-        mInstallButton.setTranslationX(STATUS_INSTALL == status ? 0 : width);
+-        mCancelButton.setTranslationX(STATUS_CANCEL == status ? 0 : width);
+-        mDeleteButton.setTranslationX(STATUS_DELETE == status ? 0 : width);
+-    }
+-
+-    // The helper method for {@link AnimatorListenerAdapter}.
+-    void animateButtonIfStatusIsEqual(final View newButton, final int newStatus) {
+-        if (newStatus != mStatus) return;
+-        animateButton(newButton, ANIMATION_IN);
+-    }
+-
+-    private void animateButtonPosition(final int oldStatus, final int newStatus) {
+-        final View oldButton = getButton(oldStatus);
+-        final View newButton = getButton(newStatus);
+-        if (null != oldButton && null != newButton) {
+-            // Transition between two buttons : animate out, then in
+-            animateButton(oldButton, ANIMATION_OUT).setListener(new AnimatorListenerAdapter() {
+-                @Override
+-                public void onAnimationEnd(final Animator animation) {
+-                    animateButtonIfStatusIsEqual(newButton, newStatus);
+-                }
+-            });
+-        } else if (null != oldButton) {
+-            animateButton(oldButton, ANIMATION_OUT);
+-        } else if (null != newButton) {
+-            animateButton(newButton, ANIMATION_IN);
+-        }
+-    }
+-
+-    public void setInternalOnClickListener(final OnClickListener listener) {
+-        mOnClickListener = listener;
+-        if (null != mInstallButton) {
+-            // Already laid out : do it now
+-            mInstallButton.setOnClickListener(mOnClickListener);
+-            mCancelButton.setOnClickListener(mOnClickListener);
+-            mDeleteButton.setOnClickListener(mOnClickListener);
+-        }
+-    }
+-
+-    private ViewPropertyAnimator animateButton(final View button, final int direction) {
+-        final float outerX = getWidth();
+-        final float innerX = button.getX() - button.getTranslationX();
+-        mInterfaceState.removeFromCache((View)getParent());
+-        if (ANIMATION_IN == direction) {
+-            button.setClickable(true);
+-            return button.animate().translationX(0);
+-        }
+-        button.setClickable(false);
+-        return button.animate().translationX(outerX - innerX);
+-    }
+-}
+diff --git a/java/src/com/android/inputmethod/dictionarypack/DictionaryListInterfaceState.java b/java/src/com/android/inputmethod/dictionarypack/DictionaryListInterfaceState.java
+deleted file mode 100644
+index 836340a..0000000
+--- a/java/src/com/android/inputmethod/dictionarypack/DictionaryListInterfaceState.java
++++ /dev/null
+@@ -1,85 +0,0 @@
+-/**
+- * Copyright (C) 2013 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+- * use this file except in compliance with the License. You may obtain a copy
+- * of the License at
+- *
+- * http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+- * License for the specific language governing permissions and limitations
+- * under the License.
+- */
+-
+-package com.android.inputmethod.dictionarypack;
+-
+-import android.view.View;
+-
+-import java.util.ArrayList;
+-import java.util.HashMap;
+-
+-/**
+- * Helper class to maintain the interface state of word list preferences.
+- *
+- * This is necessary because the views are created on-demand by calling code. There are many
+- * situations where views are renewed with little relation with user interaction. For example,
+- * when scrolling, the view is reused so it doesn't keep its state, which means we need to keep
+- * it separately. Also whenever the underlying dictionary list undergoes a change (for example,
+- * update the metadata, or finish downloading) the whole list has to be thrown out and recreated
+- * in case some dictionaries appeared, disappeared, changed states etc.
+- */
+-public class DictionaryListInterfaceState {
+-    static class State {
+-        public boolean mOpen = false;
+-        public int mStatus = MetadataDbHelper.STATUS_UNKNOWN;
+-    }
+-
+-    private HashMap<String, State> mWordlistToState = new HashMap<>();
+-    private ArrayList<View> mViewCache = new ArrayList<>();
+-
+-    public boolean isOpen(final String wordlistId) {
+-        final State state = mWordlistToState.get(wordlistId);
+-        if (null == state) return false;
+-        return state.mOpen;
+-    }
+-
+-    public int getStatus(final String wordlistId) {
+-        final State state = mWordlistToState.get(wordlistId);
+-        if (null == state) return MetadataDbHelper.STATUS_UNKNOWN;
+-        return state.mStatus;
+-    }
+-
+-    public void setOpen(final String wordlistId, final int status) {
+-        final State newState;
+-        final State state = mWordlistToState.get(wordlistId);
+-        newState = null == state ? new State() : state;
+-        newState.mOpen = true;
+-        newState.mStatus = status;
+-        mWordlistToState.put(wordlistId, newState);
+-    }
+-
+-    public void closeAll() {
+-        for (final State state : mWordlistToState.values()) {
+-            state.mOpen = false;
+-        }
+-    }
+-
+-    public View findFirstOrphanedView() {
+-        for (final View v : mViewCache) {
+-            if (null == v.getParent()) return v;
+-        }
+-        return null;
+-    }
+-
+-    public View addToCacheAndReturnView(final View view) {
+-        mViewCache.add(view);
+-        return view;
+-    }
+-
+-    public void removeFromCache(final View view) {
+-        mViewCache.remove(view);
+-    }
+-}
+diff --git a/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsActivity.java b/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsActivity.java
+index 284032b..c061463 100644
+--- a/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsActivity.java
++++ b/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsActivity.java
+@@ -16,39 +16,13 @@
+ 
+ package com.android.inputmethod.dictionarypack;
+ 
+-import com.android.inputmethod.latin.utils.FragmentUtils;
++import androidx.fragment.app.Fragment;
+ 
+-import android.annotation.TargetApi;
+-import android.content.Intent;
+-import android.os.Build;
+-import android.os.Bundle;
+-import android.preference.PreferenceActivity;
++import com.android.inputmethod.latin.settings.SettingsBaseActivity;
+ 
+-/**
+- * Preference screen.
+- */
+-public final class DictionarySettingsActivity extends PreferenceActivity {
+-    private static final String DEFAULT_FRAGMENT = DictionarySettingsFragment.class.getName();
+-
++public final class DictionarySettingsActivity extends SettingsBaseActivity {
+     @Override
+-    protected void onCreate(final Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
+-    }
+-
+-    @Override
+-    public Intent getIntent() {
+-        final Intent modIntent = new Intent(super.getIntent());
+-        modIntent.putExtra(EXTRA_SHOW_FRAGMENT, DEFAULT_FRAGMENT);
+-        modIntent.putExtra(EXTRA_NO_HEADERS, true);
+-        // Important note : the original intent should contain a String extra with the key
+-        // DictionarySettingsFragment.DICT_SETTINGS_FRAGMENT_CLIENT_ID_ARGUMENT so that the
+-        // fragment can know who the client is.
+-        return modIntent;
+-    }
+-
+-    @TargetApi(Build.VERSION_CODES.KITKAT)
+-    @Override
+-    public boolean isValidFragment(String fragmentName) {
+-        return FragmentUtils.isValidFragment(fragmentName);
++    protected Fragment createDefaultFragment() {
++        return new DictionarySettingsFragment();
+     }
+ }
+diff --git a/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsFragment.java b/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsFragment.java
+index df03fd3..53f26ed 100644
+--- a/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsFragment.java
++++ b/java/src/com/android/inputmethod/dictionarypack/DictionarySettingsFragment.java
+@@ -30,8 +30,8 @@
+ import android.net.Uri;
+ import android.os.AsyncTask;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.PreferenceGroup;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceGroup;
+ import android.text.TextUtils;
+ import android.util.Log;
+ import android.view.LayoutInflater;
+@@ -67,8 +67,6 @@
+     private ConnectivityManager mConnectivityManager;
+     private MenuItem mUpdateNowMenu;
+     private boolean mChangedSettings;
+-    private DictionaryListInterfaceState mDictionaryListInterfaceState =
+-            new DictionaryListInterfaceState();
+     // never null
+     private TreeMap<String, WordListPreference> mCurrentPreferenceMap = new TreeMap<>();
+ 
+@@ -345,9 +343,8 @@
+                         // Otherwise, discard it and create a new one instead.
+                         // TODO: when the status is different from the old one, we need to
+                         // animate the old one out before animating the new one in.
+-                        pref = new WordListPreference(activity, mDictionaryListInterfaceState,
+-                                mClientId, wordlistId, version, locale, description, status,
+-                                filesize);
++                        pref = new WordListPreference(activity, mClientId, wordlistId, version,
++                                locale, description, status, filesize);
+                     }
+                     prefMap.put(key, pref);
+                 }
+diff --git a/java/src/com/android/inputmethod/dictionarypack/WordListPreference.java b/java/src/com/android/inputmethod/dictionarypack/WordListPreference.java
+index 500e39e..05d3f56 100644
+--- a/java/src/com/android/inputmethod/dictionarypack/WordListPreference.java
++++ b/java/src/com/android/inputmethod/dictionarypack/WordListPreference.java
+@@ -18,13 +18,12 @@
+ 
+ import android.content.Context;
+ import android.content.SharedPreferences;
+-import android.preference.Preference;
+ import android.util.Log;
+ import android.view.View;
+-import android.view.ViewGroup;
+-import android.view.ViewParent;
+-import android.widget.ListView;
+-import android.widget.TextView;
++
++import androidx.annotation.NonNull;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceViewHolder;
+ 
+ import com.android.inputmethod.latin.R;
+ 
+@@ -34,8 +33,8 @@
+  * A preference for one word list.
+  *
+  * This preference refers to a single word list, as available in the dictionary
+- * pack. Upon being pressed, it displays a menu to allow the user to install, disable,
+- * enable or delete it as appropriate for the current state of the word list.
++ * pack. It shows a button to install, cancel or delete it as appropriate for the current
++ * state of the word list.
+  */
+ public final class WordListPreference extends Preference {
+     private static final String TAG = WordListPreference.class.getSimpleName();
+@@ -64,14 +63,10 @@
+     // The size of the dictionary file
+     private final int mFilesize;
+ 
+-    private final DictionaryListInterfaceState mInterfaceState;
+-
+-    public WordListPreference(final Context context,
+-            final DictionaryListInterfaceState dictionaryListInterfaceState, final String clientId,
++    public WordListPreference(final Context context, final String clientId,
+             final String wordlistId, final int version, final Locale locale,
+             final String description, final int status, final int filesize) {
+         super(context, null);
+-        mInterfaceState = dictionaryListInterfaceState;
+         mClientId = clientId;
+         mVersion = version;
+         mWordlistId = wordlistId;
+@@ -80,6 +75,7 @@
+         mDescription = description;
+ 
+         setLayoutResource(R.layout.dictionary_line);
++        setSelectable(false);
+ 
+         setTitle(description);
+         setStatus(status);
+@@ -96,14 +92,6 @@
+         return status == mStatus;
+     }
+ 
+-    @Override
+-    public View onCreateView(final ViewGroup parent) {
+-        final View orphanedView = mInterfaceState.findFirstOrphanedView();
+-        if (null != orphanedView) return orphanedView; // Will be sent to onBindView
+-        final View newView = super.onCreateView(parent);
+-        return mInterfaceState.addToCacheAndReturnView(newView);
+-    }
+-
+     public boolean hasPriorityOver(final int otherPrefStatus) {
+         // Both of these should be one of MetadataDbHelper.STATUS_*
+         return mStatus > otherPrefStatus;
+@@ -132,37 +120,29 @@
+ 
+     // The table below needs to be kept in sync with MetadataDbHelper.STATUS_* since it uses
+     // the values as indices.
+-    private static final int sStatusActionList[][] = {
++    private static final int sStatusActionList[] = {
+         // MetadataDbHelper.STATUS_UNKNOWN
+-        {},
++        ACTION_UNKNOWN,
+         // MetadataDbHelper.STATUS_AVAILABLE
+-        { ButtonSwitcher.STATUS_INSTALL, ACTION_ENABLE_DICT },
++        ACTION_ENABLE_DICT,
+         // MetadataDbHelper.STATUS_DOWNLOADING
+-        { ButtonSwitcher.STATUS_CANCEL, ACTION_DISABLE_DICT },
++        ACTION_DISABLE_DICT,
+         // MetadataDbHelper.STATUS_INSTALLED
+-        { ButtonSwitcher.STATUS_DELETE, ACTION_DELETE_DICT },
++        ACTION_DELETE_DICT,
+         // MetadataDbHelper.STATUS_DISABLED
+-        { ButtonSwitcher.STATUS_DELETE, ACTION_DELETE_DICT },
++        ACTION_DELETE_DICT,
+         // MetadataDbHelper.STATUS_DELETING
+         // We show 'install' because the file is supposed to be deleted.
+         // The user may reinstall it.
+-        { ButtonSwitcher.STATUS_INSTALL, ACTION_ENABLE_DICT }
++        ACTION_ENABLE_DICT
+     };
+ 
+-    static int getButtonSwitcherStatus(final int status) {
+-        if (status >= sStatusActionList.length) {
+-            Log.e(TAG, "Unknown status " + status);
+-            return ButtonSwitcher.STATUS_NO_BUTTON;
+-        }
+-        return sStatusActionList[status][0];
+-    }
+-
+     static int getActionIdFromStatusAndMenuEntry(final int status) {
+         if (status >= sStatusActionList.length) {
+             Log.e(TAG, "Unknown status " + status);
+             return ACTION_UNKNOWN;
+         }
+-        return sStatusActionList[status][1];
++        return sStatusActionList[status];
+     }
+ 
+     private void disableDict() {
+@@ -211,85 +191,28 @@
+     }
+ 
+     @Override
+-    protected void onBindView(final View view) {
+-        super.onBindView(view);
+-        ((ViewGroup)view).setLayoutTransition(null);
+-
+-        final DictionaryDownloadProgressBar progressBar =
+-                (DictionaryDownloadProgressBar)view.findViewById(R.id.dictionary_line_progress_bar);
+-        final TextView status = (TextView)view.findViewById(android.R.id.summary);
++    public void onBindViewHolder(@NonNull final PreferenceViewHolder holder) {
++        super.onBindViewHolder(holder);
++        final DictionaryDownloadProgressBar progressBar = (DictionaryDownloadProgressBar)
++                holder.findViewById(R.id.dictionary_line_progress_bar);
++        final View status = holder.findViewById(android.R.id.summary);
+         progressBar.setIds(mClientId, mWordlistId);
+         progressBar.setMax(mFilesize);
+         final boolean showProgressBar = (MetadataDbHelper.STATUS_DOWNLOADING == mStatus);
+-        setSummary(getSummary(mStatus));
+         status.setVisibility(showProgressBar ? View.INVISIBLE : View.VISIBLE);
+         progressBar.setVisibility(showProgressBar ? View.VISIBLE : View.INVISIBLE);
+-
+-        final ButtonSwitcher buttonSwitcher = (ButtonSwitcher)view.findViewById(
+-                R.id.wordlist_button_switcher);
+-        // We need to clear the state of the button switcher, because we reuse views; if we didn't
+-        // reset it would animate from whatever its old state was.
+-        buttonSwitcher.reset(mInterfaceState);
+-        if (mInterfaceState.isOpen(mWordlistId)) {
+-            // The button is open.
+-            final int previousStatus = mInterfaceState.getStatus(mWordlistId);
+-            buttonSwitcher.setStatusAndUpdateVisuals(getButtonSwitcherStatus(previousStatus));
+-            if (previousStatus != mStatus) {
+-                // We come here if the status has changed since last time. We need to animate
+-                // the transition.
+-                buttonSwitcher.setStatusAndUpdateVisuals(getButtonSwitcherStatus(mStatus));
+-                mInterfaceState.setOpen(mWordlistId, mStatus);
+-            }
+-        } else {
+-            // The button is closed.
+-            buttonSwitcher.setStatusAndUpdateVisuals(ButtonSwitcher.STATUS_NO_BUTTON);
+-        }
+-        buttonSwitcher.setInternalOnClickListener(new View.OnClickListener() {
+-            @Override
+-            public void onClick(final View v) {
+-                onActionButtonClicked();
+-            }
+-        });
+-        view.setOnClickListener(new View.OnClickListener() {
+-            @Override
+-            public void onClick(final View v) {
+-                onWordListClicked(v);
+-            }
+-        });
++        final int action = getActionIdFromStatusAndMenuEntry(mStatus);
++        bindActionButton(holder.findViewById(R.id.dict_install_button),
++                action == ACTION_ENABLE_DICT);
++        bindActionButton(holder.findViewById(R.id.dict_cancel_button),
++                action == ACTION_DISABLE_DICT);
++        bindActionButton(holder.findViewById(R.id.dict_delete_button),
++                action == ACTION_DELETE_DICT);
+     }
+ 
+-    void onWordListClicked(final View v) {
+-        // Note : v is the preference view
+-        final ViewParent parent = v.getParent();
+-        // Just in case something changed in the framework, test for the concrete class
+-        if (!(parent instanceof ListView)) return;
+-        final ListView listView = (ListView)parent;
+-        final int indexToOpen;
+-        // Close all first, we'll open back any item that needs to be open.
+-        final boolean wasOpen = mInterfaceState.isOpen(mWordlistId);
+-        mInterfaceState.closeAll();
+-        if (wasOpen) {
+-            // This button being shown. Take note that we don't want to open any button in the
+-            // loop below.
+-            indexToOpen = -1;
+-        } else {
+-            // This button was not being shown. Open it, and remember the index of this
+-            // child as the one to open in the following loop.
+-            mInterfaceState.setOpen(mWordlistId, mStatus);
+-            indexToOpen = listView.indexOfChild(v);
+-        }
+-        final int lastDisplayedIndex =
+-                listView.getLastVisiblePosition() - listView.getFirstVisiblePosition();
+-        // The "lastDisplayedIndex" is actually displayed, hence the <=
+-        for (int i = 0; i <= lastDisplayedIndex; ++i) {
+-            final ButtonSwitcher buttonSwitcher = (ButtonSwitcher)listView.getChildAt(i)
+-                    .findViewById(R.id.wordlist_button_switcher);
+-            if (i == indexToOpen) {
+-                buttonSwitcher.setStatusAndUpdateVisuals(getButtonSwitcherStatus(mStatus));
+-            } else {
+-                buttonSwitcher.setStatusAndUpdateVisuals(ButtonSwitcher.STATUS_NO_BUTTON);
+-            }
+-        }
++    private void bindActionButton(final View button, final boolean visible) {
++        button.setVisibility(visible ? View.VISIBLE : View.GONE);
++        button.setOnClickListener(visible ? v -> onActionButtonClicked() : null);
+     }
+ 
+     void onActionButtonClicked() {
+diff --git a/java/src/com/android/inputmethod/latin/about/AboutPreferences.java b/java/src/com/android/inputmethod/latin/about/AboutPreferences.java
+index ec7e6de..2555150 100644
+--- a/java/src/com/android/inputmethod/latin/about/AboutPreferences.java
++++ b/java/src/com/android/inputmethod/latin/about/AboutPreferences.java
+@@ -16,7 +16,7 @@
+ 
+ package com.android.inputmethod.latin.about;
+ 
+-import android.app.Fragment;
++import androidx.fragment.app.Fragment;
+ 
+ /**
+  * Placeholer class of AboutPreferences. Never use this.
+diff --git a/java/src/com/android/inputmethod/latin/settings/AccountsSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/AccountsSettingsFragment.java
+index b39e6b4..3361aa4 100644
+--- a/java/src/com/android/inputmethod/latin/settings/AccountsSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/AccountsSettingsFragment.java
+@@ -20,7 +20,6 @@
+ import static com.android.inputmethod.latin.settings.LocalSettingsConstants.PREF_ENABLE_CLOUD_SYNC;
+ 
+ import android.Manifest;
+-import android.app.AlertDialog;
+ import android.content.Context;
+ import android.content.DialogInterface;
+ import android.content.DialogInterface.OnShowListener;
+@@ -28,9 +27,10 @@
+ import android.content.res.Resources;
+ import android.os.AsyncTask;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.Preference.OnPreferenceClickListener;
+-import android.preference.TwoStatePreference;
++import androidx.appcompat.app.AlertDialog;
++import androidx.preference.Preference;
++import androidx.preference.Preference.OnPreferenceClickListener;
++import androidx.preference.TwoStatePreference;
+ import android.text.TextUtils;
+ import android.text.method.LinkMovementMethod;
+ import android.widget.ListView;
+@@ -43,6 +43,7 @@
+ import com.android.inputmethod.latin.define.ProductionFlags;
+ import com.android.inputmethod.latin.permissions.PermissionsUtil;
+ import com.android.inputmethod.latin.utils.ManagedProfileUtils;
++import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+ 
+ import java.util.concurrent.atomic.AtomicBoolean;
+ 
+@@ -366,7 +367,7 @@
+                 break;
+             }
+         }
+-        final AlertDialog.Builder builder = new AlertDialog.Builder(getActivity())
++        final AlertDialog.Builder builder = new MaterialAlertDialogBuilder(requireContext())
+                 .setTitle(R.string.account_select_title)
+                 .setSingleChoiceItems(accounts, index, null)
+                 .setPositiveButton(R.string.account_select_ok, positiveButtonClickListener)
+@@ -436,7 +437,7 @@
+     class DeleteSyncDataListener implements Preference.OnPreferenceClickListener {
+         @Override
+         public boolean onPreferenceClick(final Preference preference) {
+-            final AlertDialog confirmationDialog = new AlertDialog.Builder(getActivity())
++            final AlertDialog confirmationDialog = new MaterialAlertDialogBuilder(requireContext())
+                     .setTitle(R.string.clear_sync_data_title)
+                     .setMessage(R.string.clear_sync_data_confirmation)
+                     .setPositiveButton(R.string.clear_sync_data_ok,
+@@ -469,7 +470,7 @@
+                 syncPreference.setChecked(false);
+ 
+                 // Show opt-in.
+-                final AlertDialog optInDialog = new AlertDialog.Builder(getActivity())
++                final AlertDialog optInDialog = new MaterialAlertDialogBuilder(requireContext())
+                         .setTitle(R.string.cloud_sync_title)
+                         .setMessage(R.string.cloud_sync_opt_in_text)
+                         .setPositiveButton(R.string.account_select_ok,
+diff --git a/java/src/com/android/inputmethod/latin/settings/AdditionalFeaturesSettingUtils.java b/java/src/com/android/inputmethod/latin/settings/AdditionalFeaturesSettingUtils.java
+index 4e8a10b..c1cb200 100644
+--- a/java/src/com/android/inputmethod/latin/settings/AdditionalFeaturesSettingUtils.java
++++ b/java/src/com/android/inputmethod/latin/settings/AdditionalFeaturesSettingUtils.java
+@@ -18,7 +18,7 @@
+ 
+ import android.content.Context;
+ import android.content.SharedPreferences;
+-import android.preference.PreferenceFragment;
++import androidx.preference.PreferenceFragmentCompat;
+ import android.view.inputmethod.InputMethodSubtype;
+ 
+ import com.android.inputmethod.latin.RichInputMethodSubtype;
+@@ -38,7 +38,7 @@
+     }
+ 
+     public static void addAdditionalFeaturesPreferences(
+-            final Context context, final PreferenceFragment settingsFragment) {
++            final Context context, final PreferenceFragmentCompat settingsFragment) {
+         // do nothing.
+     }
+ 
+diff --git a/java/src/com/android/inputmethod/latin/settings/AdvancedSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/AdvancedSettingsFragment.java
+index bddb864..2b97877 100644
+--- a/java/src/com/android/inputmethod/latin/settings/AdvancedSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/AdvancedSettingsFragment.java
+@@ -21,8 +21,8 @@
+ import android.content.res.Resources;
+ import android.media.AudioManager;
+ import android.os.Bundle;
+-import android.preference.ListPreference;
+-import android.preference.Preference;
++import androidx.preference.ListPreference;
++import androidx.preference.Preference;
+ 
+ import com.android.inputmethod.latin.AudioAndHapticFeedbackManager;
+ import com.android.inputmethod.latin.R;
+diff --git a/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java
+index dfe899e..e8db316 100644
+--- a/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java
+@@ -25,8 +25,8 @@
+ import android.content.pm.ResolveInfo;
+ import android.os.Build;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.SwitchPreference;
++import androidx.preference.Preference;
++import androidx.preference.SwitchPreference;
+ import android.text.TextUtils;
+ 
+ import com.android.inputmethod.dictionarypack.DictionarySettingsActivity;
+diff --git a/java/src/com/android/inputmethod/latin/settings/CustomInputStylePreference.java b/java/src/com/android/inputmethod/latin/settings/CustomInputStylePreference.java
+index 44a98c1..bb63fdd 100644
+--- a/java/src/com/android/inputmethod/latin/settings/CustomInputStylePreference.java
++++ b/java/src/com/android/inputmethod/latin/settings/CustomInputStylePreference.java
+@@ -16,14 +16,9 @@
+ 
+ package com.android.inputmethod.latin.settings;
+ 
+-import android.app.AlertDialog;
+-import android.app.Dialog;
+ import android.content.Context;
+ import android.content.DialogInterface;
+-import android.os.Parcel;
+-import android.os.Parcelable;
+-import android.preference.DialogPreference;
+-import android.preference.Preference;
++import android.os.Bundle;
+ import android.util.Log;
+ import android.view.View;
+ import android.view.inputmethod.InputMethodInfo;
+@@ -32,6 +27,11 @@
+ import android.widget.Spinner;
+ import android.widget.SpinnerAdapter;
+ 
++import androidx.annotation.NonNull;
++import androidx.appcompat.app.AlertDialog;
++import androidx.preference.DialogPreference;
++import androidx.preference.PreferenceDialogFragmentCompat;
++
+ import com.android.inputmethod.compat.InputMethodSubtypeCompatUtils;
+ import com.android.inputmethod.compat.ViewCompatUtils;
+ import com.android.inputmethod.latin.R;
+@@ -41,8 +41,7 @@
+ 
+ import java.util.TreeSet;
+ 
+-final class CustomInputStylePreference extends DialogPreference
+-        implements DialogInterface.OnCancelListener {
++final class CustomInputStylePreference extends DialogPreference {
+     private static final boolean DEBUG_SUBTYPE_ID = false;
+ 
+     interface Listener {
+@@ -60,8 +59,6 @@
+     private InputMethodSubtype mPreviousSubtype;
+ 
+     private final Listener mProxy;
+-    private Spinner mSubtypeLocaleSpinner;
+-    private Spinner mKeyboardLayoutSetSpinner;
+ 
+     public static CustomInputStylePreference newIncompleteSubtypePreference(
+             final Context context, final Listener proxy) {
+@@ -78,7 +75,7 @@
+     }
+ 
+     public void show() {
+-        showDialog(null);
++        getPreferenceManager().showDialog(this);
+     }
+ 
+     public final boolean isIncomplete() {
+@@ -114,36 +111,100 @@
+         return mSubtype != null && !mSubtype.equals(mPreviousSubtype);
+     }
+ 
+-    @Override
+-    protected View onCreateDialogView() {
+-        final View v = super.onCreateDialogView();
+-        mSubtypeLocaleSpinner = (Spinner) v.findViewById(R.id.subtype_locale_spinner);
+-        mSubtypeLocaleSpinner.setAdapter(mProxy.getSubtypeLocaleAdapter());
+-        mKeyboardLayoutSetSpinner = (Spinner) v.findViewById(R.id.keyboard_layout_set_spinner);
+-        mKeyboardLayoutSetSpinner.setAdapter(mProxy.getKeyboardLayoutSetAdapter());
+-        // All keyboard layout names are in the Latin script and thus left to right. That means
+-        // the view would align them to the left even if the system locale is RTL, but that
+-        // would look strange. To fix this, we align them to the view's start, which will be
+-        // natural for any direction.
+-        ViewCompatUtils.setTextAlignment(
+-                mKeyboardLayoutSetSpinner, ViewCompatUtils.TEXT_ALIGNMENT_VIEW_START);
+-        return v;
+-    }
++    public static final class CustomInputStyleDialogFragment
++            extends PreferenceDialogFragmentCompat {
++        private Spinner mSubtypeLocaleSpinner;
++        private Spinner mKeyboardLayoutSetSpinner;
+ 
+-    @Override
+-    protected void onPrepareDialogBuilder(final AlertDialog.Builder builder) {
+-        builder.setCancelable(true).setOnCancelListener(this);
+-        if (isIncomplete()) {
+-            builder.setPositiveButton(R.string.add, this)
+-                    .setNegativeButton(android.R.string.cancel, this);
+-        } else {
+-            builder.setPositiveButton(R.string.save, this)
+-                    .setNeutralButton(android.R.string.cancel, this)
+-                    .setNegativeButton(R.string.remove, this);
+-            final SubtypeLocaleItem localeItem = new SubtypeLocaleItem(mSubtype);
+-            final KeyboardLayoutSetItem layoutItem = new KeyboardLayoutSetItem(mSubtype);
+-            setSpinnerPosition(mSubtypeLocaleSpinner, localeItem);
+-            setSpinnerPosition(mKeyboardLayoutSetSpinner, layoutItem);
++        public static CustomInputStyleDialogFragment newInstance(final String key) {
++            final CustomInputStyleDialogFragment fragment = new CustomInputStyleDialogFragment();
++            final Bundle args = new Bundle(1);
++            args.putString(ARG_KEY, key);
++            fragment.setArguments(args);
++            return fragment;
++        }
++
++        private CustomInputStylePreference getStylePreference() {
++            return (CustomInputStylePreference) getPreference();
++        }
++
++        @Override
++        protected void onBindDialogView(@NonNull final View view) {
++            super.onBindDialogView(view);
++            final CustomInputStylePreference pref = getStylePreference();
++            mSubtypeLocaleSpinner = (Spinner) view.findViewById(R.id.subtype_locale_spinner);
++            mSubtypeLocaleSpinner.setAdapter(pref.mProxy.getSubtypeLocaleAdapter());
++            mKeyboardLayoutSetSpinner =
++                    (Spinner) view.findViewById(R.id.keyboard_layout_set_spinner);
++            mKeyboardLayoutSetSpinner.setAdapter(pref.mProxy.getKeyboardLayoutSetAdapter());
++            // All keyboard layout names are in the Latin script and thus left to right. That means
++            // the view would align them to the left even if the system locale is RTL, but that
++            // would look strange. To fix this, we align them to the view's start, which will be
++            // natural for any direction.
++            ViewCompatUtils.setTextAlignment(
++                    mKeyboardLayoutSetSpinner, ViewCompatUtils.TEXT_ALIGNMENT_VIEW_START);
++            if (!pref.isIncomplete()) {
++                setSpinnerPosition(mSubtypeLocaleSpinner, new SubtypeLocaleItem(pref.mSubtype));
++                setSpinnerPosition(mKeyboardLayoutSetSpinner,
++                        new KeyboardLayoutSetItem(pref.mSubtype));
++            }
++        }
++
++        @Override
++        protected void onPrepareDialogBuilder(@NonNull final AlertDialog.Builder builder) {
++            super.onPrepareDialogBuilder(builder);
++            if (getStylePreference().isIncomplete()) {
++                builder.setPositiveButton(R.string.add, this)
++                        .setNegativeButton(android.R.string.cancel, this);
++            } else {
++                builder.setPositiveButton(R.string.save, this)
++                        .setNeutralButton(android.R.string.cancel, this)
++                        .setNegativeButton(R.string.remove, this);
++            }
++        }
++
++        @Override
++        public void onCancel(@NonNull final DialogInterface dialog) {
++            super.onCancel(dialog);
++            final CustomInputStylePreference pref = getStylePreference();
++            if (pref.isIncomplete()) {
++                pref.mProxy.onRemoveCustomInputStyle(pref);
++            }
++        }
++
++        @Override
++        public void onClick(@NonNull final DialogInterface dialog, final int which) {
++            super.onClick(dialog, which);
++            final CustomInputStylePreference pref = getStylePreference();
++            switch (which) {
++            case DialogInterface.BUTTON_POSITIVE:
++                final boolean isEditing = !pref.isIncomplete();
++                final SubtypeLocaleItem locale =
++                        (SubtypeLocaleItem) mSubtypeLocaleSpinner.getSelectedItem();
++                final KeyboardLayoutSetItem layout =
++                        (KeyboardLayoutSetItem) mKeyboardLayoutSetSpinner.getSelectedItem();
++                final InputMethodSubtype subtype =
++                        AdditionalSubtypeUtils.createAsciiEmojiCapableAdditionalSubtype(
++                                locale.mLocaleString, layout.mLayoutName);
++                pref.setSubtype(subtype);
++                pref.notifyChanged();
++                if (isEditing) {
++                    pref.mProxy.onSaveCustomInputStyle(pref);
++                } else {
++                    pref.mProxy.onAddCustomInputStyle(pref);
++                }
++                break;
++            case DialogInterface.BUTTON_NEUTRAL:
++                // Nothing to do
++                break;
++            case DialogInterface.BUTTON_NEGATIVE:
++                pref.mProxy.onRemoveCustomInputStyle(pref);
++                break;
++            }
++        }
++
++        @Override
++        public void onDialogClosed(final boolean positiveResult) {
+         }
+     }
+ 
+@@ -159,101 +220,6 @@
+         }
+     }
+ 
+-    @Override
+-    public void onCancel(final DialogInterface dialog) {
+-        if (isIncomplete()) {
+-            mProxy.onRemoveCustomInputStyle(this);
+-        }
+-    }
+-
+-    @Override
+-    public void onClick(final DialogInterface dialog, final int which) {
+-        super.onClick(dialog, which);
+-        switch (which) {
+-        case DialogInterface.BUTTON_POSITIVE:
+-            final boolean isEditing = !isIncomplete();
+-            final SubtypeLocaleItem locale =
+-                    (SubtypeLocaleItem) mSubtypeLocaleSpinner.getSelectedItem();
+-            final KeyboardLayoutSetItem layout =
+-                    (KeyboardLayoutSetItem) mKeyboardLayoutSetSpinner.getSelectedItem();
+-            final InputMethodSubtype subtype =
+-                    AdditionalSubtypeUtils.createAsciiEmojiCapableAdditionalSubtype(
+-                            locale.mLocaleString, layout.mLayoutName);
+-            setSubtype(subtype);
+-            notifyChanged();
+-            if (isEditing) {
+-                mProxy.onSaveCustomInputStyle(this);
+-            } else {
+-                mProxy.onAddCustomInputStyle(this);
+-            }
+-            break;
+-        case DialogInterface.BUTTON_NEUTRAL:
+-            // Nothing to do
+-            break;
+-        case DialogInterface.BUTTON_NEGATIVE:
+-            mProxy.onRemoveCustomInputStyle(this);
+-            break;
+-        }
+-    }
+-
+-    @Override
+-    protected Parcelable onSaveInstanceState() {
+-        final Parcelable superState = super.onSaveInstanceState();
+-        final Dialog dialog = getDialog();
+-        if (dialog == null || !dialog.isShowing()) {
+-            return superState;
+-        }
+-
+-        final SavedState myState = new SavedState(superState);
+-        myState.mSubtype = mSubtype;
+-        return myState;
+-    }
+-
+-    @Override
+-    protected void onRestoreInstanceState(final Parcelable state) {
+-        if (!(state instanceof SavedState)) {
+-            super.onRestoreInstanceState(state);
+-            return;
+-        }
+-
+-        final SavedState myState = (SavedState) state;
+-        super.onRestoreInstanceState(myState.getSuperState());
+-        setSubtype(myState.mSubtype);
+-    }
+-
+-    static final class SavedState extends Preference.BaseSavedState {
+-        InputMethodSubtype mSubtype;
+-
+-        public SavedState(final Parcelable superState) {
+-            super(superState);
+-        }
+-
+-        @Override
+-        public void writeToParcel(final Parcel dest, final int flags) {
+-            super.writeToParcel(dest, flags);
+-            dest.writeParcelable(mSubtype, 0);
+-        }
+-
+-        public SavedState(final Parcel source) {
+-            super(source);
+-            mSubtype = (InputMethodSubtype)source.readParcelable(null);
+-        }
+-
+-        @SuppressWarnings("hiding")
+-        public static final Parcelable.Creator<SavedState> CREATOR =
+-                new Parcelable.Creator<SavedState>() {
+-                    @Override
+-                    public SavedState createFromParcel(final Parcel source) {
+-                        return new SavedState(source);
+-                    }
+-
+-                    @Override
+-                    public SavedState[] newArray(final int size) {
+-                        return new SavedState[size];
+-                    }
+-                };
+-    }
+-
+     static final class SubtypeLocaleItem implements Comparable<SubtypeLocaleItem> {
+         public final String mLocaleString;
+         private final String mDisplayName;
+diff --git a/java/src/com/android/inputmethod/latin/settings/CustomInputStyleSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/CustomInputStyleSettingsFragment.java
+index 6be766c..f346aec 100644
+--- a/java/src/com/android/inputmethod/latin/settings/CustomInputStyleSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/CustomInputStyleSettingsFragment.java
+@@ -16,15 +16,15 @@
+ 
+ package com.android.inputmethod.latin.settings;
+ 
+-import android.app.AlertDialog;
+ import android.content.Context;
+ import android.content.DialogInterface;
+ import android.content.Intent;
+ import android.content.SharedPreferences;
+ import android.content.res.Resources;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.PreferenceGroup;
++import androidx.appcompat.app.AlertDialog;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceGroup;
+ import androidx.core.view.ViewCompat;
+ import android.text.TextUtils;
+ import android.util.Log;
+@@ -40,9 +40,9 @@
+ import com.android.inputmethod.latin.R;
+ import com.android.inputmethod.latin.RichInputMethodManager;
+ import com.android.inputmethod.latin.utils.AdditionalSubtypeUtils;
+-import com.android.inputmethod.latin.utils.DialogUtils;
+ import com.android.inputmethod.latin.utils.IntentUtils;
+ import com.android.inputmethod.latin.utils.SubtypeLocaleUtils;
++import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+ 
+ import java.util.ArrayList;
+ 
+@@ -99,20 +99,7 @@
+         mRichImm = RichInputMethodManager.getInstance();
+         addPreferencesFromResource(R.xml.additional_subtype_settings);
+         setHasOptionsMenu(true);
+-    }
+ 
+-    @Override
+-    public View onCreateView(final LayoutInflater inflater, final ViewGroup container,
+-            final Bundle savedInstanceState) {
+-        final View view = super.onCreateView(inflater, container, savedInstanceState);
+-        // For correct display in RTL locales, we need to set the layout direction of the
+-        // fragment's top view.
+-        ViewCompat.setLayoutDirection(view, ViewCompat.LAYOUT_DIRECTION_LOCALE);
+-        return view;
+-    }
+-
+-    @Override
+-    public void onActivityCreated(final Bundle savedInstanceState) {
+         final Context context = getActivity();
+         mSubtypeLocaleAdapter = new CustomInputStylePreference.SubtypeLocaleAdapter(context);
+         mKeyboardLayoutSetAdapter =
+@@ -131,7 +118,20 @@
+             getPreferenceScreen().addPreference(
+                     CustomInputStylePreference.newIncompleteSubtypePreference(context, this));
+         }
++    }
+ 
++    @Override
++    public View onCreateView(final LayoutInflater inflater, final ViewGroup container,
++            final Bundle savedInstanceState) {
++        final View view = super.onCreateView(inflater, container, savedInstanceState);
++        // For correct display in RTL locales, we need to set the layout direction of the
++        // fragment's top view.
++        ViewCompat.setLayoutDirection(view, ViewCompat.LAYOUT_DIRECTION_LOCALE);
++        return view;
++    }
++
++    @Override
++    public void onActivityCreated(final Bundle savedInstanceState) {
+         super.onActivityCreated(savedInstanceState);
+ 
+         if (savedInstanceState != null && savedInstanceState.containsKey(
+@@ -231,8 +231,7 @@
+ 
+     private AlertDialog createDialog() {
+         final String imeId = mRichImm.getInputMethodIdOfThisIme();
+-        final AlertDialog.Builder builder = new AlertDialog.Builder(
+-                DialogUtils.getPlatformDialogThemeContext(getActivity()));
++        final AlertDialog.Builder builder = new MaterialAlertDialogBuilder(requireContext());
+         builder.setTitle(R.string.custom_input_styles_title)
+                 .setMessage(R.string.custom_input_style_note_message)
+                 .setNegativeButton(R.string.not_now, null)
+diff --git a/java/src/com/android/inputmethod/latin/settings/CustomPreferenceFragment.java b/java/src/com/android/inputmethod/latin/settings/CustomPreferenceFragment.java
+index d791b53..75a974e 100644
+--- a/java/src/com/android/inputmethod/latin/settings/CustomPreferenceFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/CustomPreferenceFragment.java
+@@ -17,21 +17,87 @@
+ package com.android.inputmethod.latin.settings;
+ 
+ import android.os.Bundle;
+-import android.preference.PreferenceFragment;
++import android.view.LayoutInflater;
+ import android.view.View;
+-import android.widget.ListView;
++import android.view.ViewGroup;
+ 
+-/**
+- * A base abstract class for a {@link PreferenceFragment} that removes divider lines
+- */
+-public abstract class CustomPreferenceFragment extends PreferenceFragment {
++import androidx.annotation.NonNull;
++import androidx.core.graphics.Insets;
++import androidx.core.view.ViewCompat;
++import androidx.core.view.WindowInsetsCompat;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceDialogFragmentCompat;
++import androidx.preference.PreferenceFragmentCompat;
++import androidx.recyclerview.widget.RecyclerView;
++
++import com.google.android.material.appbar.AppBarLayout;
++
++public abstract class CustomPreferenceFragment extends PreferenceFragmentCompat {
++    private static final String DIALOG_FRAGMENT_TAG = "CustomPreferenceFragment.DIALOG";
++
+     @Override
+-    public void onActivityCreated(Bundle savedInstanceState) {
+-        super.onActivityCreated(savedInstanceState);
++    public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
++    }
+ 
+-        // remove dividers
+-        View rootView = getView();
+-        ListView list = (ListView) rootView.findViewById(android.R.id.list);
+-        list.setDivider(null);
++    @Override
++    public void onViewCreated(@NonNull final View view, final Bundle savedInstanceState) {
++        super.onViewCreated(view, savedInstanceState);
++        final AppBarLayout appBarLayout = getAppBarLayout();
++        if (appBarLayout != null) {
++            appBarLayout.setExpanded(true, false);
++            appBarLayout.setLiftOnScrollTargetView(getListView());
++        }
++    }
++
++    @Override
++    public void onDestroyView() {
++        final AppBarLayout appBarLayout = getAppBarLayout();
++        if (appBarLayout != null) {
++            appBarLayout.setLiftOnScrollTargetView(null);
++        }
++        super.onDestroyView();
++    }
++
++    @NonNull
++    @Override
++    public RecyclerView onCreateRecyclerView(@NonNull final LayoutInflater inflater,
++            @NonNull final ViewGroup parent, final Bundle savedInstanceState) {
++        final RecyclerView recyclerView =
++                super.onCreateRecyclerView(inflater, parent, savedInstanceState);
++        recyclerView.setClipToPadding(false);
++        recyclerView.setVerticalScrollBarEnabled(false);
++        ViewCompat.setOnApplyWindowInsetsListener(recyclerView, (v, windowInsets) -> {
++            final Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
++            v.setPadding(insets.left, v.getPaddingTop(), insets.right, insets.bottom);
++            return windowInsets;
++        });
++        return recyclerView;
++    }
++
++    @Override
++    public void onDisplayPreferenceDialog(@NonNull final Preference preference) {
++        if (preference instanceof SeekBarDialogPreference) {
++            showPreferenceDialog(SeekBarDialogPreference.SeekBarDialogFragment.newInstance(
++                    preference.getKey()));
++        } else if (preference instanceof CustomInputStylePreference) {
++            showPreferenceDialog(CustomInputStylePreference.CustomInputStyleDialogFragment
++                    .newInstance(preference.getKey()));
++        } else {
++            super.onDisplayPreferenceDialog(preference);
++        }
++    }
++
++    @SuppressWarnings("deprecation")
++    private void showPreferenceDialog(final PreferenceDialogFragmentCompat dialogFragment) {
++        if (getParentFragmentManager().findFragmentByTag(DIALOG_FRAGMENT_TAG) != null) {
++            return;
++        }
++        dialogFragment.setTargetFragment(this, 0);
++        dialogFragment.show(getParentFragmentManager(), DIALOG_FRAGMENT_TAG);
++    }
++
++    private AppBarLayout getAppBarLayout() {
++        return getActivity() instanceof SettingsBaseActivity
++                ? ((SettingsBaseActivity) getActivity()).getAppBarLayout() : null;
+     }
+ }
+diff --git a/java/src/com/android/inputmethod/latin/settings/DebugSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/DebugSettingsFragment.java
+index e754f32..7becde9 100644
+--- a/java/src/com/android/inputmethod/latin/settings/DebugSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/DebugSettingsFragment.java
+@@ -22,10 +22,10 @@
+ import android.content.res.Resources;
+ import android.os.Bundle;
+ import android.os.Process;
+-import android.preference.Preference;
+-import android.preference.Preference.OnPreferenceClickListener;
+-import android.preference.PreferenceGroup;
+-import android.preference.TwoStatePreference;
++import androidx.preference.Preference;
++import androidx.preference.Preference.OnPreferenceClickListener;
++import androidx.preference.PreferenceGroup;
++import androidx.preference.TwoStatePreference;
+ 
+ import com.android.inputmethod.latin.DictionaryDumpBroadcastReceiver;
+ import com.android.inputmethod.latin.DictionaryFacilitatorImpl;
+diff --git a/java/src/com/android/inputmethod/latin/settings/PreferencesSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/PreferencesSettingsFragment.java
+index 1859bea..5330ed0 100644
+--- a/java/src/com/android/inputmethod/latin/settings/PreferencesSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/PreferencesSettingsFragment.java
+@@ -21,7 +21,7 @@
+ import android.content.res.Resources;
+ import android.os.Build;
+ import android.os.Bundle;
+-import android.preference.Preference;
++import androidx.preference.Preference;
+ 
+ import com.android.inputmethod.latin.AudioAndHapticFeedbackManager;
+ import com.android.inputmethod.latin.R;
+diff --git a/java/src/com/android/inputmethod/latin/settings/RadioButtonPreference.java b/java/src/com/android/inputmethod/latin/settings/RadioButtonPreference.java
+index 9144460..bcd4a5b 100644
+--- a/java/src/com/android/inputmethod/latin/settings/RadioButtonPreference.java
++++ b/java/src/com/android/inputmethod/latin/settings/RadioButtonPreference.java
+@@ -17,11 +17,11 @@
+ package com.android.inputmethod.latin.settings;
+ 
+ import android.content.Context;
+-import android.preference.Preference;
+-import android.util.AttributeSet;
+-import android.view.View;
+ import android.widget.RadioButton;
+ 
++import androidx.preference.Preference;
++import androidx.preference.PreferenceViewHolder;
++
+ import com.android.inputmethod.latin.R;
+ 
+ /**
+@@ -38,26 +38,10 @@
+     }
+ 
+     private boolean mIsSelected;
+-    private RadioButton mRadioButton;
+     private OnRadioButtonClickedListener mListener;
+-    private final View.OnClickListener mClickListener = new View.OnClickListener() {
+-        @Override
+-        public void onClick(final View v) {
+-            callListenerOnRadioButtonClicked();
+-        }
+-    };
+ 
+     public RadioButtonPreference(final Context context) {
+-        this(context, null);
+-    }
+-
+-    public RadioButtonPreference(final Context context, final AttributeSet attrs) {
+-        this(context, attrs, android.R.attr.preferenceStyle);
+-    }
+-
+-    public RadioButtonPreference(final Context context, final AttributeSet attrs,
+-            final int defStyleAttr) {
+-        super(context, attrs, defStyleAttr);
++        super(context);
+         setWidgetLayoutResource(R.layout.radio_button_preference_widget);
+     }
+ 
+@@ -65,19 +49,18 @@
+         mListener = listener;
+     }
+ 
+-    void callListenerOnRadioButtonClicked() {
++    @Override
++    protected void onClick() {
+         if (mListener != null) {
+             mListener.onRadioButtonClicked(this);
+         }
+     }
+ 
+     @Override
+-    protected void onBindView(final View view) {
+-        super.onBindView(view);
+-        mRadioButton = (RadioButton)view.findViewById(R.id.radio_button);
+-        mRadioButton.setChecked(mIsSelected);
+-        mRadioButton.setOnClickListener(mClickListener);
+-        view.setOnClickListener(mClickListener);
++    public void onBindViewHolder(final PreferenceViewHolder holder) {
++        super.onBindViewHolder(holder);
++        final RadioButton radioButton = (RadioButton) holder.findViewById(R.id.radio_button);
++        radioButton.setChecked(mIsSelected);
+     }
+ 
+     public boolean isSelected() {
+@@ -89,9 +72,6 @@
+             return;
+         }
+         mIsSelected = selected;
+-        if (mRadioButton != null) {
+-            mRadioButton.setChecked(selected);
+-        }
+         notifyChanged();
+     }
+ }
+diff --git a/java/src/com/android/inputmethod/latin/settings/SeekBarDialogPreference.java b/java/src/com/android/inputmethod/latin/settings/SeekBarDialogPreference.java
+index 802574a..34a19b8 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SeekBarDialogPreference.java
++++ b/java/src/com/android/inputmethod/latin/settings/SeekBarDialogPreference.java
+@@ -16,20 +16,23 @@
+ 
+ package com.android.inputmethod.latin.settings;
+ 
+-import android.app.AlertDialog;
+ import android.content.Context;
+ import android.content.DialogInterface;
+ import android.content.res.TypedArray;
+-import android.preference.DialogPreference;
++import android.os.Bundle;
+ import android.util.AttributeSet;
+ import android.view.View;
+-import android.widget.SeekBar;
+ import android.widget.TextView;
+ 
+-import com.android.inputmethod.latin.R;
++import androidx.annotation.NonNull;
++import androidx.appcompat.app.AlertDialog;
++import androidx.preference.DialogPreference;
++import androidx.preference.PreferenceDialogFragmentCompat;
+ 
+-public final class SeekBarDialogPreference extends DialogPreference
+-        implements SeekBar.OnSeekBarChangeListener {
++import com.android.inputmethod.latin.R;
++import com.google.android.material.slider.Slider;
++
++public final class SeekBarDialogPreference extends DialogPreference {
+     public interface ValueProxy {
+         public int readValue(final String key);
+         public int readDefaultValue(final String key);
+@@ -43,9 +46,6 @@
+     private final int mMinValue;
+     private final int mStepValue;
+ 
+-    private TextView mValueView;
+-    private SeekBar mSeekBar;
+-
+     private ValueProxy mValueProxy;
+ 
+     public SeekBarDialogPreference(final Context context, final AttributeSet attrs) {
+@@ -65,24 +65,6 @@
+         setSummary(mValueProxy.getValueText(value));
+     }
+ 
+-    @Override
+-    protected View onCreateDialogView() {
+-        final View view = super.onCreateDialogView();
+-        mSeekBar = (SeekBar)view.findViewById(R.id.seek_bar_dialog_bar);
+-        mSeekBar.setMax(mMaxValue - mMinValue);
+-        mSeekBar.setOnSeekBarChangeListener(this);
+-        mValueView = (TextView)view.findViewById(R.id.seek_bar_dialog_value);
+-        return view;
+-    }
+-
+-    private int getProgressFromValue(final int value) {
+-        return value - mMinValue;
+-    }
+-
+-    private int getValueFromProgress(final int progress) {
+-        return progress + mMinValue;
+-    }
+-
+     private int clipValue(final int value) {
+         final int clippedValue = Math.min(mMaxValue, Math.max(mMinValue, value));
+         if (mStepValue <= 1) {
+@@ -91,57 +73,89 @@
+         return clippedValue - (clippedValue % mStepValue);
+     }
+ 
+-    private int getClippedValueFromProgress(final int progress) {
+-        return clipValue(getValueFromProgress(progress));
++    private void writeValue(final int value) {
++        setSummary(mValueProxy.getValueText(value));
++        mValueProxy.writeValue(value, getKey());
+     }
+ 
+-    @Override
+-    protected void onBindDialogView(final View view) {
+-        final int value = mValueProxy.readValue(getKey());
+-        mValueView.setText(mValueProxy.getValueText(value));
+-        mSeekBar.setProgress(getProgressFromValue(clipValue(value)));
+-    }
+-
+-    @Override
+-    protected void onPrepareDialogBuilder(final AlertDialog.Builder builder) {
+-        builder.setPositiveButton(android.R.string.ok, this)
+-            .setNegativeButton(android.R.string.cancel, this)
+-            .setNeutralButton(R.string.button_default, this);
+-    }
+-
+-    @Override
+-    public void onClick(final DialogInterface dialog, final int which) {
+-        super.onClick(dialog, which);
++    private void writeDefaultValue() {
+         final String key = getKey();
+-        if (which == DialogInterface.BUTTON_NEUTRAL) {
+-            final int value = mValueProxy.readDefaultValue(key);
+-            setSummary(mValueProxy.getValueText(value));
+-            mValueProxy.writeDefaultValue(key);
+-            return;
+-        }
+-        if (which == DialogInterface.BUTTON_POSITIVE) {
+-            final int value = getClippedValueFromProgress(mSeekBar.getProgress());
+-            setSummary(mValueProxy.getValueText(value));
+-            mValueProxy.writeValue(value, key);
+-            return;
+-        }
++        setSummary(mValueProxy.getValueText(mValueProxy.readDefaultValue(key)));
++        mValueProxy.writeDefaultValue(key);
+     }
+ 
+-    @Override
+-    public void onProgressChanged(final SeekBar seekBar, final int progress,
+-            final boolean fromUser) {
+-        final int value = getClippedValueFromProgress(progress);
+-        mValueView.setText(mValueProxy.getValueText(value));
+-        if (!fromUser) {
+-            mSeekBar.setProgress(getProgressFromValue(value));
++    public static final class SeekBarDialogFragment extends PreferenceDialogFragmentCompat
++            implements Slider.OnChangeListener, Slider.OnSliderTouchListener {
++        private TextView mValueView;
++        private Slider mSlider;
++
++        public static SeekBarDialogFragment newInstance(final String key) {
++            final SeekBarDialogFragment fragment = new SeekBarDialogFragment();
++            final Bundle args = new Bundle(1);
++            args.putString(ARG_KEY, key);
++            fragment.setArguments(args);
++            return fragment;
+         }
+-    }
+ 
+-    @Override
+-    public void onStartTrackingTouch(final SeekBar seekBar) {}
++        private SeekBarDialogPreference getSeekBarPreference() {
++            return (SeekBarDialogPreference) getPreference();
++        }
+ 
+-    @Override
+-    public void onStopTrackingTouch(final SeekBar seekBar) {
+-        mValueProxy.feedbackValue(getClippedValueFromProgress(seekBar.getProgress()));
++        @Override
++        protected void onBindDialogView(@NonNull final View view) {
++            super.onBindDialogView(view);
++            final SeekBarDialogPreference pref = getSeekBarPreference();
++            mSlider = (Slider) view.findViewById(R.id.seek_bar_dialog_bar);
++            mSlider.setValueFrom(pref.mMinValue);
++            mSlider.setValueTo(pref.mMaxValue);
++            mValueView = (TextView) view.findViewById(R.id.seek_bar_dialog_value);
++            final int value = pref.clipValue(pref.mValueProxy.readValue(pref.getKey()));
++            mValueView.setText(pref.mValueProxy.getValueText(value));
++            mSlider.setValue(value);
++            mSlider.addOnChangeListener(this);
++            mSlider.addOnSliderTouchListener(this);
++        }
++
++        @Override
++        protected void onPrepareDialogBuilder(@NonNull final AlertDialog.Builder builder) {
++            super.onPrepareDialogBuilder(builder);
++            builder.setNeutralButton(R.string.button_default, this);
++        }
++
++        @Override
++        public void onClick(@NonNull final DialogInterface dialog, final int which) {
++            super.onClick(dialog, which);
++            if (which == DialogInterface.BUTTON_NEUTRAL) {
++                getSeekBarPreference().writeDefaultValue();
++            }
++        }
++
++        @Override
++        public void onDialogClosed(final boolean positiveResult) {
++            if (positiveResult) {
++                final SeekBarDialogPreference pref = getSeekBarPreference();
++                pref.writeValue(pref.clipValue((int) mSlider.getValue()));
++            }
++        }
++
++        @Override
++        public void onValueChange(@NonNull final Slider slider, final float value,
++                final boolean fromUser) {
++            final SeekBarDialogPreference pref = getSeekBarPreference();
++            final int clippedValue = pref.clipValue((int) value);
++            mValueView.setText(pref.mValueProxy.getValueText(clippedValue));
++            if (clippedValue != (int) value) {
++                slider.setValue(clippedValue);
++            }
++        }
++
++        @Override
++        public void onStartTrackingTouch(@NonNull final Slider slider) {}
++
++        @Override
++        public void onStopTrackingTouch(@NonNull final Slider slider) {
++            final SeekBarDialogPreference pref = getSeekBarPreference();
++            pref.mValueProxy.feedbackValue(pref.clipValue((int) slider.getValue()));
++        }
+     }
+ }
+diff --git a/java/src/com/android/inputmethod/latin/settings/SettingsActivity.java b/java/src/com/android/inputmethod/latin/settings/SettingsActivity.java
+index 43467a0..f238884 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SettingsActivity.java
++++ b/java/src/com/android/inputmethod/latin/settings/SettingsActivity.java
+@@ -16,22 +16,17 @@
+ 
+ package com.android.inputmethod.latin.settings;
+ 
+-import com.android.inputmethod.latin.permissions.PermissionsManager;
+-import com.android.inputmethod.latin.utils.FragmentUtils;
+-import com.android.inputmethod.latin.utils.StatsUtils;
+-import com.android.inputmethod.latin.utils.StatsUtilsManager;
+-
+-import android.app.ActionBar;
+ import android.content.Intent;
+ import android.os.Bundle;
+-import android.preference.PreferenceActivity;
+-import androidx.core.app.ActivityCompat;
+-import android.view.MenuItem;
+ 
+-public final class SettingsActivity extends PreferenceActivity
+-        implements ActivityCompat.OnRequestPermissionsResultCallback {
+-    private static final String DEFAULT_FRAGMENT = SettingsFragment.class.getName();
++import androidx.annotation.NonNull;
++import androidx.appcompat.app.ActionBar;
++import androidx.fragment.app.Fragment;
+ 
++import com.android.inputmethod.latin.permissions.PermissionsManager;
++import com.android.inputmethod.latin.utils.StatsUtils;
++
++public final class SettingsActivity extends SettingsBaseActivity {
+     public static final String EXTRA_SHOW_HOME_AS_UP = "show_home_as_up";
+     public static final String EXTRA_ENTRY_KEY = "entry";
+     public static final String EXTRA_ENTRY_VALUE_LONG_PRESS_COMMA = "long_press_comma";
+@@ -39,17 +34,18 @@
+     public static final String EXTRA_ENTRY_VALUE_NOTICE_DIALOG = "important_notice";
+     public static final String EXTRA_ENTRY_VALUE_SYSTEM_SETTINGS = "system_settings";
+ 
+-    private boolean mShowHomeAsUp;
++    @Override
++    protected Fragment createDefaultFragment() {
++        return new SettingsFragment();
++    }
+ 
+     @Override
+     protected void onCreate(final Bundle savedState) {
+         super.onCreate(savedState);
+-        final ActionBar actionBar = getActionBar();
++        final ActionBar actionBar = getSupportActionBar();
+         final Intent intent = getIntent();
+-        if (actionBar != null) {
+-            mShowHomeAsUp = intent.getBooleanExtra(EXTRA_SHOW_HOME_AS_UP, true);
+-            actionBar.setDisplayHomeAsUpEnabled(mShowHomeAsUp);
+-            actionBar.setHomeButtonEnabled(mShowHomeAsUp);
++        if (actionBar != null && !intent.getBooleanExtra(EXTRA_SHOW_HOME_AS_UP, true)) {
++            actionBar.setDisplayHomeAsUpEnabled(false);
+         }
+         StatsUtils.onSettingsActivity(
+                 intent.hasExtra(EXTRA_ENTRY_KEY) ? intent.getStringExtra(EXTRA_ENTRY_KEY)
+@@ -57,32 +53,10 @@
+     }
+ 
+     @Override
+-    public boolean onOptionsItemSelected(final MenuItem item) {
+-        if (mShowHomeAsUp && item.getItemId() == android.R.id.home) {
+-            onBackPressed();
+-            return true;
+-        }
+-        return super.onOptionsItemSelected(item);
+-    }
+-
+-    @Override
+-    public Intent getIntent() {
+-        final Intent intent = super.getIntent();
+-        final String fragment = intent.getStringExtra(EXTRA_SHOW_FRAGMENT);
+-        if (fragment == null) {
+-            intent.putExtra(EXTRA_SHOW_FRAGMENT, DEFAULT_FRAGMENT);
+-        }
+-        intent.putExtra(EXTRA_NO_HEADERS, true);
+-        return intent;
+-    }
+-
+-    @Override
+-    public boolean isValidFragment(final String fragmentName) {
+-        return FragmentUtils.isValidFragment(fragmentName);
+-    }
+-
+-    @Override
+-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+-        PermissionsManager.get(this).onRequestPermissionsResult(requestCode, permissions, grantResults);
++    public void onRequestPermissionsResult(final int requestCode,
++            @NonNull final String[] permissions, @NonNull final int[] grantResults) {
++        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
++        PermissionsManager.get(this).onRequestPermissionsResult(
++                requestCode, permissions, grantResults);
+     }
+ }
+diff --git a/java/src/com/android/inputmethod/latin/settings/SettingsBaseActivity.java b/java/src/com/android/inputmethod/latin/settings/SettingsBaseActivity.java
+new file mode 100644
+index 0000000..2becda3
+--- /dev/null
++++ b/java/src/com/android/inputmethod/latin/settings/SettingsBaseActivity.java
+@@ -0,0 +1,93 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.latin.settings;
++
++import android.os.Bundle;
++import android.text.TextUtils;
++import android.view.MenuItem;
++
++import androidx.activity.EdgeToEdge;
++import androidx.annotation.NonNull;
++import androidx.appcompat.app.ActionBar;
++import androidx.appcompat.app.AppCompatActivity;
++import androidx.fragment.app.Fragment;
++import androidx.fragment.app.FragmentManager;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceFragmentCompat;
++
++import com.android.inputmethod.latin.R;
++import com.google.android.material.appbar.AppBarLayout;
++import com.google.android.material.color.DynamicColors;
++
++public abstract class SettingsBaseActivity extends AppCompatActivity
++        implements PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
++    private CharSequence mInitialTitle;
++
++    protected abstract Fragment createDefaultFragment();
++
++    @Override
++    protected void onCreate(final Bundle savedInstanceState) {
++        DynamicColors.applyToActivityIfAvailable(this);
++        super.onCreate(savedInstanceState);
++        EdgeToEdge.enable(this);
++        setContentView(R.layout.activity_settings);
++        setSupportActionBar(findViewById(R.id.toolbar));
++        final ActionBar actionBar = getSupportActionBar();
++        if (actionBar != null) {
++            actionBar.setDisplayHomeAsUpEnabled(true);
++            actionBar.setDisplayShowHomeEnabled(true);
++        }
++
++        mInitialTitle = getTitle();
++        final FragmentManager fragmentManager = getSupportFragmentManager();
++        fragmentManager.addOnBackStackChangedListener(this::updateTitle);
++        if (savedInstanceState == null) {
++            fragmentManager.beginTransaction()
++                    .replace(R.id.settings, createDefaultFragment())
++                    .commit();
++        } else {
++            updateTitle();
++        }
++    }
++
++    @Override
++    public boolean onOptionsItemSelected(@NonNull final MenuItem item) {
++        if (item.getItemId() == android.R.id.home) {
++            getOnBackPressedDispatcher().onBackPressed();
++            return true;
++        }
++        return super.onOptionsItemSelected(item);
++    }
++
++    @Override
++    public boolean onPreferenceStartFragment(@NonNull final PreferenceFragmentCompat caller,
++            @NonNull final Preference pref) {
++        final Fragment fragment = getSupportFragmentManager().getFragmentFactory()
++                .instantiate(getClassLoader(), pref.getFragment());
++        fragment.setArguments(pref.getExtras());
++        startFragment(fragment, pref.getTitle());
++        return true;
++    }
++
++    public void startFragment(final Fragment fragment, final CharSequence title) {
++        getSupportFragmentManager().beginTransaction()
++                .replace(R.id.settings, fragment)
++                .addToBackStack(TextUtils.isEmpty(title) ? null : title.toString())
++                .commit();
++    }
++
++    AppBarLayout getAppBarLayout() {
++        return findViewById(R.id.appBarLayout);
++    }
++
++    private void updateTitle() {
++        final FragmentManager fragmentManager = getSupportFragmentManager();
++        final int count = fragmentManager.getBackStackEntryCount();
++        final String name = count == 0 ? null
++                : fragmentManager.getBackStackEntryAt(count - 1).getName();
++        setTitle(name != null ? name : mInitialTitle);
++    }
++}
+diff --git a/java/src/com/android/inputmethod/latin/settings/SettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/SettingsFragment.java
+index 3690219..9fb7346 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/SettingsFragment.java
+@@ -20,14 +20,12 @@
+ import android.content.Intent;
+ import android.os.Build;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.PreferenceScreen;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceScreen;
+ import android.provider.Settings.Secure;
+ import android.view.Menu;
+ import android.view.MenuInflater;
+ import android.view.MenuItem;
+-import android.view.View;
+-import android.widget.ListView;
+ 
+ import com.android.inputmethod.latin.R;
+ import com.android.inputmethod.latin.define.ProductionFlags;
+@@ -66,16 +64,6 @@
+     }
+ 
+     @Override
+-    public void onActivityCreated(Bundle savedInstanceState) {
+-        super.onActivityCreated(savedInstanceState);
+-
+-        // remove dividers
+-        View rootView = getView();
+-        ListView list = (ListView) rootView.findViewById(android.R.id.list);
+-        list.setDivider(null);
+-    }
+-
+-    @Override
+     public void onCreateOptionsMenu(final Menu menu, final MenuInflater inflater) {
+         if (FeedbackUtils.isHelpAndFeedbackFormSupported()) {
+             menu.add(NO_MENU_GROUP, MENU_HELP_AND_FEEDBACK /* itemId */,
+diff --git a/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java b/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java
+index 3194ba0..55c4adb 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java
+@@ -22,9 +22,9 @@
+ import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
+ import android.content.res.Resources;
+ import android.os.Bundle;
+-import android.preference.ListPreference;
+-import android.preference.Preference;
+-import android.preference.PreferenceScreen;
++import androidx.preference.ListPreference;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceScreen;
+ import android.util.Log;
+ 
+ /**
+diff --git a/java/src/com/android/inputmethod/latin/settings/TestFragmentActivity.java b/java/src/com/android/inputmethod/latin/settings/TestFragmentActivity.java
+index 254bc65..5aef3a8 100644
+--- a/java/src/com/android/inputmethod/latin/settings/TestFragmentActivity.java
++++ b/java/src/com/android/inputmethod/latin/settings/TestFragmentActivity.java
+@@ -16,12 +16,13 @@
+ 
+ package com.android.inputmethod.latin.settings;
+ 
+-import android.app.Activity;
+-import android.app.Fragment;
+-import android.app.FragmentManager;
+ import android.content.Intent;
+ import android.os.Bundle;
+ 
++import androidx.fragment.app.Fragment;
++import androidx.fragment.app.FragmentActivity;
++import androidx.fragment.app.FragmentManager;
++
+ /**
+  * Test activity to use when testing preference fragments. <br/>
+  * Usage: <br/>
+@@ -29,7 +30,7 @@
+  * and call setIntent() with an intent that specifies the fragment to load in the activity.
+  * The fragment can then be obtained from this activity and used for testing/verification.
+  */
+-public final class TestFragmentActivity extends Activity {
++public final class TestFragmentActivity extends FragmentActivity {
+     /**
+      * The fragment name that should be loaded when starting this activity.
+      * This must be specified when starting this activity, as this activity is only
+@@ -48,8 +49,9 @@
+             throw new IllegalArgumentException("No fragment name specified for testing");
+         }
+ 
+-        mFragment = Fragment.instantiate(this, fragmentName);
+-        FragmentManager fragmentManager = getFragmentManager();
++        FragmentManager fragmentManager = getSupportFragmentManager();
++        mFragment = fragmentManager.getFragmentFactory().instantiate(
++                getClassLoader(), fragmentName);
+         fragmentManager.beginTransaction().add(mFragment, fragmentName).commit();
+     }
+ }
+diff --git a/java/src/com/android/inputmethod/latin/settings/ThemeSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/ThemeSettingsFragment.java
+index 437209b..7fea310 100644
+--- a/java/src/com/android/inputmethod/latin/settings/ThemeSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/ThemeSettingsFragment.java
+@@ -19,8 +19,8 @@
+ import android.content.Context;
+ import android.content.res.Resources;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.PreferenceScreen;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceScreen;
+ 
+ import com.android.inputmethod.keyboard.KeyboardTheme;
+ import com.android.inputmethod.latin.R;
+diff --git a/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java b/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java
+index 07a871c..66bc464 100644
+--- a/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java
++++ b/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java
+@@ -17,10 +17,10 @@
+ package com.android.inputmethod.latin.settings;
+ 
+ import android.os.Build;
+-import android.preference.CheckBoxPreference;
+-import android.preference.Preference;
+-import android.preference.PreferenceGroup;
+-import android.preference.SwitchPreference;
++import androidx.preference.CheckBoxPreference;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceGroup;
++import androidx.preference.SwitchPreference;
+ 
+ import java.util.ArrayList;
+ 
+diff --git a/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsActivity.java b/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsActivity.java
+index 5f99f90..697f1cb 100644
+--- a/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsActivity.java
++++ b/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsActivity.java
+@@ -16,45 +16,22 @@
+ 
+ package com.android.inputmethod.latin.spellcheck;
+ 
++import androidx.annotation.NonNull;
++import androidx.fragment.app.Fragment;
++
+ import com.android.inputmethod.latin.permissions.PermissionsManager;
+-import com.android.inputmethod.latin.utils.FragmentUtils;
++import com.android.inputmethod.latin.settings.SettingsBaseActivity;
+ 
+-import android.annotation.TargetApi;
+-import android.content.Intent;
+-import android.os.Build;
+-import android.os.Bundle;
+-import android.preference.PreferenceActivity;
+-import androidx.core.app.ActivityCompat;
+-
+-/**
+- * Spell checker preference screen.
+- */
+-public final class SpellCheckerSettingsActivity extends PreferenceActivity
+-        implements ActivityCompat.OnRequestPermissionsResultCallback {
+-    private static final String DEFAULT_FRAGMENT = SpellCheckerSettingsFragment.class.getName();
+-
++public final class SpellCheckerSettingsActivity extends SettingsBaseActivity {
+     @Override
+-    protected void onCreate(Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
++    protected Fragment createDefaultFragment() {
++        return new SpellCheckerSettingsFragment();
+     }
+ 
+     @Override
+-    public Intent getIntent() {
+-        final Intent modIntent = new Intent(super.getIntent());
+-        modIntent.putExtra(EXTRA_SHOW_FRAGMENT, DEFAULT_FRAGMENT);
+-        modIntent.putExtra(EXTRA_NO_HEADERS, true);
+-        return modIntent;
+-    }
+-
+-    @TargetApi(Build.VERSION_CODES.KITKAT)
+-    @Override
+-    public boolean isValidFragment(String fragmentName) {
+-        return FragmentUtils.isValidFragment(fragmentName);
+-    }
+-
+-    @Override
+-    public void onRequestPermissionsResult(
+-            int requestCode, String[] permissions, int[] grantResults) {
++    public void onRequestPermissionsResult(final int requestCode,
++            @NonNull final String[] permissions, @NonNull final int[] grantResults) {
++        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+         PermissionsManager.get(this).onRequestPermissionsResult(
+                 requestCode, permissions, grantResults);
+     }
+diff --git a/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java b/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java
+index 12005c2..7d5db9d 100644
+--- a/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java
+@@ -19,8 +19,8 @@
+ import android.Manifest;
+ import android.content.SharedPreferences;
+ import android.os.Bundle;
+-import android.preference.PreferenceScreen;
+-import android.preference.SwitchPreference;
++import androidx.preference.PreferenceScreen;
++import androidx.preference.SwitchPreference;
+ import android.text.TextUtils;
+ 
+ import com.android.inputmethod.latin.R;
+diff --git a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryAddWordFragment.java b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryAddWordFragment.java
+index a8781d7..a1aa105 100644
+--- a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryAddWordFragment.java
++++ b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryAddWordFragment.java
+@@ -17,12 +17,14 @@
+ package com.android.inputmethod.latin.userdictionary;
+ 
+ import com.android.inputmethod.latin.R;
++import com.android.inputmethod.latin.settings.SettingsBaseActivity;
+ import com.android.inputmethod.latin.userdictionary.UserDictionaryAddWordContents.LocaleRenderer;
+ import com.android.inputmethod.latin.userdictionary.UserDictionaryLocalePicker.LocationChangedListener;
+ 
+-import android.app.Fragment;
++import androidx.appcompat.app.ActionBar;
++import androidx.appcompat.app.AppCompatActivity;
++import androidx.fragment.app.Fragment;
+ import android.os.Bundle;
+-import android.preference.PreferenceActivity;
+ import android.view.LayoutInflater;
+ import android.view.Menu;
+ import android.view.MenuInflater;
+@@ -60,7 +62,7 @@
+     public void onActivityCreated(final Bundle savedInstanceState) {
+         super.onActivityCreated(savedInstanceState);
+         setHasOptionsMenu(true);
+-        getActivity().getActionBar().setTitle(R.string.edit_personal_dictionary);
++        getActivity().setTitle(R.string.edit_personal_dictionary);
+         // Keep the instance so that we remember mContents when configuration changes (eg rotation)
+         setRetainInstance(true);
+     }
+@@ -83,8 +85,11 @@
+             mContents = new UserDictionaryAddWordContents(mRootView,
+                     mContents /* oldInstanceToBeEdited */);
+         }
+-        getActivity().getActionBar().setSubtitle(UserDictionarySettingsUtils.getLocaleDisplayName(
+-                getActivity(), mContents.getCurrentUserDictionaryLocale()));
++        final ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
++        if (actionBar != null) {
++            actionBar.setSubtitle(UserDictionarySettingsUtils.getLocaleDisplayName(
++                    getActivity(), mContents.getCurrentUserDictionaryLocale()));
++        }
+         return mRootView;
+     }
+ 
+@@ -155,8 +160,8 @@
+             final long id) {
+         final LocaleRenderer locale = (LocaleRenderer)parent.getItemAtPosition(pos);
+         if (locale.isMoreLanguages()) {
+-            PreferenceActivity preferenceActivity = (PreferenceActivity)getActivity();
+-            preferenceActivity.startPreferenceFragment(new UserDictionaryLocalePicker(), true);
++            ((SettingsBaseActivity) requireActivity()).startFragment(
++                    new UserDictionaryLocalePicker(), null);
+         } else {
+             mContents.updateLocale(locale.getLocaleString());
+         }
+diff --git a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryList.java b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryList.java
+index 8efa85f..6ab7339 100644
+--- a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryList.java
++++ b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryList.java
+@@ -21,8 +21,8 @@
+ import android.content.Intent;
+ import android.database.Cursor;
+ import android.os.Bundle;
+-import android.preference.Preference;
+-import android.preference.PreferenceGroup;
++import androidx.preference.Preference;
++import androidx.preference.PreferenceGroup;
+ import android.provider.UserDictionary;
+ import android.text.TextUtils;
+ import android.view.inputmethod.InputMethodInfo;
+diff --git a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryLocalePicker.java b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryLocalePicker.java
+index 58d3fb9..66c1a52 100644
+--- a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryLocalePicker.java
++++ b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionaryLocalePicker.java
+@@ -16,7 +16,7 @@
+ 
+ package com.android.inputmethod.latin.userdictionary;
+ 
+-import android.app.Fragment;
++import androidx.fragment.app.Fragment;
+ 
+ import java.util.Locale;
+ 
+diff --git a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionarySettings.java b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionarySettings.java
+index d9339d9..10b89dd 100644
+--- a/java/src/com/android/inputmethod/latin/userdictionary/UserDictionarySettings.java
++++ b/java/src/com/android/inputmethod/latin/userdictionary/UserDictionarySettings.java
+@@ -17,8 +17,11 @@
+ package com.android.inputmethod.latin.userdictionary;
+ 
+ import com.android.inputmethod.latin.R;
++import com.android.inputmethod.latin.settings.SettingsBaseActivity;
+ 
+-import android.app.ListFragment;
++import androidx.appcompat.app.ActionBar;
++import androidx.appcompat.app.AppCompatActivity;
++import androidx.fragment.app.ListFragment;
+ import android.content.ContentResolver;
+ import android.content.Context;
+ import android.content.Intent;
+@@ -106,12 +109,6 @@
+     protected String mLocale;
+ 
+     @Override
+-    public void onCreate(Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
+-        getActivity().getActionBar().setTitle(R.string.edit_personal_dictionary);
+-    }
+-
+-    @Override
+     public View onCreateView(
+             LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+         return inflater.inflate(
+@@ -152,12 +149,16 @@
+         final ListView listView = getListView();
+         listView.setAdapter(createAdapter());
+         listView.setFastScrollEnabled(true);
++        listView.setNestedScrollingEnabled(true);
+         listView.setEmptyView(emptyView);
+ 
+         setHasOptionsMenu(true);
+         // Show the language as a subtitle of the action bar
+-        getActivity().getActionBar().setSubtitle(
+-                UserDictionarySettingsUtils.getLocaleDisplayName(getActivity(), mLocale));
++        final ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
++        if (actionBar != null) {
++            actionBar.setSubtitle(
++                    UserDictionarySettingsUtils.getLocaleDisplayName(getActivity(), mLocale));
++        }
+     }
+ 
+     @Override
+@@ -251,10 +252,10 @@
+         args.putString(UserDictionaryAddWordContents.EXTRA_WORD, editingWord);
+         args.putString(UserDictionaryAddWordContents.EXTRA_SHORTCUT, editingShortcut);
+         args.putString(UserDictionaryAddWordContents.EXTRA_LOCALE, mLocale);
+-        android.preference.PreferenceActivity pa =
+-                (android.preference.PreferenceActivity)getActivity();
+-        pa.startPreferencePanel(UserDictionaryAddWordFragment.class.getName(),
+-                args, R.string.user_dict_settings_add_dialog_title, null, null, 0);
++        final UserDictionaryAddWordFragment fragment = new UserDictionaryAddWordFragment();
++        fragment.setArguments(args);
++        ((SettingsBaseActivity) requireActivity()).startFragment(fragment,
++                getString(R.string.user_dict_settings_add_dialog_title));
+     }
+ 
+     private String getWord(final int position) {
+diff --git a/java/src/com/android/inputmethod/latin/utils/FragmentUtils.java b/java/src/com/android/inputmethod/latin/utils/FragmentUtils.java
+deleted file mode 100644
+index 147e57b..0000000
+--- a/java/src/com/android/inputmethod/latin/utils/FragmentUtils.java
++++ /dev/null
+@@ -1,64 +0,0 @@
+-/*
+- * Copyright (C) 2013 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.inputmethod.latin.utils;
+-
+-import com.android.inputmethod.dictionarypack.DictionarySettingsFragment;
+-import com.android.inputmethod.latin.about.AboutPreferences;
+-import com.android.inputmethod.latin.settings.AccountsSettingsFragment;
+-import com.android.inputmethod.latin.settings.AdvancedSettingsFragment;
+-import com.android.inputmethod.latin.settings.AppearanceSettingsFragment;
+-import com.android.inputmethod.latin.settings.CorrectionSettingsFragment;
+-import com.android.inputmethod.latin.settings.CustomInputStyleSettingsFragment;
+-import com.android.inputmethod.latin.settings.DebugSettingsFragment;
+-import com.android.inputmethod.latin.settings.GestureSettingsFragment;
+-import com.android.inputmethod.latin.settings.PreferencesSettingsFragment;
+-import com.android.inputmethod.latin.settings.SettingsFragment;
+-import com.android.inputmethod.latin.settings.ThemeSettingsFragment;
+-import com.android.inputmethod.latin.spellcheck.SpellCheckerSettingsFragment;
+-import com.android.inputmethod.latin.userdictionary.UserDictionaryAddWordFragment;
+-import com.android.inputmethod.latin.userdictionary.UserDictionaryList;
+-import com.android.inputmethod.latin.userdictionary.UserDictionaryLocalePicker;
+-import com.android.inputmethod.latin.userdictionary.UserDictionarySettings;
+-
+-import java.util.HashSet;
+-
+-public class FragmentUtils {
+-    private static final HashSet<String> sLatinImeFragments = new HashSet<>();
+-    static {
+-        sLatinImeFragments.add(DictionarySettingsFragment.class.getName());
+-        sLatinImeFragments.add(AboutPreferences.class.getName());
+-        sLatinImeFragments.add(PreferencesSettingsFragment.class.getName());
+-        sLatinImeFragments.add(AccountsSettingsFragment.class.getName());
+-        sLatinImeFragments.add(AppearanceSettingsFragment.class.getName());
+-        sLatinImeFragments.add(ThemeSettingsFragment.class.getName());
+-        sLatinImeFragments.add(CustomInputStyleSettingsFragment.class.getName());
+-        sLatinImeFragments.add(GestureSettingsFragment.class.getName());
+-        sLatinImeFragments.add(CorrectionSettingsFragment.class.getName());
+-        sLatinImeFragments.add(AdvancedSettingsFragment.class.getName());
+-        sLatinImeFragments.add(DebugSettingsFragment.class.getName());
+-        sLatinImeFragments.add(SettingsFragment.class.getName());
+-        sLatinImeFragments.add(SpellCheckerSettingsFragment.class.getName());
+-        sLatinImeFragments.add(UserDictionaryAddWordFragment.class.getName());
+-        sLatinImeFragments.add(UserDictionaryList.class.getName());
+-        sLatinImeFragments.add(UserDictionaryLocalePicker.class.getName());
+-        sLatinImeFragments.add(UserDictionarySettings.class.getName());
+-    }
+-
+-    public static boolean isValidFragment(String fragmentName) {
+-        return sLatinImeFragments.contains(fragmentName);
+-    }
+-}
+diff --git a/java/src/com/android/inputmethodcommon/InputMethodSettingsActivity.java b/java/src/com/android/inputmethodcommon/InputMethodSettingsActivity.java
+deleted file mode 100644
+index 6e868c9..0000000
+--- a/java/src/com/android/inputmethodcommon/InputMethodSettingsActivity.java
++++ /dev/null
+@@ -1,94 +0,0 @@
+-/*
+- * Copyright (C) 2011 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License
+- */
+-
+-package com.android.inputmethodcommon;
+-
+-import android.graphics.drawable.Drawable;
+-import android.os.Bundle;
+-import android.preference.PreferenceActivity;
+-
+-/**
+- * This is a helper class for an IME's settings preference activity. It's recommended for every
+- * IME to have its own settings preference activity which inherits this class.
+- */
+-public abstract class InputMethodSettingsActivity extends PreferenceActivity
+-        implements InputMethodSettingsInterface {
+-    private final InputMethodSettingsImpl mSettings = new InputMethodSettingsImpl();
+-    @SuppressWarnings("deprecation")
+-    @Override
+-    public void onCreate(Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
+-        setPreferenceScreen(getPreferenceManager().createPreferenceScreen(this));
+-        mSettings.init(this, getPreferenceScreen());
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void setInputMethodSettingsCategoryTitle(int resId) {
+-        mSettings.setInputMethodSettingsCategoryTitle(resId);
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void setInputMethodSettingsCategoryTitle(CharSequence title) {
+-        mSettings.setInputMethodSettingsCategoryTitle(title);
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void setSubtypeEnablerTitle(int resId) {
+-        mSettings.setSubtypeEnablerTitle(resId);
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void setSubtypeEnablerTitle(CharSequence title) {
+-        mSettings.setSubtypeEnablerTitle(title);
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void setSubtypeEnablerIcon(int resId) {
+-        mSettings.setSubtypeEnablerIcon(resId);
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void setSubtypeEnablerIcon(Drawable drawable) {
+-        mSettings.setSubtypeEnablerIcon(drawable);
+-    }
+-
+-    /**
+-     * {@inheritDoc}
+-     */
+-    @Override
+-    public void onResume() {
+-        super.onResume();
+-        mSettings.updateSubtypeEnabler();
+-    }
+-}
+diff --git a/java/src/com/android/inputmethodcommon/InputMethodSettingsImpl.java b/java/src/com/android/inputmethodcommon/InputMethodSettingsImpl.java
+index e56c975..9a4d42e 100644
+--- a/java/src/com/android/inputmethodcommon/InputMethodSettingsImpl.java
++++ b/java/src/com/android/inputmethodcommon/InputMethodSettingsImpl.java
+@@ -19,9 +19,9 @@
+ import android.content.Context;
+ import android.content.Intent;
+ import android.graphics.drawable.Drawable;
+-import android.preference.Preference;
+-import android.preference.Preference.OnPreferenceClickListener;
+-import android.preference.PreferenceScreen;
++import androidx.preference.Preference;
++import androidx.preference.Preference.OnPreferenceClickListener;
++import androidx.preference.PreferenceScreen;
+ import android.provider.Settings;
+ import android.text.TextUtils;
+ import android.view.inputmethod.InputMethodInfo;
+diff --git a/tests/src/com/android/inputmethod/latin/settings/AccountsSettingsFragmentTests.java b/tests/src/com/android/inputmethod/latin/settings/AccountsSettingsFragmentTests.java
+index 3b55143..95b0ddf 100644
+--- a/tests/src/com/android/inputmethod/latin/settings/AccountsSettingsFragmentTests.java
++++ b/tests/src/com/android/inputmethod/latin/settings/AccountsSettingsFragmentTests.java
+@@ -22,7 +22,7 @@
+ import static org.mockito.ArgumentMatchers.any;
+ import static org.mockito.Mockito.when;
+ 
+-import android.app.AlertDialog;
++import androidx.appcompat.app.AlertDialog;
+ import android.content.Context;
+ import android.content.DialogInterface;
+ import android.content.Intent;

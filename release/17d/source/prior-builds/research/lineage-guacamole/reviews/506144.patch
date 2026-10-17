@@ -1,0 +1,121 @@
+From f58ab8cf7115da90ba4db660cfdbf027de8fc872 Mon Sep 17 00:00:00 2001
+From: Khargosxh18 <khargosxh18@gmail.com>
+Date: Sat, 03 Oct 2026 20:53:53 +0000
+Subject: [PATCH] liblp: Add GrowBlockDevicesToLiveSize
+
+The block device size is recorded in the metadata when the table is
+created, but the real super partition can be bigger. UpdateBlockDeviceInfo()
+keeps the recorded size, so the extra space can't be used and a bigger
+layout fails in recovery with  ErrorCode 7 (kInstallDeviceOpenError).
+
+Add a method to raise the recorded size to the real size reported by
+the opener. It only grows, never shrinks, so existing extents stay valid.
+Other callers are unchanged.
+
+Test: BuilderTest.GrowBlockDevicesToLiveSize
+Test: Grew block device 0 from 6442450944 to 9126805504 via update_engine_sideload, system boots
+
+Assisted-by: LLM
+Signed-off-by: Khargosxh18 <khargosxh18@gmail.com>
+Change-Id: I4e065c8e4bf292b13f3cfb59e13feff8df4978c1
+---
+
+diff --git a/liblp/builder.cpp b/liblp/builder.cpp
+index c385c45..acb5a6f 100644
+--- a/liblp/builder.cpp
++++ b/liblp/builder.cpp
+@@ -1064,6 +1064,25 @@
+     return true;
+ }
+ 
++bool MetadataBuilder::GrowBlockDevicesToLiveSize(const IPartitionOpener& opener) {
++    bool grown = false;
++    for (size_t i = 0; i < block_devices_.size(); i++) {
++        BlockDeviceInfo device_info;
++        if (!opener.GetInfo(GetBlockDevicePartitionName(i), &device_info)) {
++            continue;
++        }
++        LpMetadataBlockDevice& block_device = block_devices_[i];
++        if (device_info.size <= block_device.size) {
++            continue;
++        }
++        LINFO << "Growing block device " << i << " from " << block_device.size << " to "
++              << device_info.size;
++        block_device.size = device_info.size;
++        grown = true;
++    }
++    return grown;
++}
++
+ bool MetadataBuilder::ResizePartition(Partition* partition, uint64_t requested_size,
+                                       const std::vector<Interval>& free_region_hint) {
+     // Align the space needed up to the nearest sector.
+diff --git a/liblp/builder_test.cpp b/liblp/builder_test.cpp
+index 50d19cb..f7938e0 100644
+--- a/liblp/builder_test.cpp
++++ b/liblp/builder_test.cpp
+@@ -491,6 +491,43 @@
+     EXPECT_EQ(new_info.logical_block_size, 4096);
+ }
+ 
++namespace {
++class FixedSizeOpener : public IPartitionOpener {
++  public:
++    explicit FixedSizeOpener(uint64_t size) : size_(size) {}
++    android::base::unique_fd Open(const std::string&, int) const override { return {}; }
++    bool GetInfo(const std::string& name, BlockDeviceInfo* info) const override {
++        *info = BlockDeviceInfo(name, size_, 0, 0, 4096);
++        return true;
++    }
++    std::string GetDeviceString(const std::string& name) const override { return name; }
++
++  private:
++    uint64_t size_;
++};
++}  // namespace
++
++TEST_F(BuilderTest, GrowBlockDevicesToLiveSize) {
++    BlockDeviceInfo device_info("super", 1024 * 1024, 4096, 1024, 4096);
++    unique_ptr<MetadataBuilder> builder = MetadataBuilder::New(device_info, 1024, 1);
++    ASSERT_NE(builder, nullptr);
++
++    // Same size, nothing changes.
++    EXPECT_FALSE(builder->GrowBlockDevicesToLiveSize(FixedSizeOpener(1024 * 1024)));
++    // Smaller device, it never shrinks.
++    EXPECT_FALSE(builder->GrowBlockDevicesToLiveSize(FixedSizeOpener(512 * 1024)));
++    BlockDeviceInfo info;
++    ASSERT_TRUE(builder->GetBlockDeviceInfo("super", &info));
++    EXPECT_EQ(info.size, 1024 * 1024);
++
++    // Bigger device, it grows and the free space grows with it.
++    uint64_t before = builder->AllocatableSpace();
++    EXPECT_TRUE(builder->GrowBlockDevicesToLiveSize(FixedSizeOpener(2 * 1024 * 1024)));
++    ASSERT_TRUE(builder->GetBlockDeviceInfo("super", &info));
++    EXPECT_EQ(info.size, 2 * 1024 * 1024);
++    EXPECT_EQ(builder->AllocatableSpace(), before + 1024 * 1024);
++}
++
+ TEST_F(BuilderTest, InvalidBlockSize) {
+     BlockDeviceInfo device_info("super", 1024 * 1024, 0, 0, 513);
+     unique_ptr<MetadataBuilder> builder = MetadataBuilder::New(device_info, 1024, 1);
+diff --git a/liblp/include/liblp/builder.h b/liblp/include/liblp/builder.h
+index a60403e..548291c 100644
+--- a/liblp/include/liblp/builder.h
++++ b/liblp/include/liblp/builder.h
+@@ -350,6 +350,16 @@
+     bool GetBlockDeviceInfo(const std::string& partition_name, BlockDeviceInfo* info) const;
+     bool UpdateBlockDeviceInfo(const std::string& partition_name, const BlockDeviceInfo& info);
+ 
++    // Raise the recorded size of each block device to its real size.
++    // It only grows the size and never shrinks it, so old partitions stay valid.
++    // Returns true if at least one device was grown.
++    //
++    // This is kept separate from UpdateBlockDeviceInfo on purpose, because that
++    // one keeps the recorded size as it is. Use this only when you know the
++    // super partition is bigger than what the current table was made for, for
++    // example when the table on the device was written for a smaller super.
++    bool GrowBlockDevicesToLiveSize(const IPartitionOpener& opener);
++
+     // Require the expanded metadata header. This is exposed for testing, and
+     // is normally only called as needed by other methods.
+     void RequireExpandedMetadataHeader();

@@ -1,0 +1,53 @@
+From 3b3c28e8e537ffd182def2dedde3987b01a60f0f Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@gmail.com>
+Date: Wed, 03 Jun 2026 14:15:55 +0300
+Subject: [PATCH] EuiccPolicy: Always enable EUICC packages
+
+Previously, Google EUICC packages depended on GMS, but now they seem to
+work fine without GMS/microG. Since users already set up their device
+on previous builds, we need to enable the disabled packages again.
+
+Test: Flash device without GMS/microG, boot, add eSIM successfully.
+Change-Id: Iccb1e69b30926aed1568c4733ded7461198c674a
+---
+
+diff --git a/src/org/lineageos/euicc/EuiccDisabler.kt b/src/org/lineageos/euicc/EuiccDisabler.kt
+index e09b818..baaafce 100644
+--- a/src/org/lineageos/euicc/EuiccDisabler.kt
++++ b/src/org/lineageos/euicc/EuiccDisabler.kt
+@@ -9,13 +9,8 @@
+ import android.content.pm.ApplicationInfo
+ import android.content.pm.PackageManager
+ import android.content.pm.PackageManager.ApplicationInfoFlags
+-import android.util.Log
+ 
+ object EuiccDisabler {
+-    private const val TAG = "EuiccDisabler"
+-
+-    private val EUICC_DEPENDENCIES = listOf("com.google.android.gms")
+-
+     private val EUICC_PACKAGES = listOf("com.google.android.euicc")
+ 
+     private fun isInstalled(pm: PackageManager, pkgName: String) =
+@@ -25,20 +20,11 @@
+             }
+             .getOrDefault(false)
+ 
+-    private fun isInstalledAndEnabled(pm: PackageManager, pkgName: String) =
+-        runCatching {
+-                val info = pm.getApplicationInfo(pkgName, ApplicationInfoFlags.of(0))
+-                Log.d(TAG, "package $pkgName installed, enabled = ${info.enabled}")
+-                info.enabled
+-            }
+-            .getOrDefault(false)
+-
+     fun enableOrDisableEuicc(context: Context) {
+         val pm = context.packageManager
+         val supportsEuicc = pm.hasSystemFeature(PackageManager.FEATURE_TELEPHONY_EUICC)
+-        val disable = !supportsEuicc || EUICC_DEPENDENCIES.any { !isInstalledAndEnabled(pm, it) }
+         val flag =
+-            if (disable) {
++            if (!supportsEuicc) {
+                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+             } else {
+                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED

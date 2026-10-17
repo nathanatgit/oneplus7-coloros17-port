@@ -1,0 +1,393 @@
+From ca814514fff0a8603cc9ce8a4671a961a82399c5 Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 20 Sep 2026 09:36:53 +0200
+Subject: [PATCH] Twelve: Update play bar with new design
+
+Change-Id: I8bb70eb6f18511e59c8b9afce2f9f5b69f8a1b96
+Co-Authored-By: Asher Simonds <dayanhammer@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/twelve/fragments/AlbumFragment.kt b/app/src/main/java/org/lineageos/twelve/fragments/AlbumFragment.kt
+index add8475..c1861e7 100644
+--- a/app/src/main/java/org/lineageos/twelve/fragments/AlbumFragment.kt
++++ b/app/src/main/java/org/lineageos/twelve/fragments/AlbumFragment.kt
+@@ -26,8 +26,9 @@
+ import androidx.recyclerview.widget.RecyclerView
+ import com.google.android.material.appbar.AppBarLayout
+ import com.google.android.material.appbar.MaterialToolbar
+-import com.google.android.material.card.MaterialCardView
+ import com.google.android.material.button.MaterialButton
++import com.google.android.material.card.MaterialCardView
++import com.google.android.material.floatingactionbutton.FloatingActionButton
+ import com.google.android.material.progressindicator.LinearProgressIndicator
+ import kotlinx.coroutines.coroutineScope
+ import kotlinx.coroutines.flow.collectLatest
+@@ -58,6 +59,7 @@
+     private val viewModel by viewModels<AlbumViewModel>()
+ 
+     // Views
++    private val addToQueueButton by getViewProperty<MaterialButton>(R.id.addToQueue)
+     private val albumTitleTextView by getViewProperty<TextView>(R.id.albumTitleTextView)
+     override val appBarLayout by getViewProperty<AppBarLayout>(R.id.appBarLayout)
+     private val artistNameTextView by getViewProperty<TextView>(R.id.artistNameTextView)
+@@ -67,8 +69,9 @@
+     private val infoNestedScrollView by getViewProperty<NestedScrollView?>(R.id.infoNestedScrollView)
+     private val linearProgressIndicator by getViewProperty<LinearProgressIndicator>(R.id.linearProgressIndicator)
+     private val noElementsNestedScrollView by getViewProperty<NestedScrollView>(R.id.noElementsNestedScrollView)
+-    private val playAllButton by getViewProperty<MaterialButton>(R.id.playAllButton)
++    private val playAllButton by getViewProperty<FloatingActionButton>(R.id.playAllButton)
+     private val playButtonsLinearLayout by getViewProperty<LinearLayout>(R.id.playButtonsLinearLayout)
++    private val playNextButton by getViewProperty<MaterialButton>(R.id.playNextButton)
+     private val recyclerView by getViewProperty<RecyclerView>(R.id.recyclerView)
+     private val shufflePlayButton by getViewProperty<MaterialButton>(R.id.shufflePlayButton)
+     private val thumbnailImageView by getViewProperty<ImageView>(R.id.thumbnailImageView)
+@@ -234,29 +237,21 @@
+         }
+ 
+         toolbar.setupWithNavController(findNavController())
+-        toolbar.inflateMenu(R.menu.fragment_album_toolbar)
+-        toolbar.setOnMenuItemClickListener {
+-            when (it.itemId) {
+-                R.id.addToQueue -> {
+-                    viewModel.addToQueue()
+-                    true
+-                }
+-
+-                R.id.playNext -> {
+-                    viewModel.playNext()
+-                    true
+-                }
+-
+-                else -> false
+-            }
+-        }
+ 
+         recyclerView.adapter = adapter
+ 
++        addToQueueButton.setOnClickListener {
++            viewModel.addToQueue()
++        }
++
+         playAllButton.setOnClickListener {
+             viewModel.playAlbum()
+         }
+ 
++        playNextButton.setOnClickListener {
++            viewModel.playNext()
++        }
++
+         shufflePlayButton.setOnClickListener {
+             viewModel.shufflePlayAlbum()
+         }
+diff --git a/app/src/main/java/org/lineageos/twelve/fragments/PlaylistFragment.kt b/app/src/main/java/org/lineageos/twelve/fragments/PlaylistFragment.kt
+index 01e5a22..05727b1 100644
+--- a/app/src/main/java/org/lineageos/twelve/fragments/PlaylistFragment.kt
++++ b/app/src/main/java/org/lineageos/twelve/fragments/PlaylistFragment.kt
+@@ -26,8 +26,9 @@
+ import androidx.recyclerview.widget.RecyclerView
+ import com.google.android.material.appbar.AppBarLayout
+ import com.google.android.material.appbar.MaterialToolbar
+-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+ import com.google.android.material.button.MaterialButton
++import com.google.android.material.dialog.MaterialAlertDialogBuilder
++import com.google.android.material.floatingactionbutton.FloatingActionButton
+ import com.google.android.material.progressindicator.LinearProgressIndicator
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.flow.collectLatest
+@@ -62,15 +63,17 @@
+     private val viewModel by viewModels<PlaylistViewModel>()
+ 
+     // Views
++    private val addToQueueButton by getViewProperty<MaterialButton>(R.id.addToQueue)
+     override val appBarLayout by getViewProperty<AppBarLayout>(R.id.appBarLayout)
+     override val coordinatorLayout by getViewProperty<CoordinatorLayout>(R.id.coordinatorLayout)
+     private val fullscreenLoadingProgressBar by getViewProperty<FullscreenLoadingProgressBar>(R.id.fullscreenLoadingProgressBar)
+     private val infoNestedScrollView by getViewProperty<NestedScrollView?>(R.id.infoNestedScrollView)
+     private val linearProgressIndicator by getViewProperty<LinearProgressIndicator>(R.id.linearProgressIndicator)
+     private val noElementsNestedScrollView by getViewProperty<NestedScrollView>(R.id.noElementsNestedScrollView)
+-    private val playAllButton by getViewProperty<MaterialButton>(R.id.playAllButton)
++    private val playAllButton by getViewProperty<FloatingActionButton>(R.id.playAllButton)
+     private val playlistNameTextView by getViewProperty<TextView>(R.id.playlistNameTextView)
+     private val playButtonsLinearLayout by getViewProperty<LinearLayout>(R.id.playButtonsLinearLayout)
++    private val playNextButton by getViewProperty<MaterialButton>(R.id.playNextButton)
+     private val recyclerView by getViewProperty<RecyclerView>(R.id.recyclerView)
+     private val shufflePlayButton by getViewProperty<MaterialButton>(R.id.shufflePlayButton)
+     private val thumbnailImageView by getViewProperty<ImageView>(R.id.thumbnailImageView)
+@@ -208,10 +211,18 @@
+ 
+         recyclerView.adapter = adapter
+ 
++        addToQueueButton.setOnClickListener {
++            viewModel.addToQueue()
++        }
++
+         playAllButton.setOnClickListener {
+             viewModel.playPlaylist()
+         }
+ 
++        playNextButton.setOnClickListener {
++            viewModel.playNext()
++        }
++
+         shufflePlayButton.setOnClickListener {
+             viewModel.shufflePlayPlaylist()
+         }
+diff --git a/app/src/main/java/org/lineageos/twelve/viewmodels/AlbumViewModel.kt b/app/src/main/java/org/lineageos/twelve/viewmodels/AlbumViewModel.kt
+index dccb002..0962305 100644
+--- a/app/src/main/java/org/lineageos/twelve/viewmodels/AlbumViewModel.kt
++++ b/app/src/main/java/org/lineageos/twelve/viewmodels/AlbumViewModel.kt
+@@ -184,30 +184,13 @@
+ 
+     fun addToQueue() {
+         tracks.value.takeUnless { it.isEmpty() }?.let { audios ->
+-            mediaController.value?.apply {
+-                addMediaItems(audios.map { it.toMedia3MediaItem(resources) })
+-
+-                // If the added items are the only one, play them
+-                if (mediaItemCount == audios.count()) {
+-                    play()
+-                }
+-            }
++            addToQueue(audios)
+         }
+     }
+ 
+     fun playNext() {
+         tracks.value.takeUnless { it.isEmpty() }?.let { audios ->
+-            mediaController.value?.apply {
+-                addMediaItems(
+-                    currentMediaItemIndex + 1,
+-                    audios.map { it.toMedia3MediaItem(resources) },
+-                )
+-
+-                // If the added items are the only one, play them
+-                if (mediaItemCount == audios.count()) {
+-                    play()
+-                }
+-            }
++            playNext(audios)
+         }
+     }
+ }
+diff --git a/app/src/main/java/org/lineageos/twelve/viewmodels/PlaylistViewModel.kt b/app/src/main/java/org/lineageos/twelve/viewmodels/PlaylistViewModel.kt
+index cfa14b8..e4817ee 100644
+--- a/app/src/main/java/org/lineageos/twelve/viewmodels/PlaylistViewModel.kt
++++ b/app/src/main/java/org/lineageos/twelve/viewmodels/PlaylistViewModel.kt
+@@ -87,4 +87,20 @@
+             playAudio(it.shuffled(), 0)
+         }
+     }
++
++    fun addToQueue() {
++        playlist.value.getOrNull()?.second?.takeUnless {
++            it.isEmpty()
++        }?.let {
++            addToQueue(it)
++        }
++    }
++
++    fun playNext() {
++        playlist.value.getOrNull()?.second?.takeUnless {
++            it.isEmpty()
++        }?.let {
++            playNext(it)
++        }
++    }
+ }
+diff --git a/app/src/main/java/org/lineageos/twelve/viewmodels/TwelveViewModel.kt b/app/src/main/java/org/lineageos/twelve/viewmodels/TwelveViewModel.kt
+index 2e57940..aafec4d 100644
+--- a/app/src/main/java/org/lineageos/twelve/viewmodels/TwelveViewModel.kt
++++ b/app/src/main/java/org/lineageos/twelve/viewmodels/TwelveViewModel.kt
+@@ -109,16 +109,39 @@
+             }
+         }
+ 
+-    fun playAudio(audio: List<Audio>, position: Int) {
++    fun playAudio(audios: List<Audio>, position: Int) {
+         mediaController.value?.apply {
+             // Initialize shuffle and repeat modes
+             shuffleModeEnabled = sharedPreferences.shuffleModeEnabled
+             typedRepeatMode = sharedPreferences.typedRepeatMode
+ 
+-            setMediaItems(audio.map { it.toMedia3MediaItem(resources) }, true)
++            setMediaItems(audios.map { it.toMedia3MediaItem(resources) }, true)
+             prepare()
+             seekToDefaultPosition(position)
+             play()
+         }
+     }
++
++    fun addToQueue(audios: List<Audio>) {
++        mediaController.value?.apply {
++            addMediaItems(audios.map { it.toMedia3MediaItem(resources) })
++
++            if (mediaItemCount == audios.count()) {
++                play()
++            }
++        }
++    }
++
++    fun playNext(audios: List<Audio>) {
++        mediaController.value?.apply {
++            addMediaItems(
++                currentMediaItemIndex + 1,
++                audios.map { it.toMedia3MediaItem(resources) },
++            )
++
++            if (mediaItemCount == audios.count()) {
++                play()
++            }
++        }
++    }
+ }
+diff --git a/app/src/main/res/layout-land/fragment_album.xml b/app/src/main/res/layout-land/fragment_album.xml
+index cfe30e8..b292c14 100644
+--- a/app/src/main/res/layout-land/fragment_album.xml
++++ b/app/src/main/res/layout-land/fragment_album.xml
+@@ -100,10 +100,9 @@
+         layout="@layout/play_buttons"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:layout_marginEnd="16dp"
+         android:layout_marginBottom="16dp"
+         app:layout_anchor="@+id/recyclerView"
+-        app:layout_anchorGravity="bottom|end"
++        app:layout_anchorGravity="bottom|center_horizontal"
+         app:layout_behavior="@string/hide_bottom_view_on_scroll_behavior" />
+ 
+ </androidx.coordinatorlayout.widget.CoordinatorLayout>
+diff --git a/app/src/main/res/layout-land/fragment_playlist.xml b/app/src/main/res/layout-land/fragment_playlist.xml
+index ba2083a..2dd0daa 100644
+--- a/app/src/main/res/layout-land/fragment_playlist.xml
++++ b/app/src/main/res/layout-land/fragment_playlist.xml
+@@ -100,10 +100,9 @@
+         layout="@layout/play_buttons"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:layout_marginEnd="16dp"
+         android:layout_marginBottom="16dp"
+         app:layout_anchor="@+id/recyclerView"
+-        app:layout_anchorGravity="bottom|end"
++        app:layout_anchorGravity="bottom|center_horizontal"
+         app:layout_behavior="@string/hide_bottom_view_on_scroll_behavior" />
+ 
+     <org.lineageos.twelve.ui.views.FullscreenLoadingProgressBar
+diff --git a/app/src/main/res/layout/fragment_album.xml b/app/src/main/res/layout/fragment_album.xml
+index 606250a..982eec7 100644
+--- a/app/src/main/res/layout/fragment_album.xml
++++ b/app/src/main/res/layout/fragment_album.xml
+@@ -101,10 +101,9 @@
+         layout="@layout/play_buttons"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:layout_marginEnd="16dp"
+         android:layout_marginBottom="16dp"
+         app:layout_anchor="@+id/recyclerView"
+-        app:layout_anchorGravity="bottom|end"
++        app:layout_anchorGravity="bottom|center_horizontal"
+         app:layout_behavior="@string/hide_bottom_view_on_scroll_behavior" />
+ 
+ </androidx.coordinatorlayout.widget.CoordinatorLayout>
+diff --git a/app/src/main/res/layout/fragment_playlist.xml b/app/src/main/res/layout/fragment_playlist.xml
+index 35dfb0c..2a8f3c6 100644
+--- a/app/src/main/res/layout/fragment_playlist.xml
++++ b/app/src/main/res/layout/fragment_playlist.xml
+@@ -102,10 +102,9 @@
+         layout="@layout/play_buttons"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:layout_marginEnd="16dp"
+         android:layout_marginBottom="16dp"
+         app:layout_anchor="@+id/recyclerView"
+-        app:layout_anchorGravity="bottom|end"
++        app:layout_anchorGravity="bottom|center_horizontal"
+         app:layout_behavior="@string/hide_bottom_view_on_scroll_behavior" />
+ 
+     <org.lineageos.twelve.ui.views.FullscreenLoadingProgressBar
+diff --git a/app/src/main/res/layout/play_buttons.xml b/app/src/main/res/layout/play_buttons.xml
+index 61911fe..5029888 100644
+--- a/app/src/main/res/layout/play_buttons.xml
++++ b/app/src/main/res/layout/play_buttons.xml
+@@ -11,34 +11,60 @@
+     android:gravity="center_vertical"
+     android:orientation="horizontal">
+ 
+-    <com.google.android.material.button.MaterialButtonGroup
++    <com.google.android.material.floatingtoolbar.FloatingToolbarLayout
+         android:id="@+id/buttonGroup"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+-        android:gravity="center_horizontal">
++        android:layout_marginEnd="8dp"
++        app:marginBottomSystemWindowInsets="false"
++        app:marginTopSystemWindowInsets="false">
+ 
+-        <com.google.android.material.button.MaterialButton
+-            android:id="@+id/shufflePlayButton"
+-            style="?attr/materialIconButtonFilledTonalStyle"
++        <com.google.android.material.overflow.OverflowLinearLayout
+             android:layout_width="wrap_content"
+             android:layout_height="match_parent"
+-            android:contentDescription="@string/shuffle_play"
+-            android:tooltipText="@string/shuffle_play"
+-            app:icon="@drawable/ic_shuffle_play"
+-            app:iconGravity="textStart"
+-            app:materialSizeOverlay="@style/SizeOverlay.Material3Expressive.Button.IconButton.Medium" />
++            android:orientation="horizontal">
+ 
+-        <com.google.android.material.button.MaterialButton
+-            android:id="@+id/playAllButton"
+-            style="?attr/materialButtonTonalStyle"
+-            android:layout_width="wrap_content"
+-            android:layout_height="wrap_content"
+-            android:text="@string/play_all"
+-            android:textColor="?attr/colorOnTertiaryContainer"
+-            app:backgroundTint="?attr/colorTertiaryContainer"
+-            app:icon="@drawable/ic_play_arrow"
+-            app:iconTint="?attr/colorOnTertiaryContainer"
+-            app:materialSizeOverlay="@style/SizeOverlay.Material3Expressive.Button.Medium" />
++            <Button
++                android:id="@+id/shufflePlayButton"
++                style="?attr/materialIconButtonStyle"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:contentDescription="@string/shuffle_play"
++                android:tooltipText="@string/shuffle_play"
++                app:icon="@drawable/ic_shuffle_play" />
+ 
+-    </com.google.android.material.button.MaterialButtonGroup>
++            <Button
++                android:id="@+id/addToQueue"
++                style="?attr/materialIconButtonStyle"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:contentDescription="@string/audio_add_to_queue"
++                android:tooltipText="@string/audio_add_to_queue"
++                app:icon="@drawable/ic_add_to_queue" />
++
++            <Button
++                android:id="@+id/playNextButton"
++                style="?attr/materialIconButtonStyle"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:contentDescription="@string/audio_play_next"
++                android:tooltipText="@string/audio_play_next"
++                app:icon="@drawable/ic_queue_play_next" />
++
++        </com.google.android.material.overflow.OverflowLinearLayout>
++
++    </com.google.android.material.floatingtoolbar.FloatingToolbarLayout>
++
++    <com.google.android.material.floatingactionbutton.FloatingActionButton
++        android:id="@+id/playAllButton"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:contentDescription="@string/play_all"
++        android:stateListAnimator="@null"
++        android:tooltipText="@string/play_all"
++        app:elevation="0dp"
++        app:materialThemeOverlay="@style/ThemeOverlay.Material3Expressive.FloatingActionButton.Tertiary"
++        app:pressedTranslationZ="0dp"
++        app:srcCompat="@drawable/ic_play_arrow" />
++
+ </LinearLayout>

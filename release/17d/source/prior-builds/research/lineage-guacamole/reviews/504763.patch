@@ -1,0 +1,108 @@
+From 766be23ae0bcaabd4a2f2958ddb72c2162d151e5 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 24 Sep 2026 22:10:30 +0530
+Subject: [PATCH] SUW: Scale LineageOS logo separately for tablets
+
+Change-Id: Iea07eb97c5f6ff068788113af48eaedd8a986b17
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+index 9ad75ca..f91d334 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+@@ -28,6 +28,7 @@
+ import android.widget.ImageView
+ import android.widget.TextView
+ import androidx.annotation.DimenRes
++import androidx.core.content.res.ResourcesCompat
+ import androidx.core.view.ViewCompat
+ import androidx.core.view.WindowInsetsCompat
+ import com.google.android.setupcompat.util.SystemBarHelper
+@@ -56,6 +57,10 @@
+     private var edgeToEdgeWallpaperBackgroundTheme: Resources.Theme? = null
+     private val revealWallpaper by lazy { !SetupWizardUtils.hasLeanback(this) }
+ 
++    private val logoStartScale by lazy {
++        ResourcesCompat.getFloat(resources, R.dimen.finish_logo_scale)
++    }
++
+     private enum class FinishState {
+         NONE,
+         ANIMATING,
+@@ -91,6 +96,9 @@
+ 
+         rootView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+ 
++        brandLogo.scaleX = logoStartScale
++        brandLogo.scaleY = logoStartScale
++
+         applyHomeAffordance()
+ 
+         // Ensure the main layout (not including the background view) does not get obscured by bars.
+@@ -283,10 +291,10 @@
+     private fun applyRevealProgress(progress: Float) {
+         revealProgress = progress
+         updateLogoPivot()
+-        (brandLogo.parent as? View)?.let { parent ->
++        (brandLogo.parent as? View)?.let {
+             val parentLocation = IntArray(2)
+             val backgroundLocation = IntArray(2)
+-            parent.getLocationOnScreen(parentLocation)
++            it.getLocationOnScreen(parentLocation)
+             background.getLocationOnScreen(backgroundLocation)
+             background.holeCenterX =
+                 parentLocation[0] - backgroundLocation[0] + brandLogo.left + brandLogo.pivotX
+@@ -295,7 +303,7 @@
+         }
+         background.holeRadius = background.fullRadius * REVEAL_OVERSHOOT * progress
+         brandLogo.apply {
+-            val scale = LOGO_START_SCALE + (LOGO_END_SCALE - LOGO_START_SCALE) * progress
++            val scale = logoStartScale + (LOGO_END_SCALE - logoStartScale) * progress
+             scaleX = scale
+             scaleY = scale
+         }
+@@ -407,7 +415,6 @@
+ 
+         private const val REVEAL_OVERSHOOT = 1.35f
+ 
+-        private const val LOGO_START_SCALE = 1.2f
+         private const val LOGO_END_SCALE = 18f
+ 
+         // Static so a relaunch after the wizard has finished is recognised and dropped rather
+diff --git a/app/src/main/res/layout/finish_activity.xml b/app/src/main/res/layout/finish_activity.xml
+index c1ddc00..85fdbbb 100644
+--- a/app/src/main/res/layout/finish_activity.xml
++++ b/app/src/main/res/layout/finish_activity.xml
+@@ -32,8 +32,6 @@
+             android:src="@drawable/logo"
+             android:adjustViewBounds="true"
+             android:scaleType="fitCenter"
+-            android:scaleX="1.2"
+-            android:scaleY="1.2"
+             android:gravity="center"
+             android:padding="@dimen/content_margin_left"/>
+ 
+diff --git a/app/src/main/res/values-w600dp-h480dp/dimens.xml b/app/src/main/res/values-w600dp-h480dp/dimens.xml
+index dd0a26e..2b7965f 100644
+--- a/app/src/main/res/values-w600dp-h480dp/dimens.xml
++++ b/app/src/main/res/values-w600dp-h480dp/dimens.xml
+@@ -8,4 +8,6 @@
+     <dimen name="welcome_title_line_height">64dp</dimen>
+ 
+     <dimen name="welcome_wide_logo_height">112dp</dimen>
++
++    <item name="finish_logo_scale" format="float" type="dimen">0.84</item>
+ </resources>
+diff --git a/app/src/main/res/values/dimens.xml b/app/src/main/res/values/dimens.xml
+index 651c60b..acd9ce8 100644
+--- a/app/src/main/res/values/dimens.xml
++++ b/app/src/main/res/values/dimens.xml
+@@ -37,6 +37,7 @@
+     <dimen name="setup_compat_footer_button_radius">@dimen/sud_glif_expressive_footer_button_radius</dimen>
+     <dimen name="setup_design_items_group_corner_radius">20dp</dimen>
+ 
++    <item name="finish_logo_scale" format="float" type="dimen">1.2</item>
+     <dimen name="swipe_hint_icon_size">67dp</dimen>
+     <dimen name="swipe_hint_text_margin_top">12dp</dimen>
+     <dimen name="swipe_hint_text_size">17sp</dimen>

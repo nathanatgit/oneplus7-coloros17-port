@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest version="1.0" type="device">
+    <hal format="hidl">
+        <name>vendor.oplus.hardware.charger</name>
+        <transport>hwbinder</transport>
+        <version>1.0</version>
+        <interface>
+            <name>ICharger</name>
+            <instance>default</instance>
+        </interface>
+    </hal>
+    <hal format="aidl">
+        <name>vendor.oplus.hardware.charger</name>
+        <version>12</version>
+        <fqname>ICharger/default</fqname>
+    </hal>
+    <hal format="aidl">
+        <name>android.se.omapi</name>
+        <version>1</version>
+        <fqname>ISecureElementService/default</fqname>
+    </hal>
+</manifest>

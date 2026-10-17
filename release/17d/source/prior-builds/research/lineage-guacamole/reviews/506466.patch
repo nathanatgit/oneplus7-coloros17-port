@@ -1,0 +1,30 @@
+From e9c35906eca2bc8436c38616608f38b1802f5089 Mon Sep 17 00:00:00 2001
+From: Maja Błaszczak <maja.blaszczak@proton.me>
+Date: Tue, 06 Oct 2026 17:02:18 +0200
+Subject: [PATCH] ims: Sort soong namespace declaration
+
+Change-Id: Iae2c4280a11c88a7532316fb525296b8cc12d758
+Signed-off-by: Maja Błaszczak <maja.blaszczak@proton.me>
+---
+
+diff --git a/ims.mk b/ims.mk
+index ad08928..9cec17d 100644
+--- a/ims.mk
++++ b/ims.mk
+@@ -5,9 +5,6 @@
+ 
+ GENERIC_IMS_PATH := hardware/lineage/generic-ims
+ 
+-# Soong namespaces
+-PRODUCT_SOONG_NAMESPACES += $(GENERIC_IMS_PATH)
+-
+ # CarrierSettings
+ PRODUCT_PACKAGES += CarrierSettings
+ 
+@@ -29,3 +26,6 @@
+ 
+ # SEPolicy
+ SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(GENERIC_IMS_PATH)/sepolicy/system_ext/private
++
++# Soong namespaces
++PRODUCT_SOONG_NAMESPACES += $(GENERIC_IMS_PATH)

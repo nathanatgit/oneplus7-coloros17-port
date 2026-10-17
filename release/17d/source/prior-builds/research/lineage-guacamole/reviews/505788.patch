@@ -1,0 +1,111 @@
+From 0599b1406d6019e30e2a3a84c16596f6a6aff518 Mon Sep 17 00:00:00 2001
+From: Nicholas Lim <niclimcy@lineageos.org>
+Date: Thu, 01 Oct 2026 20:11:02 +0800
+Subject: [PATCH] CharacterPickerDialog: Use DeviceDefault dialog style
+
+Replace the legacy bitmap panel, keys and close button with the
+DeviceDefault dialog theme and theme attributes, so it follows dark mode
+and stays sharp at any density.
+
+Test: On a physical keyboard, hold down the A character.
+Assisted-by: LLM
+Change-Id: Id452f15c9f9cc9ffcde335716ac01d84b4bb6db1
+---
+
+diff --git a/core/java/android/text/method/CharacterPickerDialog.java b/core/java/android/text/method/CharacterPickerDialog.java
+index f084d03..0ec77e9 100644
+--- a/core/java/android/text/method/CharacterPickerDialog.java
++++ b/core/java/android/text/method/CharacterPickerDialog.java
+@@ -46,7 +46,7 @@
+     private String mOptions;
+     private boolean mInsert;
+     private LayoutInflater mInflater;
+-    private Button mCancelButton;
++    private View mCancelButton;
+ 
+     /**
+      * Creates a new CharacterPickerDialog that presents the specified
+@@ -56,13 +56,13 @@
+     public CharacterPickerDialog(Context context, View view,
+                                  Editable text, String options,
+                                  boolean insert) {
+-        super(context, com.android.internal.R.style.Theme_Panel);
++        super(context, com.android.internal.R.style.Theme_DeviceDefault_Dialog_NoActionBar);
+ 
+         mView = view;
+         mText = text;
+         mOptions = options;
+         mInsert = insert;
+-        mInflater = LayoutInflater.from(context);
++        mInflater = LayoutInflater.from(getContext());
+     }
+ 
+     @Override
+@@ -80,7 +80,7 @@
+         grid.setAdapter(new OptionsAdapter(getContext()));
+         grid.setOnItemClickListener(this);
+ 
+-        mCancelButton = (Button) findViewById(R.id.cancel);
++        mCancelButton = findViewById(R.id.cancel);
+         mCancelButton.setOnClickListener(this);
+     }
+ 
+diff --git a/core/res/res/layout/character_picker.xml b/core/res/res/layout/character_picker.xml
+index 3ddbbb2c..5c944ad 100644
+--- a/core/res/res/layout/character_picker.xml
++++ b/core/res/res/layout/character_picker.xml
+@@ -17,8 +17,8 @@
+ <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     android:orientation="horizontal"
+     android:layout_width="304dp"
+-    android:layout_height="match_parent"
+-    android:background="@drawable/keyboard_popup_panel_trans_background">
++    android:layout_height="wrap_content"
++    android:padding="8dp">
+ 
+     <GridView
+         android:id="@+id/characterPicker"
+@@ -37,13 +37,15 @@
+         android:listSelector="#0000"
+     />
+ 
+-    <Button
++    <ImageButton
+         android:id="@+id/cancel"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_marginStart="12dp"
+-        android:layout_marginEnd="12dp"
+-        android:background="@drawable/btn_close"
++        android:layout_width="48dp"
++        android:layout_height="48dp"
++        android:layout_marginStart="8dp"
+         android:layout_gravity="center_vertical"
++        android:src="@drawable/ic_close"
++        android:tint="?android:attr/colorControlNormal"
++        android:background="?android:attr/selectableItemBackgroundBorderless"
++        android:contentDescription="@string/cancel"
+     />
+ </LinearLayout>
+diff --git a/core/res/res/layout/character_picker_button.xml b/core/res/res/layout/character_picker_button.xml
+index b74e620..7d1db3a 100644
+--- a/core/res/res/layout/character_picker_button.xml
++++ b/core/res/res/layout/character_picker_button.xml
+@@ -17,10 +17,15 @@
+ <Button xmlns:android="http://schemas.android.com/apk/res/android"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
++    android:minWidth="48dp"
++    android:minHeight="48dp"
++    android:padding="0dp"
+     android:clickable="true"
+     android:focusable="false"
+     android:textAppearance="?android:attr/textAppearanceLarge"
+-    android:background="@drawable/btn_keyboard_key_trans"
+-    android:textColor="#FFFFFFFF"
++    android:textAllCaps="false"
++    android:textColor="?android:attr/textColorPrimary"
++    android:background="?android:attr/selectableItemBackground"
++    android:stateListAnimator="@null"
+ />
+ 

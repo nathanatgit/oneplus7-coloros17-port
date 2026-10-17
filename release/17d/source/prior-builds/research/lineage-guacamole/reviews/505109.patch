@@ -1,0 +1,3901 @@
+From 9a49c02e9a8bb865319b506364ffb7e3695b500a Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:44:53 +0300
+Subject: [PATCH] Merge tag 'WLAN.LA.2.0.r3-10600-kaanapali.0' into staging/lineage-24.0_merge-WLAN.LA.2.0.r3-10600-kaanapali.0
+
+WLAN.LA.2.0.r3-10600-kaanapali.0
+
+* tag 'WLAN.LA.2.0.r3-10600-kaanapali.0': (30 commits)
+  wifi_hal: Remove old peer entries using NIK
+  Revert^6 "wpa_supplicant_8_lib: Testing coral workflow"
+  Revert^5 "wpa_supplicant_8_lib: Testing coral workflow"
+  Revert^4 "wpa_supplicant_8_lib: Testing coral workflow"
+  Revert^3 "wpa_supplicant_8_lib: Testing coral workflow"
+  Revert^2 "wpa_supplicant_8_lib: Testing coral workflow"
+  Revert "wpa_supplicant_8_lib: Testing coral workflow"
+  wpa_supplicant_8_lib: Testing coral workflow
+  wpa_supplicant_8_lib: split named-command dispatch from ioctl fallback
+  wifi_hal: Add null iface handle checks to all vendor HAL functions
+  nan: Update pub_sub_id and requestor_instance_id from followup indication
+  wifiHal: Fixed Compilation issue for LE Env
+  Add QCA vendor interface to support Time Average SAR (TAS)
+  wifi-hal: Change one nan msg to debug level
+  wifi_hal: update qca-vendor_copy.h
+  wifiHal: Update log_event_host_reason_code enum
+  wifiHal: Enable error logging on event sockets
+  WIFI-HAL: Add support for STA DFS channel configuration
+  wifi_hal: Remove TARGET_SUPPORTS_WEARABLES flag
+  wpa_supplicant: Add PA report v2 support with golden PDADC values
+  ...
+
+Change-Id: I51ac43a1af5343e1f68d52c86e6b70d814b28452
+---
+
+diff --git a/cld80211-lib/cld80211_lib.c b/cld80211-lib/cld80211_lib.c
+index 2d97dc6..2be8d9a 100644
+--- a/cld80211-lib/cld80211_lib.c
++++ b/cld80211-lib/cld80211_lib.c
+@@ -61,7 +61,7 @@
+  const char *getprogname() { return (__progname); }
+ #endif
+ 
+-#define SOCK_BUF_SIZE (256*1024)
++#define SOCK_BUF_SIZE (256 * 1024)
+ 
+ #ifdef __LINUX__
+   #define LOG_TAG "CLD80211"
+@@ -549,7 +549,13 @@
+ 		ALOGE("%s: Failed to initialize exit sockets", getprogname());
+ 		goto cleanup;
+ 	}
+-
++	int opt = 1;
++	int ret = setsockopt(nl_socket_get_fd(ctx->sock), SOL_NETLINK,
++			     NETLINK_NO_ENOBUFS, &opt, sizeof(opt));
++	ALOGE("cld80211_init: configured NETLINK_NO_ENOBUFS %d", ret);
++	ret = setsockopt(nl_socket_get_fd(ctx->sock), SOL_NETLINK,
++			 NETLINK_BROADCAST_ERROR, &opt, sizeof(opt));
++	ALOGE("cld80211_init: configured NETLINK_BROADCAST_ERROR %d", ret);
+ 	return ctx;
+ cleanup:
+ 	if (ctx->sock) {
+diff --git a/qcwcn/wifi_hal/Android.bp b/qcwcn/wifi_hal/Android.bp
+index c6546aa..2ea4418 100644
+--- a/qcwcn/wifi_hal/Android.bp
++++ b/qcwcn/wifi_hal/Android.bp
+@@ -56,7 +56,6 @@
+     ],
+     bool_variables: [
+         "mac_privacy_logging", // CONFIG_MAC_PRIVACY_LOGGING
+-        "target_supports_wearables", // TARGET_SUPPORTS_WEARABLES
+     ],
+     variables: [
+         "libpasn_support", //$(wildcard external/wpa_supplicant_8/src/pasn/pasn_common.c)
+@@ -86,9 +85,6 @@
+         mac_privacy_logging: {
+             cflags: ["-DCONFIG_MAC_PRIVACY_LOGGING"],
+         },
+-        target_supports_wearables: {
+-            cflags: ["-DTARGET_SUPPORTS_WEARABLES"],
+-        },
+         libpasn_support: {
+             true: {
+                 cflags: ["-DWPA_PASN_LIB"],
+diff --git a/qcwcn/wifi_hal/Makefile.am b/qcwcn/wifi_hal/Makefile.am
+new file mode 100644
+index 0000000..a228022
+--- /dev/null
++++ b/qcwcn/wifi_hal/Makefile.am
+@@ -0,0 +1,69 @@
++AM_CPPFLAGS = -Wall \
++             -g -O0 \
++             $(DIAG_CFLAGS) \
++             -I$(srcdir) \
++             -I$(srcdir)/vendor_nan \
++             -I$(srcdir)/wifi_hal_ctrl \
++             -DWPA_PASN_LIB
++
++if DEBUG
++AM_CPPFLAGS += DDEBUG
++endif
++
++requiredlibs = -lrt $(DIAG_LIBS)
++
++AM_CPPFLAGS += $(CPPFLAGS)
++
++if USE_GLIB
++AM_CFLAGS = -DUSE_GLIB $(GLIB_CFLAGS)
++AM_CPPFLAGS += -DUSE_GLIB $(GLIB_CFLAGS)
++requiredlibs += $(GLIB_LIBS)
++endif
++
++h_sources = ${WORKSPACE}/system/core/include/log/log.h
++
++#include sub directories header files
++h_sources += $(srcdir)/vendor_nan/vendor_nan_hal.h
++h_sources += $(srcdir)/wifi_hal_ctrl/wifi_hal_ctrl.h
++
++c_sources = list.cpp
++c_sources += nan.cpp
++c_sources += wifi_hal.cpp
++c_sources += common.cpp
++c_sources += cpp_bindings.cpp
++c_sources += llstats.cpp
++c_sources += gscan.cpp
++c_sources += gscan_event_handler.cpp
++c_sources += rtt.cpp
++c_sources += ifaceeventhandler.cpp
++c_sources += tdls.cpp
++c_sources += nan_ind.cpp
++c_sources += nan_req.cpp
++c_sources += nan_rsp.cpp
++c_sources += wificonfig.cpp
++c_sources += wifilogger.cpp
++c_sources += wifilogger_diag.cpp
++c_sources += ring_buffer.cpp
++c_sources += rb_wrapper.cpp
++c_sources += rssi_monitor.cpp
++c_sources += roam.cpp
++c_sources += radio_mode.cpp
++c_sources += wifihal_vendor.cpp
++c_sources += nan_pairing.cpp
++c_sources += nan_pairing_initiator.cpp
++c_sources += nan_pairing_responder.cpp
++c_sources += tcp_params_update.cpp
++c_sources += twt.cpp
++c_sources += wifi_cached_scan_result.cpp
++
++#include sub-directories source files
++c_sources += $(srcdir)/vendor_nan/vendor_nan.cpp
++c_sources += $(srcdir)/wifi_hal_ctrl/wifi_hal_ctrl.c
++
++library_includedir = $(pkgincludedir)
++library_include_HEADERS = $(h_sources)
++
++libwifihalqcom_la_SOURCES = $(c_sources) $(h_sources)
++libwifihalqcom_la_LIBADD = ${requiredlibs} -lpasn
++libwifihalqcom_la_CPPFLAGS =$(AM_CPPFLAGS)
++lib_LTLIBRARIES = libwifihalqcom.la
+diff --git a/qcwcn/wifi_hal/common.cpp b/qcwcn/wifi_hal/common.cpp
+index 80ae60d..25a4680 100644
+--- a/qcwcn/wifi_hal/common.cpp
++++ b/qcwcn/wifi_hal/common.cpp
+@@ -258,7 +258,16 @@
+                       0x100*(minor) + \
+                       micro;
+ 
+-    return (memcmp(&currVersion, &lowiVersion, sizeof(u32)));
++    ALOGV("%s: comparing versions - current: 0x%08x, lowi: 0x%08x",
++          __FUNCTION__, currVersion, lowiVersion);
++
++    if (lowiVersion > currVersion) {
++        return 1;
++    } else if (lowiVersion < currVersion) {
++        return -1;
++    } else {
++        return 0;
++    }
+ }
+ 
+ /*
+diff --git a/qcwcn/wifi_hal/common.h b/qcwcn/wifi_hal/common.h
+index 0c52be0..deea374 100644
+--- a/qcwcn/wifi_hal/common.h
++++ b/qcwcn/wifi_hal/common.h
+@@ -227,10 +227,8 @@
+     bool apf_enabled;
+     bool support_nan_ext_cmd;
+     pkt_log_version  pkt_log_ver;
+-#ifndef TARGET_SUPPORTS_WEARABLES
+     /* Interface combination matrix */
+     wifi_iface_concurrency_matrix iface_comb_matrix;
+-#endif /* TARGET_SUPPORTS_WEARABLES */
+     qca_wlan_vendor_sar_version sar_version;
+     struct wpa_secure_nan *secure_nan;
+ } hal_info;
+diff --git a/qcwcn/wifi_hal/configure.ac b/qcwcn/wifi_hal/configure.ac
+new file mode 100644
+index 0000000..2541a15
+--- /dev/null
++++ b/qcwcn/wifi_hal/configure.ac
+@@ -0,0 +1,133 @@
++# configure.ac -- Autoconf script for wifi-hal
++
++# Requires autoconf tool later than 2.61
++AC_PREREQ(2.61)
++# Initialize the qcacld-tools package version 1.0.0
++AC_INIT([qcwcn],1.0.0)
++# Does not strictly follow GNU Coding standards
++AM_INIT_AUTOMAKE([foreign])
++# Disables auto rebuilding of configure, Makefile.ins
++AM_MAINTAINER_MODE
++# defines some macros variable to be included by source
++AC_CONFIG_HEADERS([config.h])
++AC_CONFIG_MACRO_DIR([m4])
++
++# Checks for programs.
++AC_PROG_CC
++AC_PROG_CXX
++AM_PROG_CC_C_O
++AC_PROG_LIBTOOL
++AC_PROG_AWK
++AC_PROG_CPP
++AC_PROG_INSTALL
++AC_PROG_LN_S
++AC_PROG_MAKE_SET
++
++# Checks for libraries.
++PKG_CHECK_MODULES([DIAG], [diag])
++AC_SUBST([DIAG_CFLAGS])
++AC_SUBST([DIAG_LIBS])
++
++AC_ARG_WITH([glib],
++      AC_HELP_STRING([--with-glib],
++         [enable glib, building FTM Daemon which use glib]))
++
++if (test "x${with_glib}" = "xyes"); then
++        PKG_CHECK_MODULES(GTHREAD, gthread-2.0 >= 2.16, dummy=yes,
++                               AC_MSG_ERROR(GThread >= 2.16 is required))
++        PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.16, dummy=yes,
++                                AC_MSG_ERROR(GLib >= 2.16 is required))
++        GLIB_CFLAGS="$GLIB_CFLAGS $GTHREAD_CFLAGS"
++        GLIB_LIBS="$GLIB_LIBS $GTHREAD_LIBS"
++
++        AC_SUBST(GLIB_CFLAGS)
++        AC_SUBST(GLIB_LIBS)
++fi
++AM_CONDITIONAL(USE_GLIB, test "x${with_glib}" = "xyes")
++
++AC_ARG_ENABLE([debug],
++        [  --enable-debug    Turn on debugging],
++        [case "${enableval}" in
++            yes) debug=true ;;
++            no)  debug=false ;;
++            *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
++        esac],[debug=false])
++AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
++
++# Checks for typedefs, structures, and compiler characteristics.
++AC_HEADER_STDBOOL
++AC_HEADER_STDC
++AC_C_INLINE
++AC_TYPE_INT64_T
++AC_TYPE_PID_T
++AC_TYPE_SIZE_T
++AC_TYPE_SSIZE_T
++AC_TYPE_UINT16_T
++AC_TYPE_UINT32_T
++AC_TYPE_UINT8_T
++
++# Checks for library functions.
++AC_FUNC_ERROR_AT_LINE
++AC_FUNC_FORK
++AC_FUNC_MALLOC
++
++AC_ARG_WITH([system-core-includes],
++     AC_HELP_STRING([--with-system-core-includes=@<:@dir@:>@],
++        [Specify the location of the system core headers]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     with_system_core_includes=no)
++
++AC_ARG_WITH([libhardware-legacy-includes],
++     AC_HELP_STRING([--with-libhardware-legacy-includes=@<:@dir@:>@],
++        [Specify the location of the libhardware legacy headers]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     with_libhardware_legacy_includes=no)
++
++AC_ARG_WITH([supplicant-header-includes],
++     AC_HELP_STRING([--with-supplicant-header-includes=@<:@dir@:>@],
++        [Specify the location of the supplicant header includes]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     supplicant-header-includes=no)
++
++AC_ARG_WITH([supplicant-utils-includes],
++      AC_HELP_STRING([--with_supplicant-utils-includes=@<:@dir@:>@],
++         [Specify the location of the supplicant header includes]),
++      [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++      with_supplicant-utils-includes=no)
++
++AC_ARG_WITH([supplicant-includes],
++      AC_HELP_STRING([--with_supplicant-includes=@<:@dir@:>@],
++         [Specify the location of the supplicant header includes]),
++      [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++      with_supplicant-includes=no)
++
++AC_ARG_WITH([cld80211-lib-includes],
++     AC_HELP_STRING([--with-cld80211-lib-includes=@<:@dir@:>@],
++        [Specify the location of the cld80211 lib headers]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     cld80211-lib-includes=no)
++
++AC_ARG_WITH([libnl-includes],
++     AC_HELP_STRING([--with-libnl-includes=@<:@dir@:>@],
++        [Specify the location of the libnl lib headers]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     libnl-includes=no)
++
++AC_ARG_WITH([vendor-nan-includes],
++     AC_HELP_STRING([--with-vendor-nan-includes=@<:@dir@:>@],
++        [Specify the location of the vendor nan headers]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     vendor-nan-includes=no)
++
++AC_ARG_WITH([wifi-hal-ctrl-includes],
++     AC_HELP_STRING([--with-wifi-hal-ctrl-includes=@<:@dir@:>@],
++        [Specify the location of the wifi hal ctrl headers]),
++     [CPPFLAGS="$CPPFLAGS -idirafter $withval"],
++     wifi-hal-ctrl-includes=no)
++
++AC_SUBST([CPPFLAGS])
++
++AC_CONFIG_FILES([ \
++	Makefile \
++])
++AC_OUTPUT
+diff --git a/qcwcn/wifi_hal/gscan.cpp b/qcwcn/wifi_hal/gscan.cpp
+index 334e7a4..8a7d6b6 100644
+--- a/qcwcn/wifi_hal/gscan.cpp
++++ b/qcwcn/wifi_hal/gscan.cpp
+@@ -108,6 +108,10 @@
+     struct nlattr *nlData;
+     interface_info *ifaceInfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* No request id from caller, so generate one and pass it on to the driver.
+      * Generate one randomly.
+@@ -1176,6 +1180,10 @@
+     WifiVendorCommand *vCommand = NULL;
+     interface_info *iinfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
++    if (!iinfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     vCommand = new WifiVendorCommand(wifiHandle, 0,
+             OUI_QCA,
+diff --git a/qcwcn/wifi_hal/ifaceeventhandler.cpp b/qcwcn/wifi_hal/ifaceeventhandler.cpp
+index adcddb3..5400415 100644
+--- a/qcwcn/wifi_hal/ifaceeventhandler.cpp
++++ b/qcwcn/wifi_hal/ifaceeventhandler.cpp
+@@ -77,7 +77,12 @@
+                                         wifi_interface_handle iface,
+                                         wifi_event_handler eh)
+ {
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* Check if a similar request to set iface event handler was made earlier.
+      * Right now we don't differentiate between the case where (i) the new
+@@ -789,15 +794,15 @@
+     u8 *buff_ptr;
+ 
+     static struct nla_policy
+-        radio_combination_policy[QCA_WLAN_VENDOR_ATTR_RADIO_COMBINATIONS_MAX + 1] = {
+-            [QCA_WLAN_VENDOR_ATTR_RADIO_COMBINATIONS_CFGS] = { .type = NLA_NESTED },
+-        };
++        radio_combination_policy[QCA_WLAN_VENDOR_ATTR_RADIO_COMBINATIONS_MAX + 1];
++    radio_combination_policy[
++        QCA_WLAN_VENDOR_ATTR_RADIO_COMBINATIONS_CFGS].type = NLA_NESTED;
+ 
+     static struct nla_policy
+-        radio_cfg_policy[QCA_WLAN_VENDOR_ATTR_SUPPORTED_RADIO_CFG_MAX + 1] = {
+-            [QCA_WLAN_VENDOR_ATTR_SUPPORTED_RADIO_CFG_BAND] = { .type = NLA_U32 },
+-            [QCA_WLAN_VENDOR_ATTR_SUPPORTED_RADIO_CFG_ANTENNA] = { .type = NLA_U8 },
+-        };
++        radio_cfg_policy[QCA_WLAN_VENDOR_ATTR_SUPPORTED_RADIO_CFG_MAX + 1];
++    radio_cfg_policy[
++        QCA_WLAN_VENDOR_ATTR_SUPPORTED_RADIO_CFG_BAND].type = NLA_U32;
++    radio_cfg_policy[QCA_WLAN_VENDOR_ATTR_SUPPORTED_RADIO_CFG_ANTENNA].type = NLA_U8;
+ 
+     if (nla_parse(tbVendor, QCA_WLAN_VENDOR_ATTR_RADIO_MATRIX_MAX,
+                 (struct nlattr *)mVendorData,mDataLen, NULL)) {
+@@ -945,11 +950,10 @@
+     struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_MAX + 1];
+     struct nlattr *attr;
+     static struct nla_policy
+-      policy[QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_MAX + 1] = {
+-            [QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_FREQ] = { .type = NLA_U32 },
+-            [QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_TIMESTAMP] = { .type = NLA_U64 },
+-            [QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_DETECTED] = { .type = NLA_FLAG },
+-    };
++      policy[QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_MAX + 1];
++    policy[QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_FREQ].type = NLA_U32;
++    policy[QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_TIMESTAMP].type = NLA_U64;
++    policy[QCA_WLAN_VENDOR_ATTR_RADAR_HISTORY_DETECTED].type = NLA_FLAG;
+     radar_history_result *newEntry;
+     radar_history_result *temp;
+     u32 totalEntrySize = 0;
+diff --git a/qcwcn/wifi_hal/nan.cpp b/qcwcn/wifi_hal/nan.cpp
+index 7a12435..75e6dc5 100644
+--- a/qcwcn/wifi_hal/nan.cpp
++++ b/qcwcn/wifi_hal/nan.cpp
+@@ -1593,11 +1593,16 @@
+     struct nlattr *nlData, *nlCfgQos;
+     NanCommand *nanCommand = NULL;
+     NanCommand *t_nanCommand = NULL;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
+     hal_info *info = getHalInfo(wifiHandle);
+ #ifdef WPA_PASN_LIB
+     struct ptksa_cache_entry *entry = NULL;
+ #endif
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+     if (msg == NULL)
+         return WIFI_ERROR_INVALID_ARGS;
+ 
+@@ -1814,12 +1819,17 @@
+     struct nlattr *nlData, *nlCfgQos;
+     NanCommand *nanCommand = NULL;
+     NanCommand *t_nanCommand = NULL;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
+     hal_info *info = getHalInfo(wifiHandle);
+ #ifdef WPA_PASN_LIB
+     struct ptksa_cache_entry *entry = NULL;
+     struct nan_pairing_peer_info *peer = NULL;
+ #endif
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     if (msg == NULL)
+         return WIFI_ERROR_INVALID_ARGS;
+diff --git a/qcwcn/wifi_hal/nan_i.h b/qcwcn/wifi_hal/nan_i.h
+index 590f7f0..3fe11bb 100644
+--- a/qcwcn/wifi_hal/nan_i.h
++++ b/qcwcn/wifi_hal/nan_i.h
+@@ -1839,7 +1839,9 @@
+     NAN_I_STATUS_INVALID_5G_CHANNEL = 27,
+     NAN_I_STATUS_POLICY_MANAGER_NOT_SINGLE_MAC_MODE = 28,
+     NAN_I_STATUS_VDEV_NOT_CREATED = 29,
+-    NAN_I_STATUS_IC_MODE_FAIL = 30,
++    NAN_I_STATUS_SVC_SUSPEND_RESUME_FAILURE = 30,
++    NAN_I_STATUS_IC_MODE_FAIL = 31,
++
+     /* 27-4095 Reserved */
+     /* NAN Configuration Response codes */
+     NAN_I_STATUS_INVALID_RSSI_CLOSE_VALUE = 4096,
+@@ -2171,6 +2173,12 @@
+     u8 dialog_token;
+     /* cipher type used for pairing */
+     u32 cipher_type;
++    /* NIRA nonce used in verification */
++    u8 nira_nonce[NAN_IDENTITY_NONCE_LEN];
++    /* NIRA tag used in verification */
++    u8 nira_tag[NAN_IDENTITY_TAG_LEN];
++    /* flag to check if NIRA is valid */
++    bool is_nira_valid;
+ };
+ 
+ struct wpa_secure_nan {
+@@ -2388,6 +2396,10 @@
+                                     wifi_interface_handle iface,
+                                     u32 key_index);
+ u16 get_matching_bootstrap_method(u16 method);
++void nan_cache_peer_nira(struct nan_pairing_peer_info *entry,
++                         u8 *nira_nonce, u8 *nira_tag);
++void nan_flush_peer_alias_key_by_nik(hal_info *info,
++                                     struct nan_pairing_peer_info *entry);
+ 
+ #ifdef __cplusplus
+ }
+diff --git a/qcwcn/wifi_hal/nan_ind.cpp b/qcwcn/wifi_hal/nan_ind.cpp
+index 6e089a2..5d43c3c 100644
+--- a/qcwcn/wifi_hal/nan_ind.cpp
++++ b/qcwcn/wifi_hal/nan_ind.cpp
+@@ -742,6 +742,8 @@
+     u16 shared_key_attr_len = 0;
+     u8 shared_key_attr[NAN_MAX_SHARED_KEY_ATTR_LEN];
+     wifi_interface_handle ifaceHandle;
++    u16 publish_subscribe_id;
++    u32 requestor_instance_id;
+ 
+     if (mNanVendorEvent == NULL) {
+         ALOGE("%s: Invalid mNanVendorEvent:%p",
+@@ -750,6 +752,9 @@
+     }
+ 
+     pNanFollowupIndMsg pRsp = (pNanFollowupIndMsg)mNanVendorEvent;
++    publish_subscribe_id = pRsp->fwHeader.handle;
++    requestor_instance_id = pRsp->followupIndParams.matchHandle;
++
+     u8 *pInputTlv = pRsp->ptlv;
+     NanTlv outputTlv;
+     u16 readLen = 0;
+@@ -828,6 +833,19 @@
+         return retval;
+     }
+ 
++    if (publish_subscribe_id &&
++        entry->pub_sub_id != publish_subscribe_id) {
++          ALOGI("Update previous pub sub id: %d with new id: %d",
++                entry->pub_sub_id, publish_subscribe_id);
++          entry->pub_sub_id = publish_subscribe_id;
++    }
++    if (requestor_instance_id &&
++        entry->requestor_instance_id != requestor_instance_id) {
++          ALOGI("Update previous requestor instance id: %d with new id: %d",
++                entry->requestor_instance_id, requestor_instance_id);
++          entry->requestor_instance_id = requestor_instance_id;
++    }
++
+     if (entry->peer_role == SECURE_NAN_PAIRING_INITIATOR) {
+         info->secure_nan->pending_peer = entry;
+         nan_pairing_prepare_skda_data(ifaceHandle);
+diff --git a/qcwcn/wifi_hal/nan_pairing.cpp b/qcwcn/wifi_hal/nan_pairing.cpp
+index e940420..818e003 100644
+--- a/qcwcn/wifi_hal/nan_pairing.cpp
++++ b/qcwcn/wifi_hal/nan_pairing.cpp
+@@ -794,6 +794,16 @@
+                 nan_csia *csia = (nan_csia *)nan_attr_ie;
+                 peer->csia_cap_info = csia->caps;
+             }
++
++            nan_attr_ie = nan_get_attr_from_ies(mgmt->u.auth.variable,
++                             len - offsetof(struct ieee80211_mgmt, u.auth.variable),
++                             NAN_ATTR_ID_NIRA);
++            if (nan_attr_ie) {
++                nan_nira *nira = (nan_nira *)nan_attr_ie;
++                nan_cache_peer_nira(peer, nira->nonce_tag,
++                                    &nira->nonce_tag[NAN_IDENTITY_NONCE_LEN]);
++            }
++
+             ptksa_cache_add(info->secure_nan->ptksa, info->secure_nan->own_addr,
+                             peer->bssid, pasn_get_cipher(pasn), nanPMKLifetime,
+                             pasn_get_ptk(pasn), NULL, NULL, pasn_get_akmp(pasn));
+@@ -1863,6 +1873,7 @@
+     ALOGD("PASN:" MACSTR "present in PTKSA cache",
+           MAC2STR(bssid));
+ 
++    nan_flush_peer_alias_key_by_nik(info, peer);
+     nan_pairing_set_key(info, alg, bssid, 0, 1, NULL, 0, tk, tk_len,
+                         KEY_FLAG_PAIRWISE_RX_TX);
+ 
+@@ -1941,6 +1952,7 @@
+         nanCommand->handleNanPairingConfirm(&evt);
+         peer->is_paired = true;
+         peer->is_pairing_in_progress = false;
++        nan_pairing_remove_peers_with_nik(info, peer->peer_nik, peer->bssid);
+     }
+     return WIFI_SUCCESS;
+ }
+@@ -2939,6 +2951,8 @@
+     peer = nan_pairing_get_peer_from_id(info->secure_nan, msg->pairing_instance_id);
+     if (peer) {
+         peer->is_pairing_in_progress = false;
++        ptksa_cache_flush(info->secure_nan->ptksa, peer->bssid,
++                          WPA_CIPHER_NONE);
+         nan_pairing_set_key(info, WPA_ALG_NONE, peer->bssid, 0, 0, NULL, 0,
+                             NULL, 0, KEY_FLAG_PAIRWISE);
+         nan_pairing_delete_peer_from_list(info->secure_nan, peer->bssid);
+@@ -2946,6 +2960,64 @@
+     return WIFI_SUCCESS;
+ }
+ 
++void nan_cache_peer_nira(struct nan_pairing_peer_info *entry,
++                         u8 *nira_nonce, u8 *nira_tag)
++{
++    if (!entry || !nira_nonce || !nira_tag)
++        return;
++
++    memcpy(entry->nira_nonce, nira_nonce, NAN_IDENTITY_NONCE_LEN);
++    memcpy(entry->nira_tag, nira_tag, NAN_IDENTITY_TAG_LEN);
++    entry->is_nira_valid = true;
++}
++
++void nan_flush_peer_alias_key_by_nik(hal_info *info,
++                                     struct nan_pairing_peer_info *c_entry)
++{
++    struct nan_pairing_peer_info *entry, *tmp;
++    int ret;
++    u8 tag[NAN_MAX_HASH_LEN];
++    u8 data[NIR_STR_LEN + NAN_IDENTITY_NONCE_LEN + ETH_ALEN];
++    struct wpa_secure_nan *secure_nan = info->secure_nan;
++
++    if (!c_entry->is_paired || !c_entry->is_nira_valid) {
++        ALOGV("%s Peer " MACSTR " not paired yet or NIRA invalid",
++              __FUNCTION__, MAC2STR(c_entry->bssid));
++        return;
++    }
++
++    memset(tag, 0, sizeof(tag));
++    memset(data, 0, sizeof(data));
++    memcpy(data, "NIR", NIR_STR_LEN);
++    memcpy(&data[NIR_STR_LEN], c_entry->bssid, ETH_ALEN);
++    memcpy(&data[NIR_STR_LEN + ETH_ALEN], c_entry->nira_nonce,
++              NAN_IDENTITY_NONCE_LEN);
++
++    list_for_each_entry_safe(entry, tmp, &info->secure_nan->peers, list) {
++        if (is_zero_nan_identity_key(entry->peer_nik) ||
++            (memcmp(entry->bssid, c_entry->bssid, ETH_ALEN) == 0))
++            continue;
++
++        ret = hmac_sha256(entry->peer_nik, NAN_IDENTITY_KEY_LEN,
++                          data, sizeof(data), tag);
++        if (ret < 0) {
++            ALOGV("%s Could not derive NIRA Tag, retval = %d",
++                  __FUNCTION__, ret);
++            continue;
++        }
++        if (memcmp(tag, c_entry->nira_tag, NAN_IDENTITY_TAG_LEN) != 0)
++            continue;
++
++        memcpy(c_entry->peer_nik, entry->peer_nik, NAN_IDENTITY_KEY_LEN);
++        ptksa_cache_flush(secure_nan->ptksa, entry->bssid, WPA_CIPHER_NONE);
++        nan_pairing_set_key(info, WPA_ALG_NONE, entry->bssid, 0, 0, NULL, 0,
++                            NULL, 0, KEY_FLAG_PAIRWISE);
++        ALOGD("%s Flush keys of stale peer " MACSTR " -new active peer:" MACSTR,
++              __FUNCTION__, MAC2STR(entry->bssid), MAC2STR(c_entry->bssid));
++        return;
++    }
++}
++
+ #else  /* WPA_PASN_LIB */
+ 
+ struct nan_pairing_peer_info*
+diff --git a/qcwcn/wifi_hal/nan_pairing_responder.cpp b/qcwcn/wifi_hal/nan_pairing_responder.cpp
+index 2f96d30..a11868e 100644
+--- a/qcwcn/wifi_hal/nan_pairing_responder.cpp
++++ b/qcwcn/wifi_hal/nan_pairing_responder.cpp
+@@ -442,6 +442,7 @@
+             memcpy(pairingReqInd.nira.nonce, nira_nonce, NAN_IDENTITY_NONCE_LEN);
+             memcpy(pairingReqInd.nira.tag, nira_tag, NAN_IDENTITY_TAG_LEN);
+             entry->is_paired = true;
++            nan_cache_peer_nira(entry, nira_nonce, nira_tag);
+         } else {
+             pairingReqInd.nan_pairing_request_type = NAN_PAIRING_SETUP;
+         }
+@@ -500,6 +501,8 @@
+             } else {
+                 ALOGE("%s: Invalid pmk len: %zu", __FUNCTION__, pasn_get_pmk_len(pasn));
+             }
++
++            nan_pairing_remove_peers_with_nik(info, entry->peer_nik, entry->bssid);
+             wpa_pasn_reset(pasn);
+             nanCommand->handleNanPairingConfirm(&evt);
+             entry->is_paired = true;
+diff --git a/qcwcn/wifi_hal/nan_rsp.cpp b/qcwcn/wifi_hal/nan_rsp.cpp
+index eebccdb..2812798 100644
+--- a/qcwcn/wifi_hal/nan_rsp.cpp
++++ b/qcwcn/wifi_hal/nan_rsp.cpp
+@@ -338,6 +338,8 @@
+      "NAN is Already enabled"},
+     {NAN_STATUS_FOLLOWUP_QUEUE_FULL, NAN_I_STATUS_FOLLOWUP_QUEUE_FULL,
+      "Follow-up queue full"},
++    {NAN_STATUS_INTERNAL_FAILURE, NAN_I_STATUS_SVC_SUSPEND_RESUME_FAILURE,
++     "NAN Suspend Resume failure"},
+     {NAN_STATUS_INTERNAL_FAILURE, NAN_I_STATUS_IC_MODE_FAIL,
+      "Instant Mode failed"},
+ 
+diff --git a/qcwcn/wifi_hal/nud_stats.h b/qcwcn/wifi_hal/nud_stats.h
+index 280cf3b..02c56a6 100644
+--- a/qcwcn/wifi_hal/nud_stats.h
++++ b/qcwcn/wifi_hal/nud_stats.h
+@@ -44,7 +44,9 @@
+ #include <netlink/netlink.h>
+ #include <netlink/socket.h>
+ #include <hardware_legacy/wifi_hal.h>
++#ifdef ANDROID
+ #include <bits/in_addr.h>
++#endif
+ 
+ #define INET6_ADDRSTRLEN 46
+ 
+diff --git a/qcwcn/wifi_hal/qca-vendor_copy.h b/qcwcn/wifi_hal/qca-vendor_copy.h
+index af108fd..27a50c3 100644
+--- a/qcwcn/wifi_hal/qca-vendor_copy.h
++++ b/qcwcn/wifi_hal/qca-vendor_copy.h
+@@ -106,6 +106,10 @@
+  * @QCA_WLAN_VENDOR_ATTR_CONFIG_TX_NSS_5GHZ: Configure TX_NSS in 5 or 6 GHz band
+  * @QCA_WLAN_VENDOR_ATTR_CONFIG_RX_NSS_5GHZ: Configure RX_NSS in 5 or 6 GHz band
+  *
++ * To effectively clear or reset the NSS configuration, user-space can set the
++ * attribute to 0xFF or 255, allowing the driver to apply the default NSS
++ * configuration.
++ *
+  * Global chain configuration - Applies to all bands (2.4 GHz and 5/6 GHz)
+  * The following attributes are used to dynamically configure the number of
+  * chains to be used for transmitting or receiving the data in the 2.4 GHz and
+@@ -141,6 +145,10 @@
+  * @QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_RX_CHAINS_5GHZ: The number of chains to be
+  * used for receiving the data in the 5/6 GHz band.
+  *
++ * To effectively clear or reset the chain configuration, user-space can set
++ * the attribute to 0xFF or 255, allowing the driver to apply the default chain
++ * configuration.
++ *
+  * Global chain-mask configuration - Applies to 2.4 GHz or 5/6 GHz band
+  * The following band specific attributes are used to dynamically configure the
+  * global chain masks (e.g., 0x1 for Chain 0, 0x2 for Chain 1, 0x4 for Chain 2)
+@@ -1480,7 +1488,8 @@
+  *	enum qca_wlan_vendor_attr_feature_config.
+  *
+  * @QCA_NL80211_VENDOR_SUBCMD_GET_COEX_STATS: Vendor subcommand used to retrieve
+- *     Wi-Fi and Bluetooth coexistence statistics from the driver.
++ *	Wi-Fi and other technologies (e.g., Bluetooth, UWB (Ultra-Wideband), MWS
++ *	(Modem Wireless System) coexistence statistics from the driver.
+  *
+  *     The attributes used with this command are defined in
+  *     enum qca_wlan_vendor_attr_coex_stats.
+@@ -1505,6 +1514,107 @@
+  *
+  *	No attributes are used in the request. The response includes attributes
+  *	defined in enum qca_wlan_vendor_attr_qsh_stats.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_WLAN_HOST_TXRX_STATS: This vendor subcommand is
++ *     used to retrieve WLAN host driver side TX/RX statistics.
++ *     The attributes used with this command are defined in
++ *     enum qca_wlan_host_txrx_stats_attr.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_IPA_RING_STATS: This vendor subcommand is
++ *     used to retrieve IP Accelerator (IPA) ring statistics.
++ *     The attributes used with this command are defined in
++ *     enum qca_wlan_ipa_ring_stats_attr.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH: This vendor subcommand is used to
++ *	offload only the authentication process to wpa_supplicant in scenarios
++ *	where the SME is implemented in the driver.
++ *
++ *	Authentication frames are exchanged between the driver and
++ *	wpa_supplicant using %NL80211_CMD_FRAME, and the transmission status
++ *	of each frame is reported through %NL80211_CMD_FRAME_TX_STATUS. If the
++ *	authentication process results in establishing a PTKSA (e.g., EPPKE
++ *	authentication), wpa_supplicant stores the PTKSA in its internal cache.
++ *	After the final Authentication frame is successfully transmitted
++ *	(confirmed via %NL80211_CMD_FRAME_TX_STATUS), wpa_supplicant installs
++ *	the required temporal keys into the driver using %NL80211_CMD_NEW_KEY.
++ *	After completing the authentication process, wpa_supplicant will
++ *	indicate the success/failure status with the same command to the driver.
++ *
++ *	Upon successful authentication, the driver proceeds with association
++ *	phase and reports the connection result via %NL80211_CMD_CONNECT. If
++ *	association completes successfully, wpa_supplicant retrieves the KCK
++ *	and KEK from the PTKSA cache for use in PTK/GTK rekeying operations. If
++ *	the association fails, wpa_supplicant clears the PTKSA cache for this
++ *	session to avoid using stale key material.
++ *
++ *	wpa_supplicant advertises the authentication algorithms it supports for
++ *	this subcommand using %QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES via
++ *	%QCA_NL80211_VENDOR_SUBCMD_CONNECT_EXT.
++ *
++ *	The attributes used with this command are defined in
++ *	enum qca_wlan_vendor_attr_external_auth.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION: This vendor subcommand is used to
++ *	configure the device with Geofenced Variable Power (GVP) operation
++ *	parameters.
++ *	Uses the attributes defined in enum qca_wlan_vendor_attr_gvp_info.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_N79_COEX: Vendor subcommand to control
++ *	WLAN host behavior based on N79 band activity.
++ *	The WLAN host manages NSS/chain reduction, AP coordination, and
++ *	hysteresis timers internally. Mode-agnostic: works regardless of
++ *	connection state or device mode.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT: This vendor subcommand is used both
++ *	as a command and as an event. Userspace sends this command with
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_CONFIG to enable or disable reporting
++ *	of TDLS events. The driver sends this as an event with
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRIES to deliver TDLS events to
++ *	userspace. The driver can cache the events even before the reporting is
++ *	enabled and sends all the events cached when this command is received.
++ *	Each entry inside the nested attribute represents one TDLS event. The
++ *	driver can send one or more TDLS events with each nl80211 event.
++ *
++ *	The attributes used with this command are defined in
++ *	enum qca_wlan_vendor_attr_tdls_event.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS: This vendor subcommand is used both
++ *	as a command and as an event. Userspace sends this command with
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG to enable or disable reporting
++ *	of TDLS data statistics. The driver sends this as an event with
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES to deliver TDLS statistics to
++ *	userspace. The driver can cache the statistics even before the reporting
++ *	is enabled and sends all the statistics cached when this command is
++ *	received. Each entry inside the nested attribute represents one set of
++ *	TDLS data statistics. The driver can send one or more sets of TDLS
++ *	statistics with each nl80211 event.
++ *
++ *	The attributes used with this command are defined in
++ *	enum qca_wlan_vendor_attr_tdls_stats.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG: Vendor command used by
++ *	userspace to configure the driver to send or stop sending TDLS events
++ *	and statistics. %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_EVENTS
++ *	controls TDLS event reporting via %QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT
++ *	and %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_STATS controls TDLS
++ *	statistics reporting via %QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS. Use this
++ *	command when enabling or disabling both events and statistics reporting
++ *	simultaneously; use %QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT or
++ *	%QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS to control them independently.
++ *	The driver can cache the statistics and events even before the reporting
++ *	is enabled by this command and sends all the statistics and events
++ *	cached when this command is received.
++ *
++ *	The attributes used with this command are defined in
++ *	enum qca_wlan_vendor_attr_tdls_reporting_config.
++ *
++ * @QCA_NL80211_VENDOR_SUBCMD_TAS: This vendor subcommand is used to manage
++ *	TAS (Time Average SAR) for Wi-Fi. The operation is selected via the
++ *	mandatory %QCA_WLAN_VENDOR_ATTR_TAS_OPERATION attribute; see
++ *	enum qca_wlan_tas_operation for the supported operations.
++ *
++ *	The attributes used with this command are defined in
++ *	enum qca_wlan_vendor_attr_tas.
+  */
+ enum qca_nl80211_vendor_subcmds {
+ 	QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
+@@ -1759,6 +1869,15 @@
+ 	QCA_NL80211_VENDOR_SUBCMD_ATF_OFFLOAD_OPS = 268,
+ 	QCA_NL80211_VENDOR_SUBCMD_DCS_CONFIG = 269,
+ 	QCA_NL80211_VENDOR_SUBCMD_QSH_GET_STATS = 270,
++	QCA_NL80211_VENDOR_SUBCMD_WLAN_HOST_TXRX_STATS = 271,
++	QCA_NL80211_VENDOR_SUBCMD_IPA_RING_STATS = 272,
++	QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH = 273,
++	QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION = 274,
++	QCA_NL80211_VENDOR_SUBCMD_N79_COEX = 275,
++	QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT = 276,
++	QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS = 277,
++	QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG = 278,
++	QCA_NL80211_VENDOR_SUBCMD_TAS = 279,
+ };
+ 
+ /* Compatibility defines for previously used subcmd names.
+@@ -2161,6 +2280,11 @@
+ 	 * nested attribute are defined in enum qca_wlan_vendor_attr_mlo_links.
+ 	 */
+ 	QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_MLO_LINKS = 15,
++	/* Flag attribute, The driver sets this flag to indicate that both the
++	 * (Re)Association Request frame and the corresponding (Re)Association
++	 * Response frame were transmitted encrypted over the air.
++	 */
++	QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_ASSOC_ENCRYPTED = 16,
+ 
+ 	/* keep last */
+ 	QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_AFTER_LAST,
+@@ -2575,6 +2699,42 @@
+  * early (using QCA_WLAN_VENDOR_ATTR_P2P_SET_GO_CANCEL_ONE_SHOT_NOA), without
+  * waiting for the originally configured NoA duration to expire.
+  *
++ * @QCA_WLAN_VENDOR_FEATURE_SUPPORT_PMKSA_CACHING_PRIVACY: Flag indicates that
++ *	the driver supports PMKSA caching privacy as defined in
++ *	IEEE P802.11bi/D4.0, 12.16.7. Userspace should enable PMKSA caching
++ *	privacy only when both %NL80211_EXT_FEATURE_ASSOC_FRAME_ENCRYPTION and
++ *	this feature flag are advertised by the driver.
++ *
++ *	When both the AP and the non-AP STA support PMKSA caching privacy and
++ *	association frame encryption, the driver shall include the PMKIDSNonce
++ *	in the (Re)Association Request frame. Upon successful non-FT
++ *	(re)association, indicated by %NL80211_CMD_CONNECT, %NL80211_CMD_ROAM,
++ *	or %QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH, wpa_supplicant shall
++ *	derive a new PMKID for the PMKSA entry used during the current
++ *	connection. The derivation uses the PMKIDANonce from the (Re)Association
++ *	Response frame and the PMKIDSNonce from the (Re)Association Request
++ *	frame. PMKR0Name randomization during FT reassociation will be handled
++ *	by the driver.
++ *
++ * @QCA_WLAN_VENDOR_FEATURE_OKC_PMKID_IN_ASSOC: Indicates that the driver
++ *	supports generating an Opportunistic Key Caching (OKC) PMKSA entry for
++ *	the target AP and including the corresponding OKC-derived PMKID in
++ *	(Re)Association Request frames.
++ *
++ *	When enabled, the driver derives an OKC PMKSA entry for the target AP
++ *	by cloning the PMKSA of the previously connected AP (reusing the same
++ *	PMK with the new AP BSSID) if no PMKSA entry already exists for the
++ *	target AP. The derived PMKID is then added to the (Re)Association
++ *	Request.
++ *
++ *	The supplicant can infer this behavior by validating that the PMKID in
++ *	the (Re)Association Request corresponds to an OKC-derived PMKID in the
++ *	absence of an existing PMKSA cache entry for the target AP.
++ *
++ *	This feature is used together with
++ *	%QCA_CONNECT_EXT_FEATURE_OKC_PMKID_IN_ASSOC to indicate mutual support
++ *	between driver and supplicant.
++ *
+  * @NUM_QCA_WLAN_VENDOR_FEATURES: Number of assigned feature bits
+  */
+ enum qca_wlan_vendor_features {
+@@ -2615,6 +2775,8 @@
+ 	QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_ASSISTED_DFS = 34,
+ 	QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GO_CANCEL_ONE_SHOT_NOA = 35,
+ 	QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA = 36,
++	QCA_WLAN_VENDOR_FEATURE_SUPPORT_PMKSA_CACHING_PRIVACY = 37,
++	QCA_WLAN_VENDOR_FEATURE_OKC_PMKID_IN_ASSOC = 38,
+ 	NUM_QCA_WLAN_VENDOR_FEATURES /* keep last */
+ };
+ 
+@@ -4273,6 +4435,27 @@
+ 	 */
+ 	QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_PEER_PROTOCOL_INDOOR_CH_STA_SCC = 142,
+ 
++	/* Nested attribute to configure or report Estimated Service Parameters
++	 * (ESP). This contains nested attributes defined in
++	 * enum qca_wlan_vendor_attr_config_esp_param.
++	 */
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PARAMS = 143,
++
++	/* 8-bit unsigned value, used in AP mode only, to indicate whether
++	 * AP_VLAN multicast hardware encryption offload handling is enabled for
++	 * dynamic VLAN operation.
++	 * This is intended for per-station AP_VLAN cases where different
++	 * VLAN instances may need separate GTK handling.
++	 * 1 - Enable, 0 - Disable.
++	 */
++	QCA_WLAN_VENDOR_ATTR_CONFIG_DYNAMIC_VLAN = 144,
++
++	/* 8-bit unsigned value to enable/disable the driver to allow forwarding
++	 * 3-address multicast frames in WDS mode
++	 * 1-Enable, 0-Disable.
++	 */
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_3ADDR_MC = 145,
++
+ 	/* keep last */
+ 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST,
+ 	QCA_WLAN_VENDOR_ATTR_CONFIG_MAX =
+@@ -5970,6 +6153,35 @@
+ 	 */
+ 	QCA_WLAN_VENDOR_ATTR_LL_STATS_RX_DRIVER_MPDU_CNT = 99,
+ 
++	/* Nested attribute for SNR distribution statistics. This attribute
++	 * contains a dynamic SNR distribution histogram and measurement
++	 * duration for the interface's operating channel.
++	 *
++	 * SNR is measured by the target hardware and reported as a distribution
++	 * across configurable bins. The bin range and step size are determined
++	 * by the firmware and reported via the nested attributes defined in
++	 * enum qca_wlan_vendor_attr_ll_stats_snr. Applications must read the
++	 * config attributes (SNR_LOWER_BOUND, SNR_UPPER_BOUND, SNR_STEP,
++	 * BIN_COUNT) to correctly interpret the BIN_DATA array.
++	 *
++	 * For non-MLO connection:
++	 * - This attribute appears at the interface level and represents the
++	 *   SNR distribution for the single operating channel.
++	 *
++	 * For MLO connection:
++	 * - This attribute ONLY appears inside
++	 *   %QCA_WLAN_VENDOR_ATTR_LL_STATS_MLO_LINK
++	 * - Each link reports its own SNR distribution for its specific
++	 *   operating channel.
++	 * - There is no aggregated SNR distribution at the interface level,
++	 *   as SNR distributions from different channels cannot be
++	 *   meaningfully combined.
++	 *
++	 * This is a nested attribute containing SNR distribution attributes
++	 * defined in enum qca_wlan_vendor_attr_ll_stats_snr.
++	 */
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_SNR = 100,
++
+ 	/* keep last */
+ 	QCA_WLAN_VENDOR_ATTR_LL_STATS_AFTER_LAST,
+ 	QCA_WLAN_VENDOR_ATTR_LL_STATS_MAX =
+@@ -5989,6 +6201,64 @@
+ };
+ 
+ /**
++ * enum qca_wlan_vendor_attr_ll_stats_snr - SNR distribution attributes
++ *
++ * These attributes report the distribution of received SNR samples collected
++ * by the target hardware. The bin configuration (range and step) is dynamic and
++ * determined by the firmware. Applications must use the config attributes
++ * (SNR_LOWER_BOUND, SNR_UPPER_BOUND, SNR_STEP, BIN_COUNT) to correctly
++ * interpret the BIN_DATA array.
++ *
++ * Bin layout (num_bins = ((upper_bound - lower_bound) / step) + 2):
++ *   Bin[0]:          SNR < lower_bound dB
++ *   Bin[1]:          SNR in [lower_bound, lower_bound + step) dB
++ *   Bin[i]:          SNR in [lower_bound + (i-1)*step, lower_bound + i*step) dB
++ *   Bin[num_bins-1]: SNR >= upper_bound dB
++ *
++ * Example (lower=0, upper=100, step=10, num_bins=12):
++ *   Bin[0]=SNR<0, Bin[1]=SNR[0,10), ..., Bin[10]=SNR[90,100), Bin[11]=SNR>=100
++ *
++ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_MEAS_DUR_US: u32
++ *     Total measurement duration in microseconds during which SNR samples
++ *     were collected on the operating channel.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_LOWER_BOUND: u32
++ *     Lower bound of the SNR measurement range in dB.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_UPPER_BOUND: u32
++ *     Upper bound of the SNR measurement range in dB.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_STEP: u32
++ *     Step size in dB for each SNR bin.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_BIN_COUNT: u32
++ *     Total number of bins = ((upper_bound - lower_bound) / step) + 2.
++ *     The +2 accounts for out-of-bound bins (below lower_bound and above
++ *     upper_bound). This is also the number of u32 elements in BIN_DATA.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_BIN_DATA: NLA_BINARY
++ *     Array of u32 values, BIN_COUNT elements total. Each element is the
++ *     count of SNR samples that fell in the corresponding bin during the
++ *     measurement period. See bin layout description above.
++ *     The u32 values are in host byte order; no byte-order conversion is
++ *     required by the application.
++ */
++enum qca_wlan_vendor_attr_ll_stats_snr {
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_MEAS_DUR_US = 1,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_LOWER_BOUND = 2,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_UPPER_BOUND = 3,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_STEP = 4,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_BIN_COUNT = 5,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_BIN_DATA = 6, /* NLA_BINARY: u32[] */
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_MAX =
++	QCA_WLAN_VENDOR_ATTR_LL_STATS_SNR_AFTER_LAST - 1,
++};
++
++/**
+  * enum qca_wlan_vendor_attr_tdls_configuration - Attributes for
+  * TDLS configuration to the host driver.
+  *
+@@ -6537,11 +6807,21 @@
+  * @QCA_ROAM_SCAN_SCHEME_FULL_SCAN: Indicates the driver/firmware to
+  *     trigger the scan on all the valid frequencies to find better
+  *     candidates to roam.
++ *
++ * @QCA_ROAM_SCAN_SCHEME_NEIGHBOR_REPORT_SCAN: Indicates the driver/firmware
++ *     to trigger the scan only on the channels obtained from the neighbor
++ *     report (e.g., neighbor request/response, RNR, BTM request).
++ *
++ * @QCA_ROAM_SCAN_SCHEME_DEFAULT: Indicates the driver/firmware to clear any
++ *     scan scheme configured earlier and revert to the default scan scheme
++ *     behavior.
+  */
+ enum qca_roam_scan_scheme {
+ 	QCA_ROAM_SCAN_SCHEME_NO_SCAN = 0,
+ 	QCA_ROAM_SCAN_SCHEME_PARTIAL_SCAN = 1,
+ 	QCA_ROAM_SCAN_SCHEME_FULL_SCAN = 2,
++	QCA_ROAM_SCAN_SCHEME_NEIGHBOR_REPORT_SCAN = 3,
++	QCA_ROAM_SCAN_SCHEME_DEFAULT = 4,
+ };
+ 
+ /*
+@@ -6904,6 +7184,11 @@
+  *	qca_roam_scan_scheme.
+  *	It's an optional attribute. If this attribute is not configured, the
+  *	driver shall proceed with default behavior.
++ *	The validity of this configuration is controlled by
++ *	QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION. When that
++ *	flag is present, the configuration is valid only until the next
++ *	disconnection. When that flag is absent, the configuration persists
++ *	across disconnections.
+  *
+  * @QCA_ATTR_ROAM_CONTROL_CONNECTED_RSSI_THRESHOLD: Signed 32-bit value in dBm,
+  *	signifying the RSSI threshold of the current connected AP, indicating
+@@ -7058,6 +7343,10 @@
+  *	QCA_ATTR_ROAM_CONTROL_CONNECTED_RSSI_THRESHOLD where the configured
+  *	threshold is used only when the connected AP asks the STA to roam
+  *	through a BTM request.
++ *	This attribute should not be used together with
++ *	QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS in the same command.
++ *	When both have been configured across separate commands, the most recent
++ *	configuration takes effect and overwrites the previous one.
+  *
+  * @QCA_ATTR_ROAM_CONTROL_CANDIDATE_ROAM_RSSI_DIFF: Unsigned 8-bit value.
+  *	This attribute signifies the RSSI difference threshold between the
+@@ -7163,6 +7452,34 @@
+  *	specified duration from the last successful connection time when a
+  *	Deauthentication or Disassociation frame is received from the connected
+  *	BSS.
++ *
++ * @QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS: Nested attribute to
++ *	configure low RSSI thresholds per band. The nl80211_band enum value of
++ *	the respective band is used as the attribute type, and the data in each
++ *	such attribute is a signed 32-bit RSSI value in dBm, signifying the low
++ *	RSSI threshold applicable when the STA is connected on the corresponding
++ *	band. The STA keeps monitoring the connected AP's RSSI and will start
++ *	scanning for neighboring APs once the RSSI falls below the threshold
++ *	configured for the current band, triggering the roam eventually.
++ *	When QCA_ATTR_ROAM_CONTROL_CONNECTED_HIGH_RSSI_OFFSET and
++ *	QCA_ATTR_ROAM_CONTROL_CONNECTED_LOW_RSSI_THRESHOLD_DECREMENT are
++ *	configured together with this attribute, the per-band threshold
++ *	configured here serves as the low RSSI threshold for the respective
++ *	band, and those attributes apply to the per-band threshold accordingly.
++ *	The configured per-band thresholds are obtained with the same attribute
++ *	for get. Clears the per-band thresholds in the driver when specified
++ *	with the clear command.
++ *	This attribute should not be used together with
++ *	QCA_ATTR_ROAM_CONTROL_CONNECTED_LOW_RSSI_THRESHOLD in the same command.
++ *	When both have been configured across separate commands, the most recent
++ *	configuration takes effect and overwrites the previous one.
++ *
++ * @QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION: Flag
++ *	attribute to configure the lifetime of the scan scheme set through
++ *	QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME. When this flag is present, the scan
++ *	scheme configuration is valid only until the next disconnection. When
++ *	this flag is absent, the scan scheme configuration persists across
++ *	disconnections.
+  */
+ enum qca_vendor_attr_roam_control {
+ 	QCA_ATTR_ROAM_CONTROL_ENABLE = 1,
+@@ -7204,6 +7521,8 @@
+ 	QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL = 37,
+ 	QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD = 38,
+ 	QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD = 39,
++	QCA_ATTR_ROAM_CONTROL_PER_BAND_LOW_RSSI_THRESHOLDS = 40,
++	QCA_ATTR_ROAM_CONTROL_SCAN_SCHEME_VALID_UNTIL_DISCONNECTION = 41,
+ 
+ 	/* keep last */
+ 	QCA_ATTR_ROAM_CONTROL_AFTER_LAST,
+@@ -9347,6 +9666,16 @@
+ 	QCA_WLAN_HANG_FLUSH_LOGS = 35,
+ 	/* Host wakeup because of page fault */
+ 	QCA_WLAN_HANG_HOST_WAKEUP_REASON_PAGE_FAULT = 36,
++	/* Timeout waiting for response of unified vdev connect command from the
++	 * firmware. This command combines peer create, vdev start, peer assoc,
++	 * and vdev up operations to optimize link switch time.
++	 */
++	QCA_WLAN_HANG_VDEV_UNIFIED_CONNECT_RESP_TIMEOUT = 37,
++	/* Timeout waiting for response of unified vdev disconnect command from
++	 * the firmware. This command combines peer delete, vdev stop, and vdev
++	 * down operations to optimize link switch time.
++	 */
++	QCA_WLAN_HANG_VDEV_UNIFIED_DISCONNECT_RESP_TIMEOUT = 38,
+ };
+ 
+ /**
+@@ -11441,6 +11770,14 @@
+ 	 */
+ 	QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SET_MLE_RESERVED_FIELDS = 82,
+ 
++	/* 8-bit unsigned value to configure the STA interface to operate in
++	 * 20 MHz only mode.
++	 *
++	 * This attribute is used to configure the testbed device.
++	 * 1-set the 20 MHz only mode, 0-default behavior
++	 */
++	QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA = 83,
++
+ 	/* keep last */
+ 	QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_AFTER_LAST,
+ 	QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_MAX =
+@@ -12713,12 +13050,14 @@
+  * @QCA_WLAN_VENDOR_CFR_LTF_TYPE_VHT: CSI from VHT-LTF (IEEE 802.11ac)
+  * @QCA_WLAN_VENDOR_CFR_LTF_TYPE_HE: CSI from HE-LTF (IEEE 802.11ax)
+  * @QCA_WLAN_VENDOR_CFR_LTF_TYPE_EHT: CSI from EHT-LTF (IEEE 802.11be)
++ * @QCA_WLAN_VENDOR_CFR_LTF_TYPE_LEGACY: CSI from Legacy (IEEE 802.11a/g)
+  */
+ enum qca_wlan_vendor_cfr_ltf_type {
+ 	QCA_WLAN_VENDOR_CFR_LTF_TYPE_HT = 0,
+ 	QCA_WLAN_VENDOR_CFR_LTF_TYPE_VHT = 1,
+ 	QCA_WLAN_VENDOR_CFR_LTF_TYPE_HE = 2,
+ 	QCA_WLAN_VENDOR_CFR_LTF_TYPE_EHT = 3,
++	QCA_WLAN_VENDOR_CFR_LTF_TYPE_LEGACY = 4,
+ };
+ 
+ /**
+@@ -12918,11 +13257,10 @@
+  *
+  * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW: Optional (u32)
+  * Indicates frames with a specific bandwidth will be filtered for CFR capture.
+- * This is for CFR version 2 only. This is a bitmask. Bits 4:0 request CFR
+- * capture to be done for frames matching the bandwidths specified within this
+- * bitmask. Bits 31:5 are reserved for future use. Bits 4:0 map to bandwidth
+- * numerated in enum nl80211_band (although not all bands may be supported
+- * by a given device).
++ * This is for CFR version 2 only. This is a bitmask where each bit N
++ * corresponds to BIT(N), with N being a value from enum nl80211_chan_width.
++ * Setting a bit requests CFR capture for frames matching that bandwidth
++ * (although not all bandwidths may be supported by a given device).
+  *
+  * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_MGMT_FILTER: Optional (u32)
+  * Management frames matching the subtype filter categories will be filtered in
+@@ -13066,6 +13404,32 @@
+  * and provides the corresponding reason code. The reason codes are defined
+  * in enum qca_wlan_vendor_cfr_stop_reason.
+  * Applicable for peer CFR events when CFR data format version is 3.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC: Optional (flag)
++ * This attribute indicates that the Wi-Fi firmware should fix RX antenna gain
++ * during CSI capturing. This is for CFR version 2 and version 3.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_ONLY_LAST_FRAME: Optional (flag)
++ * Report only the last captured frame per MAC address in each reporting
++ * interval configured by %QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL,
++ * i.e., one report per interval per MAC address. When this flag is not
++ * included, all captured frames in the reporting interval are reported.
++ * Applicable only for CFR version 3.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN: Optional (u32)
++ * Total length (in bytes) of the full CFR data being delivered across
++ * multiple fragmented vendor events. Present in every fragment when
++ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA is bifurcated.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET: Optional (u32)
++ * Byte offset of the QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA payload
++ * within the full CFR data buffer. Present in every fragment when
++ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA is bifurcated.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG: Optional (flag)
++ * When present, indicates that this vendor event carries the final fragment
++ * of a bifurcated QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA payload.
++ *
+  */
+ enum qca_wlan_vendor_peer_cfr_capture_attr {
+ 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_INVALID = 0,
+@@ -13117,6 +13481,11 @@
+ 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE = 46,
+ 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS = 47,
+ 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_STOP_REASON = 48,
++	QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC = 49,
++	QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_ONLY_LAST_FRAME = 50,
++	QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_TOTAL_LEN = 51,
++	QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_OFFSET = 52,
++	QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA_IS_LAST_FRAG = 53,
+ 
+ 	/* Keep last */
+ 	QCA_WLAN_VENDOR_ATTR_PEER_CFR_AFTER_LAST,
+@@ -13956,31 +14325,80 @@
+  * coexistence mechanisms are enforced to manage interference between Bluetooth
+  * and WLAN.
+  *
++ * @QCA_BTC_POLICY_NO_COEX: "No Coex" mode. No active coexistence conflict
++ * between WLAN and Bluetooth (e.g., when operating in different bands).
++ *
+  * @QCA_BTC_POLICY_INVALID: Invalid policy value. Used for error handling or
+  * uninitialized state.
+  */
+ enum qca_btc_policy {
+ 	QCA_BTC_POLICY_FREE_FRUN = 0,
+ 	QCA_BTC_POLICY_OCS = 1,
++	QCA_BTC_POLICY_NO_COEX = 2,
+ 	QCA_BTC_POLICY_INVALID = 255
+ };
+ 
+ /**
++ * enum qca_coex_policy_type: Specifies coexistence policy for non-BT
++ * technologies like MWS and UWB.
++ *
++ * @QCA_COEX_POLICY_NO_COEX: No active coexistence conflict between WLAN and
++ * other technologies (e.g., when operating in different bands).
++ *
++ * @QCA_COEX_POLICY_COEX: Coexistence mechanisms are enforced to manage
++ * interference between WLAN and other technologies (e.g., UWB, MWS).
++ *
++ * @QCA_COEX_POLICY_INVALID: Invalid policy value. Used for error handling.
++ */
++enum qca_coex_policy_type {
++	QCA_COEX_POLICY_NO_COEX = 0,
++	QCA_COEX_POLICY_COEX = 1,
++	QCA_COEX_POLICY_INVALID = 255
++};
++
++/**
+  * enum qca_wlan_vendor_attr_coex_stats - Coexistence statistics attributes
+  * @QCA_WLAN_VENDOR_ATTR_COEX_STATS_ARRAY_INDEX: Nested attribute containing
+  * the following attributes:
+  *      %QCA_WLAN_VENDOR_ATTR_COEX_PDEV_ID
+  *      %QCA_WLAN_VENDOR_ATTR_COEX_BTC_POLICY
+  *      %QCA_VENDOR_ATTR_BTC_CHAIN_MODE
++ *      %QCA_WLAN_VENDOR_ATTR_COEX_MWS_POLICY
++ *      %QCA_WLAN_VENDOR_ATTR_COEX_UWB_POLICY
++ *      %QCA_WLAN_VENDOR_ATTR_COEX_MONITORING_PERIOD
++ *      %QCA_WLAN_VENDOR_ATTR_COEX_OCS_ACTIVE_PERCENT
++ *      %QCA_WLAN_VENDOR_ATTR_COEX_OCS_NON_WLAN_PERCENT
+  * @QCA_WLAN_VENDOR_ATTR_COEX_PDEV_ID: 8-bit unsigned value to indicate PDEV ID.
+  * @QCA_WLAN_VENDOR_ATTR_COEX_BTC_POLICY: 8-bit unsigned value to current BTC
+  * policy. The policies are defined in enum qca_btc_policy.
++ * @QCA_WLAN_VENDOR_ATTR_COEX_MWS_POLICY: 8-bit unsigned value to current MWS
++ * (Modem Wireless System) policy. MWS refers to modem coexistence where modem
++ * and WLAN may share frequency bands. The policies are defined in
++ * enum qca_coex_policy_type.
++ * @QCA_WLAN_VENDOR_ATTR_COEX_UWB_POLICY: 8-bit unsigned value to current UWB
++ * (Ultra-Wideband) policy. UWB is a ranging technology that may conflict with
++ * WLAN if operating in the same band. The policies are defined in
++ * enum qca_coex_policy_type.
++ * @QCA_WLAN_VENDOR_ATTR_COEX_MONITORING_PERIOD: A 32-bit unsigned value
++ * specifying the monitoring interval in milliseconds. This defines the time
++ * window over which statistics are collected.
++ * @QCA_WLAN_VENDOR_ATTR_COEX_OCS_ACTIVE_PERCENT: 8-bit unsigned value to
++ * indicate the percentage of OCS (Off Channel Scheduling) policy active period
++ * in %QCA_WLAN_VENDOR_ATTR_COEX_MONITORING_PERIOD.
++ * @QCA_WLAN_VENDOR_ATTR_COEX_OCS_NON_WLAN_PERCENT: 8-bit unsigned value to
++ * indicate the percentage OCS policy active period given to non-WLAN
++ * technology.
+  */
+ enum qca_wlan_vendor_attr_coex_stats {
+ 	QCA_WLAN_VENDOR_ATTR_COEX_STATS_INVALID = 0,
+ 	QCA_WLAN_VENDOR_ATTR_COEX_STATS_ARRAY_INDEX = 1,
+ 	QCA_WLAN_VENDOR_ATTR_COEX_PDEV_ID = 2,
+ 	QCA_WLAN_VENDOR_ATTR_COEX_BTC_POLICY = 3,
++	QCA_WLAN_VENDOR_ATTR_COEX_MWS_POLICY = 4,
++	QCA_WLAN_VENDOR_ATTR_COEX_UWB_POLICY = 5,
++	QCA_WLAN_VENDOR_ATTR_COEX_MONITORING_PERIOD = 6,
++	QCA_WLAN_VENDOR_ATTR_COEX_OCS_ACTIVE_PERCENT = 7,
++	QCA_WLAN_VENDOR_ATTR_COEX_OCS_NON_WLAN_PERCENT = 8,
+ 
+ 	/* keep last */
+ 	QCA_WLAN_VENDOR_ATTR_COEX_STATS_AFTER_LAST,
+@@ -14344,6 +14762,44 @@
+  * attributes representing the beacon miss data for the affiliated AP(s) in STA
+  * mode. This uses attributes defined in
+  * enum qca_wlan_vendor_attr_beacon_miss_stat.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS: Array of nested attributes and
++ * applicable only in STA mode. Contains per-link statistics for ML connection.
++ * Each link is identified by %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID: u8 attribute and applicable
++ * only in STA mode. MLO link ID for which the statistics are being reported.
++ * Used only for ML connections. This is mandatory attribute inside
++ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS and represents the MLO link ID
++ * of the nested attribute set.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS: u8 attribute and applicable only
++ * in STA mode. This represents the current operating Tx NSS with the
++ * affiliated AP. For non-ML connection, this attribute will be reported
++ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
++ * this attribute will be reported inside
++ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS: u8 attribute and applicable only
++ * in STA mode. This represents the current operating Rx NSS with the
++ * affiliated AP. For non-ML connection, this attribute will be reported
++ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
++ * this attribute will be reported inside
++ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS: u8 attribute and applicable
++ * only in STA mode. This represents the current operating Tx chains with the
++ * affiliated AP. For non-ML connection, this attribute will be reported
++ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
++ * this attribute will be reported inside
++ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS: u8 attribute and applicable
++ * only in STA mode. This represents the current operating Rx chains with the
++ * affiliated AP. For non-ML connection, this attribute will be reported
++ * outside %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS. For ML connection,
++ * this attribute will be reported inside
++ * %QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS for each MLO link.
+  */
+ enum qca_wlan_vendor_attr_get_sta_info {
+ 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_INVALID = 0,
+@@ -14406,6 +14862,12 @@
+ 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BW_PKT_COUNT = 57,
+ 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_CCA_STAT = 58,
+ 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BEACON_MISS_STAT = 59,
++	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS = 60,
++	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID = 61,
++	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS = 62,
++	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS = 63,
++	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS = 64,
++	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS = 65,
+ 
+ 	/* keep last */
+ 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_AFTER_LAST,
+@@ -18930,6 +19392,50 @@
+ };
+ 
+ /**
++ * enum qca_wlan_vendor_attr_gvp_info - Represent attributes to configure the
++ * device (all modes) with Geofenced Variable Power (GVP) power limits.
++ * These attributes are used inside vendor subcommand
++ * %QCA_NL80211_VENDOR_SUBCMD_GVP_OPERATION.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GVP_EZ_ENTER: u8 attribute. This indicates whether the
++ * device entered Exclusion Zone or exited. This is an optional attribute and
++ * used in command path.
++ * 0 - Exit, 1 - Enter
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_START: u32 attribute. This indicates the
++ * start frequency of channel range in MHz that needs to be avoided within a
++ * particular area (Exclusion Zone). This attribute is required if EZ enter is
++ * set to 1 and is used in command path.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_END: u32 attribute. This indicates the
++ * end frequency of channel range in MHz that needs to be avoided within a
++ * particular area (Exclusion Zone). This attribute is required if EZ enter is
++ * set to 1 and is used in command path.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GVP_POWER_LIMIT: u8 attribute. This indicates the
++ * absolute EIRP TX power limit that the device should operate on in a given
++ * area. This is an optional attribute and used in command path.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_GVP_OPER_START: u8 attribute. This indicates whether to
++ * start or stop GVP operation based on device state such as device up or down.
++ * This is an optional attribute and used in event path.
++ * 0 - GVP operation stop, 1 - GVP operation start
++ */
++enum qca_wlan_vendor_attr_gvp_info {
++	QCA_WLAN_VENDOR_ATTR_GVP_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_GVP_EZ_ENTER = 1,
++	QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_START = 2,
++	QCA_WLAN_VENDOR_ATTR_GVP_AVOID_FREQ_END = 3,
++	QCA_WLAN_VENDOR_ATTR_GVP_POWER_LIMIT = 4,
++	QCA_WLAN_VENDOR_ATTR_GVP_OPER_START = 5,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_GVP_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_GVP_MAX =
++	QCA_WLAN_VENDOR_ATTR_GVP_AFTER_LAST - 1,
++};
++
++/**
+  * enum qca_wlan_vendor_attr_fw_page_fault_report - Used by the vendor
+  * command %QCA_NL80211_VENDOR_SUBCMD_FW_PAGE_FAULT_REPORT.
+  *
+@@ -19893,6 +20399,11 @@
+  *	%QCA_WLAN_VENDOR_ATTR_USD_OP_TYPE and
+  *	%QCA_WLAN_VENDOR_ATTR_USD_INSTANCE_ID.
+  *	enum qca_wlan_vendor_attr_usd_status indicates status values.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID: 6-byte MAC address that has to be
++ *	used in publish/subscribe multicast frames. It is an optional attribute
++ *	used with the types %QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH and
++ *	%QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE.
+  */
+ enum qca_wlan_vendor_attr_usd {
+ 	QCA_WLAN_VENDOR_ATTR_USD_INVALID = 0,
+@@ -19906,6 +20417,7 @@
+ 	QCA_WLAN_VENDOR_ATTR_USD_ELEMENT_CONTAINER = 8,
+ 	QCA_WLAN_VENDOR_ATTR_USD_TTL = 9,
+ 	QCA_WLAN_VENDOR_ATTR_USD_STATUS = 10,
++	QCA_WLAN_VENDOR_ATTR_USD_NETWORK_ID = 11,
+ 
+ 	QCA_WLAN_VENDOR_ATTR_USD_AFTER_LAST,
+ 	QCA_WLAN_VENDOR_ATTR_USD_MAX =
+@@ -20009,10 +20521,33 @@
+  * is available only when the driver indicates support for
+  * @QCA_WLAN_VENDOR_FEATURE_RSN_OVERRIDE_STA.
+  *
++ * @QCA_CONNECT_EXT_FEATURE_EXT_AUTH_EPPKE: Flag attribute. This indicates
++ * supplicant support for external authentication with EPPKE authentication
++ * algorithm. The driver can offload EPPKE authentication to supplicant via
++ * QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH only if this flag is enabled.
++ *
++ * @QCA_CONNECT_EXT_FEATURE_EXT_AUTH_8021X: Flag attribute. This indicates
++ * supplicant support for external authentication with IEEE 802.1X
++ * Authentication algorithm (EAP over Authentication frames) as specified
++ * in IEEE P802.11bi/D4.0, 12.16.5. The driver can offload authentication to
++ * supplicant via QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH only if this flag is
++ * enabled.
++ *
++ * @QCA_CONNECT_EXT_FEATURE_OKC_PMKID_IN_ASSOC: Indicates that the supplicant
++ * supports handling driver-generated OKC-derived PMKIDs in (Re)Association
++ * Request frames. When set, the supplicant can detect an OKC-derived PMKID
++ * inserted by the driver and update the current PMKSA to the corresponding OKC
++ * PMKSA. This flag shall be set only if the driver advertises
++ * %QCA_WLAN_VENDOR_FEATURE_OKC_PMKID_IN_ASSOC and OKC is enabled in the
++ * supplicant configuration.
++ *
+  * @NUM_QCA_WLAN_VENDOR_FEATURES: Number of assigned feature bits.
+  */
+ enum qca_wlan_connect_ext_features {
+ 	QCA_CONNECT_EXT_FEATURE_RSNO	= 0,
++	QCA_CONNECT_EXT_FEATURE_EXT_AUTH_EPPKE = 1,
++	QCA_CONNECT_EXT_FEATURE_EXT_AUTH_8021X = 2,
++	QCA_CONNECT_EXT_FEATURE_OKC_PMKID_IN_ASSOC = 3,
+ 	NUM_QCA_CONNECT_EXT_FEATURES /* keep last */
+ };
+ 
+@@ -22788,6 +23323,45 @@
+  * - If neither %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ALLOW_NSS_GT_2 nor
+  *   %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2 is configured, the
+  *   driver follows its default NSS negotiation logic.
++ *
++ * @QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE:
++ * Enable UL TX Beamformer capability only if the AP's Beacon and Probe
++ * Response frames include information that matches at least one entry from
++ * the configuration data list specified in
++ * %QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST irrespective of AP's
++ * beamforming capabilities.
++ * If no match is found, the driver must disable the UL TX Beamformer
++ * capability.
++ *
++ * Interaction with other actions:
++ * - If a new configuration with
++ *   %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE
++ *   is specified, any existing configuration with
++ *   %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_DISABLE will be
++ *   cleared.
++ * - If neither %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE
++ *   nor %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_DISABLE is
++ *   configured, the driver uses UL TX Beamformer capability based on default
++ *   configuration and device support.
++ *
++ * @QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_DISABLE:
++ * Disable UL TX Beamformer capability if the AP's Beacon and Probe Response
++ * frames include information that matches at least one entry from the
++ * configuration data list specified in
++ * %QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST irrespective of AP's
++ * beamforming capabilities.
++ * If no match is found, the driver may enable UL TX Beamformer capability.
++ *
++ * Interaction with other actions:
++ * - If a new configuration with
++ *   %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_DISABLE
++ *   is specified, any existing configuration with
++ *   %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE will be
++ *   cleared.
++ * - If neither %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE
++ *   nor %QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_DISABLE is
++ *   configured, the driver uses UL TX Beamformer capability based on default
++ *   configuration and device support.
+  */
+ 
+ enum qca_wlan_vendor_feature_config_action {
+@@ -22796,6 +23370,8 @@
+ 	QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI = 2,
+ 	QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ALLOW_NSS_GT_2 = 3,
+ 	QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISALLOW_NSS_GT_2 = 4,
++	QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_ENABLE = 5,
++	QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_UL_TX_BEAMFORMER_DISABLE = 6,
+ };
+ 
+ /**
+@@ -23304,4 +23880,901 @@
+ 	QCA_WLAN_VENDOR_ATTR_QSH_STATS_AFTER_LAST - 1
+ };
+ 
++/**
++ * enum qca_wlan_host_txrx_stats_attr - Defines attributes to be used
++ * with vendor subcmd QCA_NL80211_VENDOR_SUBCMD_WLAN_HOST_TXRX_STATS.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_TX_PKTS: 32-bit unsigned value
++ *	for total TX packets successfully transmitted to the firmware.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_TX_DROPPED: 32-bit unsigned
++ *	value for total TX packets dropped by the WLAN host driver (e.g., due
++ *	to queue exhaustion).
++ *
++ * @QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_RX_PKTS: 32-bit unsigned value
++ *	for total RX packets successfully delivered to the network stack.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_RX_DROPPED: 32-bit unsigned
++ *	value for total RX packets dropped by the WLAN host driver.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_IPA_EXCEPTION_RX_DROPPED:
++ *	64-bit unsigned value for IPA exception RX drops. Counts packets
++ *	routed from IPA to WLAN driver that were dropped.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_PAD: Attribute used for padding
++ *	for 64-bit alignment.
++ */
++
++enum qca_wlan_host_txrx_stats_attr {
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_TX_PKTS = 1,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_TX_DROPPED = 2,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_RX_PKTS = 3,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_RX_DROPPED = 4,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_IPA_EXCEPTION_RX_DROPPED = 5,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_PAD = 6,
++
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_LAST,
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_MAX =
++	QCA_WLAN_VENDOR_ATTR_HOST_TXRX_STATS_PARAM_LAST - 1
++};
++
++/**
++ * enum qca_wlan_vendor_attr_config_esp_param - Parameters for ESP configuration
++ *
++ * Attributes used to configure (set command) or report (get command)
++ * Estimated Service Parameters (ESP). ESP describes predicted service
++ * characteristics such as airtime availability, PPDU duration, and Block Ack
++ * window size per access category and it is advertised in the Estimated Service
++ * Parameters Inbound element (see IEEE Std 802.11-2024, 9.4.2.172).
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_ENABLE: u8. Enable (1) or disable (0)
++ * the advertisement of the Estimated Service Parameters Inbound element
++ * in Beacon and Probe Response frames.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_BE: u8. Predicted percentage of
++ * airtime available for AC_BE. This is the exact 8-bit value used in the ESP
++ * Information field as defined in IEEE Std 802.11-2024, 9.4.2.172. The
++ * value is linearly scaled: 0 represents 0% airtime, 255 represents 100%
++ * airtime.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_BE: u8. BE Access Category "target"
++ * duration for PPDUs that carry Data MPDUs, i.e., how long the AP expects a
++ * typical data transmission PPDU to last for the BE AC. Encoded in unts of 50
++ * microseconds (actual_duration_us = value × 50) as defined in IEEE Std
++ * 802.11-2024, 9.4.2.172.
++ * Range: 0..255 units (0..12.75 ms). Example: value 16 -> 800 microseconds.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_BE: u8. BA Window Size subfield
++ * for AC_BE as defined in IEEE Std 802.11-2024, Table 9-334 (BA Window Size
++ * subfield encoding).
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_BK: u8. Airtime for AC_BK.
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_BK: u8. PPDU duration for AC_BK.
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_BK: u8. BA window for AC_BK.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_VI: u8. Airtime for AC_VI.
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_VI: u8. PPDU duration for AC_VI.
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_VI: u8. BA window for AC_VI.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_VO: u8. Airtime for AC_VO.
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_VO: u8. PPDU duration for AC_VO.
++ * @QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_VO: u8. BA window for AC_VO.
++ */
++enum qca_wlan_vendor_attr_config_esp_param {
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_ENABLE = 1,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_BE = 2,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_BE = 3,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_BE = 4,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_BK = 5,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_BK = 6,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_BK = 7,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_VI = 8,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_VI = 9,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_VI = 10,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AIRTIME_VO = 11,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_PPDU_DUR_VO = 12,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_BA_WINDOW_VO = 13,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_MAX =
++	QCA_WLAN_VENDOR_ATTR_CONFIG_ESP_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_ipa_ring_stats_attr - Defines attributes to be used
++ * with vendor subcmd QCA_NL80211_VENDOR_SUBCMD_IPA_RING_STATS.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_RING_ID: 32-bit unsigned value
++ * for the ring identifier (ring_id). Distinguishes between different
++ * rings (e.g., REO, TCL).
++ * In the request, this specifies which ring to query.
++ * In the response, this identifies the ring the statistics belong to.
++ * Values are defined in enum qca_ipa_ring_stats_id.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_HP_IDX: 32-bit unsigned value
++ * for the head pointer index (entry index) of the ring.
++ * (Response only)
++ *
++ * @QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_TP_IDX: 32-bit unsigned value
++ * for the tail pointer index (entry index) of the ring.
++ * (Response only)
++ *
++ * @QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_FREE_ENTRIES: 32-bit unsigned
++ * value for the number of free entries available in the ring.
++ * (Response only)
++ *
++ * @QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_RING_ENTRIES: 32-bit unsigned
++ * value for the total number of entries in the ring (capacity).
++ * (Response only)
++ */
++enum qca_wlan_ipa_ring_stats_attr {
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_RING_ID = 1,
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_HP_IDX = 2,
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_TP_IDX = 3,
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_FREE_ENTRIES = 4,
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_RING_ENTRIES = 5,
++
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_LAST,
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_MAX =
++	QCA_WLAN_VENDOR_ATTR_IPA_RING_STATS_PARAM_LAST - 1,
++};
++
++/**
++ * enum qca_ipa_ring_stats_id - IPA statistics ring type
++ *
++ * @QCA_WLAN_VENDOR_IPA_RING_STATS_ID_REO: Ring ID for REO (Rx) ring.
++ * @QCA_WLAN_VENDOR_IPA_RING_STATS_ID_TCL: Ring ID for TCL (Tx) ring.
++ *
++ * These values are used to distinguish which IPA path statistics
++ * are being queried or reported.
++ */
++enum qca_ipa_ring_stats_id {
++	QCA_WLAN_VENDOR_IPA_RING_STATS_ID_REO = 0,
++	QCA_WLAN_VENDOR_IPA_RING_STATS_ID_TCL = 1,
++
++	QCA_WLAN_VENDOR_IPA_RING_STATS_ID_MAX,
++};
++
++/**
++ * enum qca_wlan_vendor_external_auth_action - Action to perform with
++ *	external authentication request. Used by
++ *	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION.
++ *
++ * @QCA_WLAN_VENDOR_EXTERNAL_AUTH_START: Start the authentication.
++ * @QCA_WLAN_VENDOR_EXTERNAL_AUTH_ABORT: Abort the ongoing authentication.
++ *
++ */
++enum qca_wlan_vendor_external_auth_action {
++	QCA_WLAN_VENDOR_EXTERNAL_AUTH_START = 0,
++	QCA_WLAN_VENDOR_EXTERNAL_AUTH_ABORT = 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_external_auth - This enum is used by
++ * %QCA_NL80211_VENDOR_SUBCMD_EXTERNAL_AUTH.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID: Mandatory binary attribute,
++ *	1..32 octets. This indicates the SSID of the AP and is used by both the
++ *	authentication request event and authentication response commands.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID: Mandatory 6-byte MAC address
++ *	attribute. It specifies the BSSID of the AP with which the
++ *	authentication has to happen. Used by both the authentication request
++ *	event and authentication response command.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR: Optional 6-byte attribute
++ *	for the authentication request event interface. This specifies the MLD
++ *	MAC address of the AP MLD. The driver indicates this to enable MLO
++ *	during the authentication offload to supplicant. The driver shall look
++ *	at %NL80211_ATTR_MLO_SUPPORT flag capability in NL80211_CMD_CONNECT to
++ *	know whether the supplicant supports enabling MLO during the
++ *	authentication offload. Supplicant should use the address of the
++ *	interface (on which the authentication request event is reported) as
++ *	own MLD MAC address.
++ *
++ *	User space should enable MLO during the authentication only when it
++ *	receives the AP MLD MAC address in authentication offload request. User
++ *	space shouldn't enable MLO when the authentication offload request
++ *	doesn't indicate the AP MLD MAC address even if the AP is MLO capable.
++ *	The supplicant and driver should use MLD MAC addresses in the RA, TA,
++ *	and BSSID fields of Authentication frames sent or received via nl80211.
++ *	The driver translates the MLD MAC addresses to/from link addresses based
++ *	on the link chosen for the authentication.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION: Mandatory u32 attribute for
++ *	authentication request event. This indicates the operation to be
++ *	performed with external authentication request event. Possible values
++ *	for this attribute are defined in
++ *	enum qca_wlan_vendor_external_auth_action.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO: Mandatory u32 attribute for
++ *	authentication request event. This indicates the authentication
++ *	algorithm to be used. Possible values are defined in
++ *	enum nl80211_auth_type.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AKM: Mandatory u32 attribute for the
++ *	authentication request event. This specifies AKM suite selector for the
++ *	respective authentication, selected by the driver. Possible values are
++ *	defined in IEEE Std 802.11-2024, 9.4.2.23.3 (AKM suites) (e.g.,
++ *	0x000FAC04).
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PAIRWISE_CIPHER: Optional u32 attribute
++ *	for the authentication request event. This specifies the pairwise cipher
++ *	suite for the respective authentication, selected by the driver.
++ *	Possible values are defined in IEEE Std 802.11-2024, 9.4.2.23.2 (Cipher
++ *	suites) (e.g., 0x000FAC04).
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_CIPHER: Optional u32 attribute for
++ *	the authentication request event. This specifes the group cipher suite
++ *	of the respective authentication, selected by the driver. Possible
++ *	values are defined in IEEE Std 802.11-2024, 9.4.2.23.2 (Cipher suites)
++ *	(e.g., 0x000FAC04).
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_MGMT_CIPHER: Optional u32
++ *	attribute for the authentication request event. This specifies
++ *	the group management cipher suite of the respective authentication,
++ *	selected by the driver. Possible values are defined in
++ *	IEEE Std 802.11-2024, 9.4.2.23.2 (Cipher suites) (e.g., 0x000FAC04).
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_STATUS_CODE: Mandatory u16 attribute for
++ *	the authentication response command. The supplicant indicates the
++ *	status of the external authentication operation with this attribute to
++ *	the driver. Use %WLAN_STATUS_SUCCESS for successful authentication, use
++ *	%WLAN_STATUS_UNSPECIFIED_FAILURE if the supplicant cannot give the real
++ *	status code for failures.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PMKID: Optional byte array attribute with
++ *	a size of 16 bytes for the authentication response command. The
++ *	supplicant indicates the PMKID generated during the external
++ *	authentication operation with this attribute to the driver, which needs
++ *	to be included in the RSNE of (Re)Association Request frame by the
++ *	driver.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB: Optional u16 attribute
++ *	for the authentication request event interface. This specifies the
++ *	RSN Capabilities field (IEEE Std 802.11-2024, 9.4.2.23.4) that is to
++ *	be included in the RSNE of the Authentication frames.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA: Optional binary attribute
++ *	for the authentication request event interface. This specifies the
++ *	entire element data to be included in the RSNXE of the Authentication
++ *	frames.
++ * @QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PTK_KCK: Optional binary attribute for
++ *	the authentication response command interface. This attribute is
++ *	present	only when the NL80211_AUTHTYPE_IEEE8021X authentication
++ *	algorithm is used with (re)association frame encryption.
++ *
++ *	In SME-in-driver mode, the (re)association exchange is entirely handled
++ *	by the driver. The standard requires that the (Re)Association Request
++ *	frame includes a Message Integrity Code (MIC) calculated using the Key
++ *	Confirmation Key (KCK). This attribute is used to pass the KCK from the
++ *	supplicant to the driver. With the KCK provided, the driver can
++ *	calculate the MIC and append it to the (Re)Association Request frame as
++ *	mandated by IEEE P802.11bi/D4.0, 12.16.6.2/12.16.6.3.
++ */
++enum qca_wlan_vendor_attr_external_auth {
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_SSID = 1,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_BSSID = 2,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AP_MLD_ADDR = 3,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ACTION = 4,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_ALGO = 5,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AKM = 6,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PAIRWISE_CIPHER = 7,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_CIPHER = 8,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_GROUP_MGMT_CIPHER = 9,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_STATUS_CODE = 10,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PMKID = 11,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSN_CAPAB = 12,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_RSNXE_DATA = 13,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_PTK_KCK = 14,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_MAX =
++	QCA_WLAN_VENDOR_ATTR_EXTERNAL_AUTH_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_n79_coex_op - Operation type for
++ * %QCA_NL80211_VENDOR_SUBCMD_N79_COEX vendor command.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_SET: Set the N79 coexistence state.
++ * @QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_GET: Get the current N79 coexistence state.
++ */
++enum qca_wlan_vendor_attr_n79_coex_op {
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_SET = 0,
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_GET = 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_n79_coex - Attributes for
++ * %QCA_NL80211_VENDOR_SUBCMD_N79_COEX vendor command.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_TYPE: u8 attribute.
++ *	Specifies the operation type. See enum qca_wlan_vendor_attr_n79_coex_op.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_N79_COEX_STATE: u8 attribute.
++ *	Indicates N79 operational state.
++ *	0: N79 inactive.
++ *	1: N79 active.
++ *	Mandatory in SET operation; returned in GET response.
++ */
++enum qca_wlan_vendor_attr_n79_coex {
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_OP_TYPE = 1,
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_STATE = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_MAX =
++	QCA_WLAN_VENDOR_ATTR_N79_COEX_CONFIG_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_tdls_config - Values used to enable or disable TDLS event and
++ * statistics reporting. Used by %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_CONFIG,
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG,
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_EVENTS, and
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_STATS attributes.
++ *
++ * @QCA_WLAN_TDLS_CONFIG_STOP: Stop sending TDLS events or statistics to
++ * userspace.
++ * @QCA_WLAN_TDLS_CONFIG_SEND: Send TDLS events or statistics to userspace.
++ */
++enum qca_wlan_tdls_config {
++	QCA_WLAN_TDLS_CONFIG_STOP = 0,
++	QCA_WLAN_TDLS_CONFIG_SEND = 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tdls_event - Attributes used by
++ * %QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT vendor command.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_CONFIG: u8 attribute. Used to configure
++ * from userspace to enable/disable sending TDLS events.
++ * Uses values defined in enum qca_wlan_tdls_config.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRIES: Nested attribute containing one
++ * or more TDLS event entries. Each entry is a nested attribute with
++ * attributes defined in enum qca_wlan_vendor_attr_tdls_event_entry,
++ * representing a specific TDLS event.
++ */
++enum qca_wlan_vendor_attr_tdls_event {
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_CONFIG = 1,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRIES = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_MAX =
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tdls_event_entry - Attributes used inside nested
++ * attribute %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRIES to provide TDLS event
++ * information.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_LOCAL_MAC_ADDR: 6-byte MAC address.
++ * The device MAC address of the local STA. Mandatory attribute. The MLD MAC
++ * address is used if the local STA is an MLO device.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_PEER_MAC_ADDR: 6-byte MAC address.
++ * The MAC address of the TDLS peer STA. Mandatory attribute. The MLD MAC
++ * address is used if the peer STA is an MLO device.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE: u8 attribute.
++ * TDLS event type. Uses values defined in enum qca_wlan_tdls_event_type.
++ * Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE: u8 attribute.
++ * TDLS frame subtype. Uses values defined in enum qca_wlan_tdls_event_subtype.
++ * Included when %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE is set to
++ * QCA_WLAN_TDLS_EVENT_TYPE_DISCOVERY, QCA_WLAN_TDLS_EVENT_TYPE_SETUP, or
++ * QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE. Not included for
++ * QCA_WLAN_TDLS_EVENT_TYPE_TEARDOWN (TDLS Teardown frames do not have a
++ * request/response/confirm subtype) or QCA_WLAN_TDLS_EVENT_TYPE_INITIATE_TDLS
++ * events.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUCCESS: Flag attribute.
++ * Event is successful if this attribute is present. When this attribute is not
++ * present, %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_REASON_CODE provides the
++ * reason for failure.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE: u8 attribute.
++ * Specify role of the device. Uses values defined in
++ * enum qca_wlan_tdls_event_role. Included when the driver is reporting TX or
++ * RX of a TDLS frame, i.e., when
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE is set to
++ * QCA_WLAN_TDLS_EVENT_TYPE_DISCOVERY, QCA_WLAN_TDLS_EVENT_TYPE_SETUP,
++ * QCA_WLAN_TDLS_EVENT_TYPE_TEARDOWN, or
++ * QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE. Not included for
++ * QCA_WLAN_TDLS_EVENT_TYPE_INITIATE_TDLS events.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_OP_FREQ: u32 attribute.
++ * Station operating channel in frequency (MHz). Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_OFFCHAN_FREQ: u32 attribute.
++ * TDLS off-channel frequency in MHz. Present only when the TDLS link is
++ * operating on an off-channel. Optional attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_RSSI: s8 attribute.
++ * RSSI of the frame in dBm (-127 ~ 0). For TX frame event, this field
++ * indicates the RSSI of the last received packet from the peer prior to
++ * sending. For RX frame event, this field indicates the RSSI of the received
++ * frame. Mandatory attribute while reporting TX or RX of a frame.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_LINK_ID: u8 attribute.
++ * The MLO link ID of the TDLS link on which the event occurred.
++ * Used only for MLO connections. Required attribute if TDLS is used in an ML
++ * association.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TIMESTAMP: Mandatory u64 attribute.
++ * This attribute indicates the kernel boot timestamp at which the event
++ * was collected. Monotonic time value CLOCK_BOOTTIME in microseconds to be
++ * filled by the driver.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_REASON_CODE: u8 attribute.
++ * Reason code for the TDLS event. Uses values defined in
++ * enum qca_wlan_tdls_event_reason_code. For teardown events, the applicable
++ * values are QCA_WLAN_TDLS_EVENT_REASON_CODE_PEER_UNREACHABLE,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_TEARDOWN_UNSPECIFIED,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_INSUFFICIENT_TRAFFIC,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_NO_TRAFFIC,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_ROAMED,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_CONCURRENT_OP_SAME_BAND,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_CONCURRENT_OP_DIFF_BAND,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_BT_COEX,
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_BSS_CHANNEL_SWITCH, and
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_DEAUTHENTICATED_LEAVING.
++ * For channel switch events (QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE),
++ * the applicable values are
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_USER_INITIATED_CH_SWITCH and
++ * QCA_WLAN_TDLS_EVENT_REASON_CODE_PEER_INITIATED_CH_SWITCH.
++ * Not applicable for other event types.
++ */
++enum qca_wlan_vendor_attr_tdls_event_entry {
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_LOCAL_MAC_ADDR = 1,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_PEER_MAC_ADDR = 2,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE = 3,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE = 4,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUCCESS = 5,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE = 6,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_OP_FREQ = 7,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_OFFCHAN_FREQ = 8,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_RSSI = 9,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_LINK_ID = 10,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TIMESTAMP = 11,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_REASON_CODE = 12,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_MAX =
++	QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_tdls_event_type - Values for
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE attribute.
++ *
++ * @QCA_WLAN_TDLS_EVENT_TYPE_INITIATE_TDLS: A driver-internal event indicating
++ * that the driver has initiated a TDLS session. Generated before any TDLS
++ * frames are exchanged. %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE and
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE are not included for this
++ * event type.
++ * @QCA_WLAN_TDLS_EVENT_TYPE_DISCOVERY: Reports TX or RX of a TDLS Discovery
++ * Request or Response frame. %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE
++ * and %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE are included.
++ * @QCA_WLAN_TDLS_EVENT_TYPE_SETUP: Reports TX or RX of a TDLS Setup Request,
++ * Response, or Confirm frame. %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE
++ * and %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE are included.
++ * @QCA_WLAN_TDLS_EVENT_TYPE_TEARDOWN: Reports TX or RX of a TDLS Teardown
++ * frame. %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE is included to indicate
++ * whether this device sent or received the Teardown frame.
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE is not included.
++ * @QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE: Reports TX or RX of a TDLS
++ * Channel Switch Request or Response Action frame.
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE and
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE are included.
++ */
++enum qca_wlan_tdls_event_type {
++	QCA_WLAN_TDLS_EVENT_TYPE_INITIATE_TDLS = 0,
++	QCA_WLAN_TDLS_EVENT_TYPE_DISCOVERY = 1,
++	QCA_WLAN_TDLS_EVENT_TYPE_SETUP = 2,
++	QCA_WLAN_TDLS_EVENT_TYPE_TEARDOWN = 3,
++	QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE = 4,
++};
++
++/**
++ * enum qca_wlan_tdls_event_subtype - Values for
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_SUBTYPE attribute.
++ *
++ * @QCA_WLAN_TDLS_EVENT_SUBTYPE_REQUEST: Request frame. Used when
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE is set to
++ *	QCA_WLAN_TDLS_EVENT_TYPE_DISCOVERY, QCA_WLAN_TDLS_EVENT_TYPE_SETUP, or
++ *	QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE.
++ * @QCA_WLAN_TDLS_EVENT_SUBTYPE_RESPONSE: Response frame. Used when
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE is set to
++ *	QCA_WLAN_TDLS_EVENT_TYPE_DISCOVERY, QCA_WLAN_TDLS_EVENT_TYPE_SETUP, or
++ *	QCA_WLAN_TDLS_EVENT_TYPE_CHANNEL_CHANGE.
++ * @QCA_WLAN_TDLS_EVENT_SUBTYPE_CONFIRM: Confirm frame. Used when
++ *	%QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_TYPE is set to
++ *	QCA_WLAN_TDLS_EVENT_TYPE_SETUP.
++ */
++enum qca_wlan_tdls_event_subtype {
++	QCA_WLAN_TDLS_EVENT_SUBTYPE_REQUEST = 0,
++	QCA_WLAN_TDLS_EVENT_SUBTYPE_RESPONSE = 1,
++	QCA_WLAN_TDLS_EVENT_SUBTYPE_CONFIRM = 2,
++};
++
++/**
++ * enum qca_wlan_tdls_event_role - Values for
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_ROLE attribute.
++ *
++ * @QCA_WLAN_TDLS_EVENT_ROLE_SENDER: This device is the sender of a frame.
++ * @QCA_WLAN_TDLS_EVENT_ROLE_RECEIVER: This device is the receiver of a frame.
++ */
++enum qca_wlan_tdls_event_role {
++	QCA_WLAN_TDLS_EVENT_ROLE_SENDER = 0,
++	QCA_WLAN_TDLS_EVENT_ROLE_RECEIVER = 1,
++};
++
++/**
++ * enum qca_wlan_tdls_event_reason_code - Values for
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_EVENT_ENTRY_REASON_CODE attribute.
++ *
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_PEER_UNREACHABLE: TDLS peer became
++ * unreachable.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_TEARDOWN_UNSPECIFIED: Teardown due to
++ * an unspecified reason.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_INSUFFICIENT_TRAFFIC: TDLS link torn
++ * down due to insufficient traffic.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_NO_TRAFFIC: TDLS link torn down due to
++ * no traffic.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_ROAMED: TDLS link torn down because the
++ * device roamed to a different AP.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_CONCURRENT_OP_SAME_BAND: TDLS link torn
++ * down due to a concurrent operation on the same band.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_CONCURRENT_OP_DIFF_BAND: TDLS link torn
++ * down due to a concurrent operation on a different band.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_BT_COEX: TDLS link torn down due to
++ * Bluetooth coexistence.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_BSS_CHANNEL_SWITCH: TDLS link torn down
++ * due to a BSS channel switch.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_DEAUTHENTICATED_LEAVING: TDLS link torn
++ * down because the device was deauthenticated or is leaving the BSS.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_USER_INITIATED_CH_SWITCH: TDLS channel
++ * switch is because of user initiation.
++ * @QCA_WLAN_TDLS_EVENT_REASON_CODE_PEER_INITIATED_CH_SWITCH: TDLS channel
++ * switch is because of peer initiation.
++ */
++enum qca_wlan_tdls_event_reason_code {
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_PEER_UNREACHABLE = 0,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_TEARDOWN_UNSPECIFIED = 1,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_INSUFFICIENT_TRAFFIC = 2,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_NO_TRAFFIC = 3,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_ROAMED = 4,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_CONCURRENT_OP_SAME_BAND = 5,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_CONCURRENT_OP_DIFF_BAND = 6,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_BT_COEX = 7,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_BSS_CHANNEL_SWITCH = 8,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_DEAUTHENTICATED_LEAVING = 9,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_USER_INITIATED_CH_SWITCH = 10,
++	QCA_WLAN_TDLS_EVENT_REASON_CODE_PEER_INITIATED_CH_SWITCH = 11,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tdls_stats - Attributes used by
++ * %QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS vendor command.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG: u8 attribute. Used to configure
++ * from userspace to enable/disable sending TDLS data statistics.
++ * Uses values defined in enum qca_wlan_tdls_config.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES: Nested attribute containing one
++ * or more TDLS statistics entries. Each entry is a nested attribute with
++ * attributes defined in enum qca_wlan_vendor_attr_tdls_stats_entry,
++ * representing the data statistics for a TDLS link.
++ */
++enum qca_wlan_vendor_attr_tdls_stats {
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_CONFIG = 1,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_MAX =
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tdls_stats_entry - Attributes used inside nested
++ * attribute %QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRIES to provide TDLS data
++ * statistics. When both %QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OP_FREQ and
++ * %QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OFFCHAN_FREQ are present in the
++ * same entry, the statistics cover both channels. Otherwise, the statistics
++ * cover only the channel indicated by whichever of those attributes is present.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LOCAL_MAC_ADDR: 6-byte MAC address.
++ * The MAC address of the local STA. Mandatory attribute. The MLD MAC address is
++ * used if the local STA is an MLO device.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_PEER_MAC_ADDR: 6-byte MAC address.
++ * The MAC address of the peer STA. Mandatory attribute. The MLD MAC address is
++ * used if the peer STA is an MLO device.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_DATA_RATE: u32 attribute.
++ * The PHY data rate of the latest transmitted Data frame on the TDLS link in
++ * units of 100 kbps. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_DATA_RATE: u32 attribute.
++ * The PHY data rate of the latest received Data frame on the TDLS link in units
++ * of 100 kbps. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_MPDUS: u32 attribute.
++ * Total TX MPDUs. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_FAILURES: u32 attribute.
++ * Number of TX MPDUs that are failed to send or ACK is not received from the
++ * TDLS peer. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_MPDUS: u32 attribute.
++ * Total RX MPDUs. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_MCS_PKT_COUNT: Array of nested
++ * attributes, used for the TDLS link. This represents the number of PPDUs
++ * transmitted/received with each MCS value.
++ * See enum qca_wlan_vendor_attr_mcs_pkt. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_FAILURES: u32 attribute.
++ * RX MPDUs for which FCS check fails but the RA and TA matches the TDLS
++ * link addresses. This may not give the exact total number of RX failures of
++ * a TDLS link as the MAC address fields themselves might get corrupted for some
++ * of the RX MPDUs. Mandatory attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LINK_ID: u8 attribute.
++ * The MLO link ID of the TDLS link on which the statistics are reported.
++ * Used only for MLO connections. Required attribute if TDLS is used in an ML
++ * association.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OP_FREQ: u32 attribute.
++ * The AP's operating channel frequency in MHz on which the statistics are
++ * collected. Optional attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OFFCHAN_FREQ: u32 attribute.
++ * TDLS off-channel frequency in MHz on which the statistics are collected.
++ * Present only when the TDLS link is operating on an off-channel.
++ * Optional attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TIMESTAMP: Mandatory u64 attribute.
++ * This attribute indicates the kernel boot timestamp at which the statistics
++ * were collected. Monotonic time value CLOCK_BOOTTIME in microseconds to be
++ * filled by the driver.
++ */
++enum qca_wlan_vendor_attr_tdls_stats_entry {
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LOCAL_MAC_ADDR = 1,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_PEER_MAC_ADDR = 2,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_DATA_RATE = 3,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_DATA_RATE = 4,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_MPDUS = 5,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TX_FAILURES = 6,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_MPDUS = 7,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_MCS_PKT_COUNT = 8,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_RX_FAILURES = 9,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_LINK_ID = 10,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OP_FREQ = 11,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_OFFCHAN_FREQ = 12,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_TIMESTAMP = 13,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_MAX =
++	QCA_WLAN_VENDOR_ATTR_TDLS_STATS_ENTRY_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tdls_reporting_config - Attributes used by
++ * %QCA_NL80211_VENDOR_SUBCMD_TDLS_REPORTING_CONFIG vendor command.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_EVENTS: u8 attribute. Configures
++ * the driver to send or stop sending TDLS events to userspace via
++ * %QCA_NL80211_VENDOR_SUBCMD_TDLS_EVENT. Uses values defined in
++ * enum qca_wlan_tdls_config. Optional attribute.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_STATS: u8 attribute. Configures
++ * the driver to send or stop sending TDLS statistics to userspace via
++ * %QCA_NL80211_VENDOR_SUBCMD_TDLS_STATS. Uses values defined in
++ * enum qca_wlan_tdls_config. Optional attribute.
++ */
++enum qca_wlan_vendor_attr_tdls_reporting_config {
++	QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_EVENTS = 1,
++	QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_STATS = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_MAX =
++	QCA_WLAN_VENDOR_ATTR_TDLS_REPORTING_CONFIG_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_tas_mode - TAS mode values used with
++ * %QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE.
++ *
++ * @QCA_WLAN_TAS_MODE_NONE: Apply default TAS power table.
++ * @QCA_WLAN_TAS_MODE_INCREASE: Baseline + X dB (e.g., when the device is
++ *	away from the body).
++ * @QCA_WLAN_TAS_MODE_DECREASE: Baseline - Y dB (e.g., when BT is
++ *	active, applying TAS backoff).
++ */
++enum qca_wlan_tas_mode {
++	QCA_WLAN_TAS_MODE_NONE = 0,
++	QCA_WLAN_TAS_MODE_INCREASE = 1,
++	QCA_WLAN_TAS_MODE_DECREASE = 2,
++};
++
++/**
++ * enum qca_wlan_tas_operation - TAS operation values used with
++ * %QCA_WLAN_VENDOR_ATTR_TAS_OPERATION.
++ *
++ * @QCA_WLAN_TAS_OPERATION_SET_MODE: Set the TAS mode. See
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE.
++ * @QCA_WLAN_TAS_OPERATION_GET_METRICS: Query per-band/per-antenna TX power
++ *	level classifications and the regulatory measurement time window from
++ *	the firmware. See %QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW and
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES.
++ * @QCA_WLAN_TAS_OPERATION_GET_PLIMIT: Query per-chain TX power limits for a
++ *	specified scenario from the firmware. See
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO and
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES.
++ */
++enum qca_wlan_tas_operation {
++	QCA_WLAN_TAS_OPERATION_SET_MODE = 0,
++	QCA_WLAN_TAS_OPERATION_GET_METRICS = 1,
++	QCA_WLAN_TAS_OPERATION_GET_PLIMIT = 2,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tas - Attributes for
++ * %QCA_NL80211_VENDOR_SUBCMD_TAS.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_OPERATION: u32 attribute. Selects the TAS
++ *	operation to perform. Mandatory in all requests. Values are defined
++ *	in enum qca_wlan_tas_operation.
++ *
++ * -- %QCA_WLAN_TAS_OPERATION_SET_MODE attributes --
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE: u32 attribute. TAS mode to
++ *	activate. Values are defined in enum qca_wlan_tas_mode.
++ *
++ * -- %QCA_WLAN_TAS_OPERATION_GET_METRICS attributes --
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW: u32 attribute. Regulatory
++ *	measurement time window in seconds. Present in
++ *	%QCA_WLAN_TAS_OPERATION_GET_METRICS responses.
++ * @QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES: Nested attribute. Array of per-band
++ *	entries in the response for %QCA_WLAN_TAS_OPERATION_GET_METRICS and
++ *	%QCA_WLAN_TAS_OPERATION_GET_PLIMIT. Each entry is a container defined
++ *	by enum qca_wlan_vendor_attr_tas_band, which holds
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_BAND_INDEX and
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST. Each element of
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST is defined by
++ *	enum qca_wlan_vendor_attr_tas_antenna and carries
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_INDEX and
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO. The
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO container is
++ *	defined by enum qca_wlan_vendor_attr_tas_tx_power_level_info.
++ *
++ * -- %QCA_WLAN_TAS_OPERATION_GET_PLIMIT attributes --
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO: u32 attribute. Mandatory input
++ *	scenario for which the per-chain TX power limits are requested. Values
++ *	are defined in enum qca_wlan_power_scenario. The response uses
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES (see above).
++ */
++enum qca_wlan_vendor_attr_tas {
++	QCA_WLAN_VENDOR_ATTR_TAS_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TAS_OPERATION = 1,
++	QCA_WLAN_VENDOR_ATTR_TAS_MODE_VALUE = 2,
++	QCA_WLAN_VENDOR_ATTR_TAS_METRICS_TIME_WINDOW = 3,
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES = 4,
++	QCA_WLAN_VENDOR_ATTR_TAS_PLIMIT_SCENARIO = 5,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TAS_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TAS_MAX =
++	QCA_WLAN_VENDOR_ATTR_TAS_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tas_band - Attributes used inside nested
++ * attribute %QCA_WLAN_VENDOR_ATTR_TAS_BAND_ENTRIES. Used in
++ * %QCA_WLAN_TAS_OPERATION_GET_METRICS and %QCA_WLAN_TAS_OPERATION_GET_PLIMIT
++ * responses.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_BAND_INDEX: u8 value to indicate the band for
++ *	this entry. Valid values are enumerated in enum %nl80211_band.
++ * @QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST: Nested attribute. Array of
++ *	per-antenna entries for this band. Attributes for each entry are
++ *	defined in enum qca_wlan_vendor_attr_tas_antenna.
++ */
++enum qca_wlan_vendor_attr_tas_band {
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_INDEX = 1,
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_MAX =
++	QCA_WLAN_VENDOR_ATTR_TAS_BAND_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tas_antenna - Attributes used inside nested
++ * attribute %QCA_WLAN_VENDOR_ATTR_TAS_BAND_ANTENNA_LIST. Used in
++ * %QCA_WLAN_TAS_OPERATION_GET_METRICS and %QCA_WLAN_TAS_OPERATION_GET_PLIMIT
++ * responses.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_INDEX: u32 attribute. Zero-based antenna
++ *	chain index. The maximum value depends on the firmware and hardware
++ *	configuration.
++ * @QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO: Nested attribute.
++ *	TX power level info container for this antenna chain. Attributes are
++ *	defined in enum qca_wlan_vendor_attr_tas_tx_power_level_info. In
++ *	%QCA_WLAN_TAS_OPERATION_GET_METRICS responses,
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LEVEL is populated. In
++ *	%QCA_WLAN_TAS_OPERATION_GET_PLIMIT responses,
++ *	%QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LIMIT_DBM is populated.
++ */
++enum qca_wlan_vendor_attr_tas_antenna {
++	QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_INDEX = 1,
++	QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_MAX =
++	QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_vendor_attr_tas_tx_power_level_info - Attributes used inside
++ * nested attribute %QCA_WLAN_VENDOR_ATTR_TAS_ANTENNA_TX_POWER_LEVEL_INFO for
++ * %QCA_WLAN_TAS_OPERATION_GET_METRICS and %QCA_WLAN_TAS_OPERATION_GET_PLIMIT
++ * responses.
++ *
++ * @QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LEVEL: u32 attribute.
++ *	TX power level classification for this antenna chain. Present in
++ *	%QCA_WLAN_TAS_OPERATION_GET_METRICS responses.
++ *	Values are defined in enum qca_wlan_tx_power_level.
++ * @QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LIMIT_DBM: u32 attribute.
++ *	TX power limit for this antenna chain in units of 0.25 dBm. Present in
++ *	%QCA_WLAN_TAS_OPERATION_GET_PLIMIT responses.
++ */
++enum qca_wlan_vendor_attr_tas_tx_power_level_info {
++	QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_INVALID = 0,
++	QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LEVEL = 1,
++	QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LIMIT_DBM = 2,
++
++	/* keep last */
++	QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_AFTER_LAST,
++	QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_MAX =
++	QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_AFTER_LAST - 1,
++};
++
++/**
++ * enum qca_wlan_tx_power_level - TX power classification relative to the
++ * TAS DECREASE/Default/INCREASE thresholds of the active TAS table. Used as
++ * the value of
++ * %QCA_WLAN_VENDOR_ATTR_TAS_TX_POWER_LEVEL_INFO_LEVEL.
++ *
++ * @QCA_WLAN_TX_POWER_LEVEL_UNSUPPORTED: Antenna chain not present or unused.
++ * @QCA_WLAN_TX_POWER_LEVEL_LOW: Avg. TX power <= DECREASE limit.
++ * @QCA_WLAN_TX_POWER_LEVEL_MEDIUM: DECREASE < Avg. TX power <= Default.
++ * @QCA_WLAN_TX_POWER_LEVEL_HIGH: Default < Avg. TX power <= INCREASE limit.
++ * @QCA_WLAN_TX_POWER_LEVEL_EXTRA_HIGH: Avg. TX power > INCREASE limit.
++ */
++enum qca_wlan_tx_power_level {
++	QCA_WLAN_TX_POWER_LEVEL_UNSUPPORTED = 0,
++	QCA_WLAN_TX_POWER_LEVEL_LOW = 1,
++	QCA_WLAN_TX_POWER_LEVEL_MEDIUM = 2,
++	QCA_WLAN_TX_POWER_LEVEL_HIGH = 3,
++	QCA_WLAN_TX_POWER_LEVEL_EXTRA_HIGH = 4,
++};
++
+ #endif /* QCA_VENDOR_H */
+diff --git a/qcwcn/wifi_hal/radio_mode.cpp b/qcwcn/wifi_hal/radio_mode.cpp
+index d0476fd..d5e74b3 100644
+--- a/qcwcn/wifi_hal/radio_mode.cpp
++++ b/qcwcn/wifi_hal/radio_mode.cpp
+@@ -51,6 +51,10 @@
+ 
+ wifi_error initializeRadioHandler(hal_info *info)
+ {
++    if (!info) {
++        ALOGE("%s: hal_info is NULL", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+     info->radio_handlers = (radio_event_handlers *)malloc(
+             sizeof(radio_event_handlers));
+     if (info->radio_handlers) {
+@@ -121,6 +125,10 @@
+         ALOGE("hal_info is invalid");
+         return NULL;
+     }
++    if (!info->radio_handlers) {
++        ALOGE("radio_handlers is NULL");
++        return NULL;
++    }
+     RADIOModeCommand* instance = info->radio_handlers->mRADIOModeCommandInstance;
+     if (instance) {
+         if (handle != getWifiHandle(instance->mInfo)) {
+@@ -296,9 +304,13 @@
+ {
+     wifi_error ret;
+     WifiVendorCommand *vCommand = NULL;
+-    wifi_handle wifiHandle = getWifiHandle(iface);
+     RADIOModeCommand *radiomodeCommand;
+ 
++    if (!iface) {
++        ALOGE("%s: iface handle is NULL", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
++    wifi_handle wifiHandle = getWifiHandle(iface);
+     ret = initialize_vendor_cmd(iface, id,
+                                 QCA_NL80211_VENDOR_SUBCMD_WLAN_MAC_INFO,
+                                 &vCommand);
+diff --git a/qcwcn/wifi_hal/roam.cpp b/qcwcn/wifi_hal/roam.cpp
+index 2605573..d44f22d 100644
+--- a/qcwcn/wifi_hal/roam.cpp
++++ b/qcwcn/wifi_hal/roam.cpp
+@@ -359,6 +359,10 @@
+     interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
+     qca_roaming_policy policy;
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     ALOGV("%s: set firmware roam state : %d", __FUNCTION__, state);
+ 
+diff --git a/qcwcn/wifi_hal/rssi_monitor.cpp b/qcwcn/wifi_hal/rssi_monitor.cpp
+index 3f4a2b4..e39c2f7 100644
+--- a/qcwcn/wifi_hal/rssi_monitor.cpp
++++ b/qcwcn/wifi_hal/rssi_monitor.cpp
+@@ -262,8 +262,13 @@
+     wifi_error ret;
+     struct nlattr *nlData;
+     WifiVendorCommand *vCommand = NULL;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
+     RSSIMonitorCommand *rssiCommand;
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     ret = initialize_vendor_cmd(iface, id,
+                                 QCA_NL80211_VENDOR_SUBCMD_MONITOR_RSSI,
+diff --git a/qcwcn/wifi_hal/wifi_hal.cpp b/qcwcn/wifi_hal/wifi_hal.cpp
+index 47f3c84..c8f12ef 100644
+--- a/qcwcn/wifi_hal/wifi_hal.cpp
++++ b/qcwcn/wifi_hal/wifi_hal.cpp
+@@ -118,6 +118,8 @@
+ #define POLL_DRIVER_DURATION_US (100000)
+ #define POLL_DRIVER_MAX_TIME_MS (10000)
+ 
++#define SOCK_BUF_SIZE (256 * 1024)
++
+ static int attach_monitor_sock(wifi_handle handle, wifihal_ctrl_req_t *ctrl_msg);
+ 
+ static int dettach_monitor_sock(wifi_handle handle, wifihal_ctrl_req_t *ctrl_msg);
+@@ -161,13 +163,11 @@
+     wifi_get_cached_scan_results(wifi_interface_handle iface,
+                                  wifi_cached_scan_result_handler handler);
+ 
+-#ifndef TARGET_SUPPORTS_WEARABLES
+ wifi_error wifi_get_supported_iface_combination(wifi_interface_handle iface_handle);
+ 
+ wifi_error wifi_get_supported_iface_concurrency_matrix(
+         wifi_handle handle,
+         wifi_iface_concurrency_matrix *iface_concurrency_matrix);
+-#endif /* TARGET_SUPPORTS_WEARABLES */
+ 
+ #ifdef WPA_PASN_LIB
+ void wifihal_event_mgmt_tx_status(wifi_handle handle, struct nlattr *cookie,
+@@ -352,6 +352,10 @@
+     wifi_error ret;
+     interface_info *iinfo = getIfaceInfo(iface);
+     wifi_handle handle = getWifiHandle(iface);
++    if (!iinfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+     *set = 0;
+ 
+     WifihalGeneric supportedFeatures(handle, 0,
+@@ -514,7 +518,7 @@
+     }
+ 
+     /* Set the socket buffer size */
+-    if (nl_socket_set_buffer_size(user_sock, (256*1024), 0) < 0) {
++    if (nl_socket_set_buffer_size(user_sock, (SOCK_BUF_SIZE), 0) < 0) {
+         ALOGE("Could not set size for user_sock: %s",
+                    strerror(errno));
+         /* continue anyway with the default (smaller) buffer */
+@@ -545,6 +549,13 @@
+     }
+ 
+     info->user_sock = user_sock;
++    int opt = 1;
++    ret = setsockopt(nl_socket_get_fd(user_sock), SOL_NETLINK,
++                     NETLINK_NO_ENOBUFS, &opt, sizeof(opt));
++    ALOGV("configured NETLINK_NO_ENOBUFS sockopt %d", ret);
++    ret = setsockopt(nl_socket_get_fd(user_sock), SOL_NETLINK,
++                     NETLINK_BROADCAST_ERROR, &opt, sizeof(opt));
++    ALOGV("configured NETLINK_BROADCAST_ERROR sockopt %d", ret);
+     ALOGV("Initiialized diag sock successfully");
+     return WIFI_SUCCESS;
+ }
+@@ -1213,10 +1224,8 @@
+     fn->wifi_get_usable_channels = wifi_get_usable_channels;
+     fn->wifi_get_supported_radio_combinations_matrix =
+                                 wifi_get_supported_radio_combinations_matrix;
+-#ifndef TARGET_SUPPORTS_WEARABLES
+     fn->wifi_get_supported_iface_concurrency_matrix =
+                                 wifi_get_supported_iface_concurrency_matrix;
+-#endif /* TARGET_SUPPORTS_WEARABLES */
+     fn->wifi_nan_suspend_request = nan_suspend_request;
+     fn->wifi_nan_resume_request = nan_resume_request;
+     fn->wifi_nan_pairing_request = nan_pairing_request;
+@@ -1588,13 +1597,11 @@
+         goto unload;
+     }
+ 
+-#ifndef TARGET_SUPPORTS_WEARABLES
+     ret = wifi_get_supported_iface_combination(iface_handle);
+     if (ret != WIFI_SUCCESS) {
+         ALOGE("Failed to get driver supported interface combinations");
+         goto unload;
+     }
+-#endif /* TARGET_SUPPORTS_WEARABLES */
+ 
+     ret = wifi_get_sar_version(iface_handle);
+     if (ret != WIFI_SUCCESS) {
+@@ -2681,7 +2688,12 @@
+         feature_set *set)
+ {
+     int ret = 0;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle handle = getWifiHandle(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+     *set = 0;
+     hal_info *info = getHalInfo(handle);
+ 
+@@ -2705,6 +2717,10 @@
+     WifihalGeneric *vCommand = NULL;
+     interface_info *ifaceInfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     if (set == NULL) {
+         ALOGE("%s: NULL set pointer provided. Exit.",
+@@ -2835,6 +2851,10 @@
+     WifiVendorCommand *vCommand = NULL;
+     interface_info *ifaceInfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     vCommand = new WifiVendorCommand(wifiHandle, 0,
+             OUI_QCA,
+@@ -2887,6 +2907,11 @@
+     wifi_error ret;
+     struct nlattr *nlData;
+     WifiVendorCommand *vCommand = NULL;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     ret = initialize_vendor_cmd(iface, id,
+                                 QCA_NL80211_VENDOR_SUBCMD_OFFLOADED_PACKETS,
+@@ -2969,6 +2994,11 @@
+     wifi_error ret;
+     struct nlattr *nlData;
+     WifiVendorCommand *vCommand = NULL;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     ret = initialize_vendor_cmd(iface, id,
+                                 QCA_NL80211_VENDOR_SUBCMD_OFFLOADED_PACKETS,
+@@ -3017,8 +3047,13 @@
+     struct nlattr *nlData;
+     WifiVendorCommand *vCommand = NULL;
+     u32 current_offset = 0;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
+     hal_info *info = getHalInfo(wifiHandle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* len=0 clears the filters in driver/firmware */
+     if (len != 0 && program == NULL) {
+@@ -3104,6 +3139,10 @@
+     WifihalGeneric *vCommand = NULL;
+     interface_info *ifaceInfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     if (version == NULL || max_len == NULL) {
+         ALOGE("%s: NULL version/max_len pointer provided. Exit.",
+@@ -3171,6 +3210,11 @@
+     wifi_error ret;
+     struct nlattr *nlData;
+     WifiVendorCommand *vCommand = NULL;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     ret = initialize_vendor_cmd(iface, get_requestid(),
+                                 QCA_NL80211_VENDOR_SUBCMD_ND_OFFLOAD,
+@@ -3390,6 +3434,10 @@
+     interface_info *ifaceInfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
+     hal_info *info = getHalInfo(wifiHandle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* Length to be passed to this function should be non-zero
+      * Return invalid argument if length is passed as zero
+@@ -3587,7 +3635,6 @@
+     }
+ }
+ 
+-#ifndef TARGET_SUPPORTS_WEARABLES
+ char *get_iface_mask_str(u32 mask, char *buf, size_t buflen) {
+     char * pos, *end;
+     int res;
+@@ -3821,17 +3868,16 @@
+                     struct nlattr *nl_limit, *nl_mode;
+                     int err, rem_limit, rem_mode, j = 0;
+                     static struct nla_policy
+-                    iface_combination_policy[NUM_NL80211_IFACE_COMB] = {
+-                        [NL80211_IFACE_COMB_LIMITS] = { .type = NLA_NESTED },
+-                        [NL80211_IFACE_COMB_MAXNUM] = { .type = NLA_U32 },
+-                        [NL80211_IFACE_COMB_STA_AP_BI_MATCH] = { .type = NLA_FLAG },
+-                        [NL80211_IFACE_COMB_NUM_CHANNELS] = { .type = NLA_U32 },
+-                        [NL80211_IFACE_COMB_RADAR_DETECT_WIDTHS] = { .type = NLA_U32 },
+-                    },
+-                    iface_limit_policy[NUM_NL80211_IFACE_LIMIT] = {
+-                        [NL80211_IFACE_LIMIT_TYPES] = { .type = NLA_NESTED },
+-                        [NL80211_IFACE_LIMIT_MAX] = { .type = NLA_U32 },
+-                    };
++                        iface_combination_policy[NUM_NL80211_IFACE_COMB],
++                        iface_limit_policy[NUM_NL80211_IFACE_LIMIT];
++
++                    iface_combination_policy[NL80211_IFACE_COMB_LIMITS].type = NLA_NESTED;
++                    iface_combination_policy[NL80211_IFACE_COMB_MAXNUM].type = NLA_U32;
++                    iface_combination_policy[NL80211_IFACE_COMB_STA_AP_BI_MATCH].type = NLA_FLAG;
++                    iface_combination_policy[NL80211_IFACE_COMB_NUM_CHANNELS].type = NLA_U32;
++                    iface_combination_policy[NL80211_IFACE_COMB_RADAR_DETECT_WIDTHS].type = NLA_U32;
++                    iface_limit_policy[NL80211_IFACE_LIMIT_TYPES].type = NLA_NESTED;
++                    iface_limit_policy[NL80211_IFACE_LIMIT_MAX].type = NLA_U32;
+ 
+                     err = nla_parse_nested(tb_comb, MAX_NL80211_IFACE_COMB,
+                                            nl_combi, iface_combination_policy);
+@@ -3956,7 +4002,6 @@
+ 
+     return ret;
+ }
+-#endif /* TARGET_SUPPORTS_WEARABLES */
+ 
+ wifi_error wifi_get_radar_history(wifi_interface_handle handle,
+        radar_history_result *resultBuf, int resultBufSize, int *numResults)
+@@ -4129,7 +4174,6 @@
+     return ret;
+ }
+ 
+-#ifndef TARGET_SUPPORTS_WEARABLES
+ wifi_error wifi_get_supported_iface_concurrency_matrix(
+         wifi_handle handle, wifi_iface_concurrency_matrix *iface_comb_matrix)
+ {
+@@ -4164,7 +4208,6 @@
+     }
+     return WIFI_SUCCESS;
+ }
+-#endif /* TARGET_SUPPORTS_WEARABLES */
+ 
+ #ifdef WPA_PASN_LIB
+ 
+@@ -4184,7 +4227,7 @@
+ 
+     peer = nan_pairing_get_peer_from_list(info->secure_nan, (u8 *)mgmt->da);
+     if (!peer) {
+-        ALOGE("nl80211: Peer not found in the pairing list");
++        ALOGV("nl80211: Peer not found in the pairing list");
+         return;
+     }
+ 
+@@ -4413,6 +4456,7 @@
+     wifi_interface_handle iface = NULL;
+     hal_info *info;
+     uint8_t peer_protocol_indoor_bitmap = 0;
++    uint8_t enable_dfs_scc_p2p = 0;
+ 
+     info = getHalInfo(handle);
+     if (!info) {
+@@ -4436,6 +4480,12 @@
+         peer_protocol_indoor_bitmap |= 0x2;  // Set bit 1 for NAN
+     }
+ 
++    enable_dfs_scc_p2p = (channelCategoryEnableFlag & 0x2) ? 1 : 0;
++
++    ALOGV("%s: channelCategoryEnableFlag=0x%x, Indoor bitmap=0x%x, DFS SCC P2P=%u",
++          __func__, channelCategoryEnableFlag, peer_protocol_indoor_bitmap,
++          enable_dfs_scc_p2p);
++
+     if (peer_protocol_indoor_bitmap &&
+         !check_feature(QCA_WLAN_VENDOR_FEATURE_SUPPORT_STA_INDOOR_CH_SCC,
+                        &info->driver_supported_features)) {
+@@ -4444,6 +4494,14 @@
+         return WIFI_ERROR_NOT_SUPPORTED;
+     }
+ 
++    if (enable_dfs_scc_p2p &&
++        !check_feature(QCA_WLAN_VENDOR_FEATURE_SUPPORT_STA_DFS_CH_SCC_P2P,
++                      &info->driver_supported_features)) {
++        ALOGE("%s: STA DFS Channel SCC P2P is not supported by the "
++              "driver (feature flag not set).", __func__);
++        return WIFI_ERROR_NOT_SUPPORTED;
++    }
++
+     ret = initialize_vendor_cmd(iface, get_requestid(),
+                                 QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION,
+                                 &vCommand);
+@@ -4464,6 +4522,10 @@
+           "QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_PEER_PROTOCOL_INDOOR_CH_STA_SCC to %u",
+           __func__, peer_protocol_indoor_bitmap);
+ 
++    ALOGV("%s: Attempting to set "
++          "QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P to %u",
++          __func__, enable_dfs_scc_p2p);
++
+     // Add the indoor channel SCC attribute with its u8 value.
+     ret = vCommand->put_u8(QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_PEER_PROTOCOL_INDOOR_CH_STA_SCC,
+                            peer_protocol_indoor_bitmap);
+@@ -4474,6 +4536,15 @@
+         goto cleanup;
+     }
+ 
++    // Add the DFS channel SCC P2P attribute with its u8 value
++    ret = vCommand->put_u8(QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P,
++                           enable_dfs_scc_p2p);
++    if (ret != WIFI_SUCCESS) {
++        ALOGE("%s: Failed to put QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P, "
++              "error: %d", __func__, ret);
++        goto cleanup;
++    }
++
+     vCommand->attr_end(nlData);
+ 
+     ret = vCommand->requestResponse();
+diff --git a/qcwcn/wifi_hal/wifi_hal_ctrl/wifi_hal_ctrl.h b/qcwcn/wifi_hal/wifi_hal_ctrl/wifi_hal_ctrl.h
+index f0cdaa3..69cc791 100644
+--- a/qcwcn/wifi_hal/wifi_hal_ctrl/wifi_hal_ctrl.h
++++ b/qcwcn/wifi_hal/wifi_hal_ctrl/wifi_hal_ctrl.h
+@@ -41,15 +41,12 @@
+ #include <fcntl.h>
+ 
+ #include "stdlib.h"
+-
+-#ifdef ANDROID
+ #include <dirent.h>
+ #include <grp.h>
+ #include <pwd.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <cutils/sockets.h>
+-#endif /* ANDROID */
+ 
+ #ifdef  __cplusplus
+ extern "C" {
+diff --git a/qcwcn/wifi_hal/wificonfig.cpp b/qcwcn/wifi_hal/wificonfig.cpp
+index 2addfb1..fbd96ac 100644
+--- a/qcwcn/wifi_hal/wificonfig.cpp
++++ b/qcwcn/wifi_hal/wificonfig.cpp
+@@ -301,7 +301,12 @@
+     int requestId, count, wiphy_index;
+     wifi_error ret;
+     WiFiConfigCommand *wifiConfigCommand;
++    interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+     hal_info *info = getHalInfo(wifiHandle);
+     char current_country_code[4];
+     bool check_update = false;
+@@ -929,6 +934,10 @@
+     struct nlattr *nlData;
+     interface_info *ifaceInfo = getIfaceInfo(handle);
+     wifi_handle wifiHandle = getWifiHandle(handle);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     wifiConfigCommand = new WiFiConfigCommand(
+                             wifiHandle,
+diff --git a/qcwcn/wifi_hal/wifilogger.cpp b/qcwcn/wifi_hal/wifilogger.cpp
+index 9462d86..5c6f852 100644
+--- a/qcwcn/wifi_hal/wifilogger.cpp
++++ b/qcwcn/wifi_hal/wifilogger.cpp
+@@ -272,6 +272,10 @@
+     struct nlattr *nlData;
+     interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* No request id from caller, so generate one and pass it on to the driver.
+      * Generate one randomly.
+@@ -415,6 +419,10 @@
+     struct nlattr *nlData;
+     interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* No request id from caller, so generate one and pass it on to the driver.
+      * Generate one randomly.
+@@ -476,6 +484,10 @@
+     struct nlattr *nlData;
+     interface_info *ifaceInfo = getIfaceInfo(iface);
+     wifi_handle wifiHandle = getWifiHandle(iface);
++    if (!ifaceInfo) {
++        ALOGE("%s: null iface handle", __FUNCTION__);
++        return WIFI_ERROR_INVALID_ARGS;
++    }
+ 
+     /* No request id from caller, so generate one and pass it on to the driver.
+      * Generate one randomly.
+diff --git a/qcwcn/wifi_hal/wifilogger_diag.h b/qcwcn/wifi_hal/wifilogger_diag.h
+index cb8c4c1..bb6ca65 100644
+--- a/qcwcn/wifi_hal/wifilogger_diag.h
++++ b/qcwcn/wifi_hal/wifilogger_diag.h
+@@ -220,20 +220,22 @@
+ 
+ enum log_event_host_reason_code {
+     WLAN_LOG_REASON_CODE_UNUSED,
+-    WLAN_LOG_REASON_COMMAND_UNSUCCESSFUL,
+     WLAN_LOG_REASON_ROAM_FAIL,
+-    WLAN_LOG_REASON_THREAD_STUCK,
+     WLAN_LOG_REASON_DATA_STALL,
+     WLAN_LOG_REASON_SME_COMMAND_STUCK,
+-    WLAN_LOG_REASON_ZERO_SCAN_RESULTS,
+     WLAN_LOG_REASON_QUEUE_FULL,
+     WLAN_LOG_REASON_POWER_COLLAPSE_FAIL,
+-    WLAN_LOG_REASON_SSR_FAIL,
+-    WLAN_LOG_REASON_DISCONNECT_FAIL,
+-    WLAN_LOG_REASON_CLEAN_UP_FAIL,
+     WLAN_LOG_REASON_MALLOC_FAIL,
+     WLAN_LOG_REASON_VOS_MSG_UNDER_RUN,
+-    WLAN_LOG_REASON_MSG_POST_FAIL,
++    WLAN_LOG_REASON_HDD_TIME_OUT,
++    WLAN_LOG_REASON_SME_OUT_OF_CMD_BUF,
++    WLAN_LOG_REASON_NO_SCAN_RESULTS,
++    WLAN_LOG_REASON_SCAN_NOT_ALLOWED,
++    WLAN_LOG_REASON_HB_FAILURE,
++    WLAN_LOG_REASON_ROAM_HO_FAILURE,
++    WLAN_LOG_REASON_DISCONNECT,
++    WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT,
++    WLAN_LOG_REASON_DUMP_IN_PROGRESS
+ };
+ 
+ typedef struct {
+diff --git a/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211.c b/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211.c
+index cc5f54c..6988a9c 100644
+--- a/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211.c
++++ b/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211.c
+@@ -205,6 +205,9 @@
+ 
+ #define MAX_GPIO_MUX_CONFIG 15
+ 
++#define CHAIN_MAX_NUM 8
++#define MAX_SUPPORTED_VAL 0x1FFF
++
+ static int twt_async_support = -1;
+ 
+ struct twt_setup_parameters {
+@@ -2846,6 +2849,25 @@
+ 	return (u32)val;
+ }
+ 
++s16 get_s16_from_string(char *cmd_string, int *ret)
++{
++	long val;
++	char *endptr = NULL;
++	*ret = 0;
++	errno = 0;
++
++	val = strtol(cmd_string, &endptr, 10);
++	if (errno == ERANGE || (errno != 0 && val == 0) || *cmd_string == *endptr) {
++		wpa_printf(MSG_ERROR, "invalid value");
++		*ret = -EINVAL;
++	}
++
++	if (val > SHRT_MAX || val < SHRT_MIN)
++		*ret = -EINVAL;
++
++	return (s16)val;
++}
++
+ s32 get_s32_from_string(char *cmd_string, int *ret)
+ {
+ 	s64 val64 = 0;
+@@ -6220,6 +6242,67 @@
+ 	return ret;
+ }
+ 
++static int wpa_driver_config_channel_width(struct i802_bss *bss, char *cmd,
++					   char *buf, size_t buf_len)
++{
++	struct wpa_driver_nl80211_data *drv;
++	struct nl_msg *nlmsg;
++	struct nlattr *attr;
++	u8 channel_width;
++	int ret;
++
++	if (!bss || !bss->drv || !cmd) {
++		wpa_printf(MSG_ERROR, "%s:Invalid arguments", __func__);
++		return -EINVAL;
++	}
++	drv = bss->drv;
++	cmd = skip_white_space(cmd);
++	if (*cmd == '\0') {
++		wpa_printf(MSG_ERROR, "channel_width value missing");
++		return -EINVAL;
++	}
++
++	channel_width = get_u8_from_string(cmd, &ret);
++	if (ret < 0) {
++		wpa_printf(MSG_ERROR, "Invalid channel_width value");
++		return -EINVAL;
++	}
++
++	nlmsg = prepare_vendor_nlmsg(drv, bss->ifname,
++				     QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION);
++	if (!nlmsg) {
++		wpa_printf(MSG_ERROR,
++			   "Fail to allocate nlmsg for config_channel_width cmd");
++		return -ENOMEM;
++	}
++
++	attr = nla_nest_start(nlmsg, NL80211_ATTR_VENDOR_DATA);
++	if (!attr) {
++		ret = -ENOMEM;
++		wpa_printf(MSG_ERROR,
++			   "Fail to create nl attributes for config_channel_width cmd");
++		goto nlmsg_fail;
++	}
++	if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH,
++		       channel_width)) {
++		ret = -ENOMEM;
++		wpa_printf(MSG_ERROR, "Fail to put channel_width value");
++		goto nlmsg_fail;
++	}
++	nla_nest_end(nlmsg, attr);
++
++	ret = send_nlmsg((struct nl_sock *)drv->global->nl, nlmsg, NULL, NULL);
++	if (ret) {
++		wpa_printf(MSG_ERROR,
++			   "Fail to send config_channel_width nlmsg, error:%d", ret);
++		return ret;
++	}
++	return 0;
++nlmsg_fail:
++	nlmsg_free(nlmsg);
++	return ret;
++}
++
+ static int wpa_driver_set_tx_rx_nss(struct i802_bss *bss, char *cmd,
+ 				    char *buf, size_t buf_len)
+ {
+@@ -7439,16 +7522,463 @@
+ 	return ret;
+ }
+ 
+-int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
+-				  size_t buf_len )
++static int wpa_driver_set_ant_div_conf(struct i802_bss *bss, char *cmd)
++{
++	struct wpa_driver_nl80211_data *drv = bss->drv;
++	struct nl_msg *nlmsg;
++	struct nlattr *attr;
++	int ret;
++	uint32_t val32;
++	uint16_t val16;
++	s16 wlan_rssi_th, bt_rssi_th;
++
++	nlmsg = prepare_vendor_nlmsg(drv, bss->ifname,
++				     QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION);
++	if (!nlmsg) {
++		wpa_printf(MSG_ERROR, "Failed to allocate nlmsg ");
++		return -ENOMEM;
++	}
++
++	attr = nla_nest_start(nlmsg, NL80211_ATTR_VENDOR_DATA);
++	if (!attr) {
++		ret = -ENOMEM;
++		wpa_printf(MSG_ERROR, "Failed to create nl attribute");
++		goto nlmsg_fail;
++	}
++
++	while (*cmd != '\0') {
++		if (os_strncasecmp(cmd, "ENABLE ", 7) == 0) {
++			cmd += 7;
++			cmd = skip_white_space(cmd);
++			val32 = get_u32_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: enable val");
++				goto nlmsg_fail;
++			}
++			if (val32 != 0 && val32 != 1) {
++				wpa_printf(MSG_ERROR, "Invalid ENABLE val %d", val32);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u32(nlmsg, QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_ENA, val32);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put enable value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "CHAIN ", 6) == 0) {
++			cmd += 6;
++			cmd = skip_white_space(cmd);
++			val32 = get_u32_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: SET chain");
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u32(nlmsg, QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_CHAIN, val32);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put ant_div_chain value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "STAY_PERIOD ", 12) == 0) {
++			cmd += 12;
++			cmd = skip_white_space(cmd);
++			val32 = get_u32_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: stay_period");
++				goto nlmsg_fail;
++			}
++			if (val32 > MAX_SUPPORTED_VAL) {
++				wpa_printf(MSG_ERROR,
++					   "stay period val %d higher than supported",
++					   val32);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u32(nlmsg,
++					  QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_STAY_PERIOD,
++					  val32);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put stay_period value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "PROBE_PERIOD ", 13) == 0) {
++			cmd += 13;
++			cmd = skip_white_space(cmd);
++			val32 = get_u32_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: probe_period");
++				goto nlmsg_fail;
++			}
++			if (val32 > MAX_SUPPORTED_VAL) {
++				wpa_printf(MSG_ERROR,
++					   "probe period val %d higher than supported",
++					   val32);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u32(nlmsg,
++					  QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_PERIOD,
++					  val32);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put probe_period value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "PROBE_COUNT_WLAN ", 17) == 0) {
++			cmd += 17;
++			cmd = skip_white_space(cmd);
++			val16 = get_u16_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: count_wlan");
++				goto nlmsg_fail;
++			}
++			if (val16 > MAX_SUPPORTED_VAL) {
++				wpa_printf(MSG_ERROR,
++					   "probe wlan val %d higher than supported",
++					   val16);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u16(nlmsg,
++					  QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_WLAN,
++					  val16);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put count_wlan value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "PROBE_COUNT_BT ", 15) == 0) {
++			cmd += 15;
++			cmd = skip_white_space(cmd);
++			val16 = get_u16_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: count_bt");
++				goto nlmsg_fail;
++			}
++			if (val16 > MAX_SUPPORTED_VAL) {
++				wpa_printf(MSG_ERROR,
++					   "probe bt val %d higher than supported",
++					   val16);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u16(nlmsg,
++					  QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_BT,
++					  val16);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put count_bt value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "WLAN_RSSI_TH ", 13) == 0) {
++			cmd += 13;
++			cmd = skip_white_space(cmd);
++			wlan_rssi_th  = get_s16_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: wlan_rssi_th");
++				goto nlmsg_fail;
++			}
++			if (wlan_rssi_th > 0 || wlan_rssi_th < -100) {
++				wpa_printf(MSG_ERROR,
++					   "wlan th val %d is not valid",
++					   wlan_rssi_th);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u16(nlmsg,
++				QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD,
++				(u16)wlan_rssi_th);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put wlan_rssi_th value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "BT_RSSI_TH ", 11) == 0) {
++			cmd += 11;
++			cmd = skip_white_space(cmd);
++			bt_rssi_th = get_s16_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: bt_rssi_th");
++				goto nlmsg_fail;
++			}
++			if (bt_rssi_th > 0 || bt_rssi_th < -100) {
++				wpa_printf(MSG_ERROR,
++					   "bt th value %d is not valid",
++					   bt_rssi_th);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u16(nlmsg,
++				QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_BT_RSSI_THRESHOLD,
++				(u16)bt_rssi_th);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put bt_rssi_th value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "WLAN_RSSI_DIFF ", 15) == 0) {
++			cmd += 15;
++			cmd = skip_white_space(cmd);
++			val16 = get_u16_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: wlan_diff");
++				goto nlmsg_fail;
++			}
++			if (val16 > MAX_SUPPORTED_VAL) {
++				wpa_printf(MSG_ERROR,
++					   "wlan diff %d higher than supported",
++					   val16);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u16(nlmsg,
++					  QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_WLAN_RSSI_DIFF,
++					  val16);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put wlan_diff value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else if (os_strncasecmp(cmd, "BT_RSSI_DIFF ", 13) == 0) {
++			cmd += 13;
++			cmd = skip_white_space(cmd);
++			val16 = get_u16_from_string(cmd, &ret);
++			if (ret < 0) {
++				wpa_printf(MSG_ERROR, "Input error: bt_diff");
++				goto nlmsg_fail;
++			}
++			if (val16 > MAX_SUPPORTED_VAL) {
++				wpa_printf(MSG_ERROR,
++					   "bt diff val %d higher than supported",
++					   val16);
++				ret = -EINVAL;
++				goto nlmsg_fail;
++			}
++			ret = nla_put_u16(nlmsg,
++					  QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_BT_RSSI_DIFF,
++					  val16);
++			if (ret) {
++				wpa_printf(MSG_ERROR, "Failed to put bt_diff value");
++				goto nlmsg_fail;
++			}
++			cmd = move_to_next_str(cmd);
++		} else {
++			wpa_printf(MSG_ERROR, "Invalid attribute");
++			ret = -EINVAL;
++			goto nlmsg_fail;
++		}
++	}
++	nla_nest_end(nlmsg, attr);
++	ret = send_nlmsg((struct nl_sock *)drv->global->nl, nlmsg, NULL, NULL);
++	if (ret)
++		wpa_printf(MSG_ERROR, "Error sending nlmsg, ret: %d", ret);
++
++	return ret;
++nlmsg_fail:
++	nlmsg_free(nlmsg);
++	return ret;
++}
++
++static int get_ant_div_response_handler(struct nl_msg *msg, void *arg)
++{
++	struct genlmsghdr *msg_hdr;
++	struct nlattr *tb[NL80211_ATTR_MAX_INTERNAL + 1];
++	struct nlattr *tb_vendor[QCA_WLAN_VENDOR_ATTR_MAX + 1];
++	struct nlattr *vendor_data;
++	int vendor_len;
++	struct resp_info *info = (struct resp_info *)arg;
++	struct wpa_driver_nl80211_data *drv;
++	uint32_t chain_rssi[CHAIN_MAX_NUM] = {0};
++	int32_t chain_evm[CHAIN_MAX_NUM] = {0};
++	uint32_t ant_id[CHAIN_MAX_NUM] = {0};
++	bool is_rssi_valid = false;
++	size_t rssi_len, evm_len, ant_len, num_chains;
++
++	if (!info) {
++		wpa_printf(MSG_ERROR, "Invalid arg");
++		return NL_STOP;
++	}
++
++	drv = info->drv;
++	if (!drv) {
++		wpa_printf(MSG_ERROR, "Invalid driver data");
++		return NL_STOP;
++	}
++
++	msg_hdr = (struct genlmsghdr *)nlmsg_data(nlmsg_hdr(msg));
++	nla_parse(tb, NL80211_ATTR_MAX_INTERNAL, genlmsg_attrdata(msg_hdr, 0),
++		  genlmsg_attrlen(msg_hdr, 0), NULL);
++
++	if (!tb[NL80211_ATTR_VENDOR_DATA]) {
++		wpa_printf(MSG_ERROR, "NL80211_ATTR_VENDOR_DATA not found");
++		return NL_STOP;
++	}
++
++	vendor_data = nla_data(tb[NL80211_ATTR_VENDOR_DATA]);
++	vendor_len = nla_len(tb[NL80211_ATTR_VENDOR_DATA]);
++
++	if (nla_parse(tb_vendor, QCA_WLAN_VENDOR_ATTR_MAX,
++		      vendor_data, vendor_len, NULL)) {
++		wpa_printf(MSG_ERROR, "NL80211_ATTR_VENDOR_DATA parse error");
++		return NL_STOP;
++	}
++
++	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_CHAIN_RSSI]) {
++		rssi_len = nla_len(tb_vendor[QCA_WLAN_VENDOR_ATTR_CHAIN_RSSI]);
++		if (rssi_len > sizeof(chain_rssi)) {
++			wpa_printf(MSG_ERROR, "RSSI data size mismatch");
++			return NL_STOP;
++		}
++		nla_memcpy(chain_rssi,
++			   tb_vendor[QCA_WLAN_VENDOR_ATTR_CHAIN_RSSI],
++			   rssi_len);
++	} else {
++		wpa_printf(MSG_ERROR, "RSSI data not present");
++		return NL_STOP;
++	}
++
++	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_CHAIN_EVM]) {
++		evm_len = nla_len(tb_vendor[QCA_WLAN_VENDOR_ATTR_CHAIN_EVM]);
++		if (evm_len > sizeof(chain_evm)) {
++			wpa_printf(MSG_ERROR, "EVM data size mismatch");
++			return NL_STOP;
++		}
++		nla_memcpy(chain_evm,
++			   tb_vendor[QCA_WLAN_VENDOR_ATTR_CHAIN_EVM],
++			   evm_len);
++	} else {
++		wpa_printf(MSG_ERROR, "EVM data not present");
++		return NL_STOP;
++	}
++
++	if (tb_vendor[QCA_WLAN_VENDOR_ATTR_ANTENNA_INFO]) {
++		ant_len = nla_len(tb_vendor[QCA_WLAN_VENDOR_ATTR_ANTENNA_INFO]);
++		if (ant_len > sizeof(ant_id)) {
++			wpa_printf(MSG_ERROR, "Antenna ID data size mismatch");
++			return NL_STOP;
++		}
++		nla_memcpy(ant_id,
++			   tb_vendor[QCA_WLAN_VENDOR_ATTR_ANTENNA_INFO],
++			   ant_len);
++	} else {
++		wpa_printf(MSG_ERROR, "Antenna ID data not present");
++		return NL_STOP;
++	}
++
++	num_chains = rssi_len / sizeof(uint32_t);
++	if (num_chains > CHAIN_MAX_NUM)
++		num_chains = CHAIN_MAX_NUM;
++
++	if (evm_len / sizeof(int32_t) != num_chains ||
++	    ant_len / sizeof(uint32_t) != num_chains) {
++		wpa_printf(MSG_ERROR, "Inconsistent chain data sizes");
++		return NL_STOP;
++	}
++
++	for (int i = 0; i < num_chains; i++) {
++		if (chain_rssi[i] != 0) {
++			is_rssi_valid = true;
++			wpa_msg(drv->ctx, MSG_INFO, "RSSI %d, AntID %u, EVM %d",
++				(int32_t)chain_rssi[i], ant_id[i], chain_evm[i]);
++		}
++	}
++
++	if (!is_rssi_valid)
++		wpa_msg(drv->ctx, MSG_INFO, "Rssi is invalid");
++
++	return 0;
++}
++
++static int wpa_driver_get_ant_div_conf(struct i802_bss *bss, char *cmd,
++				       char *buf, size_t buf_len)
++{
++	struct resp_info info;
++	struct wpa_driver_nl80211_data *drv = bss->drv;
++	struct nl_msg *nlmsg;
++	struct nlattr *attr;
++	int ret;
++	u8 mac_addr[MAC_ADDR_LEN];
++
++	if (!cmd) {
++		wpa_printf(MSG_ERROR, "cmd is NULL");
++		return -EINVAL;
++	}
++
++	memset(&info, 0, sizeof(struct resp_info));
++	info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GET_CHAIN_RSSI;
++	info.reply_buf = buf;
++	info.reply_buf_len = buf_len;
++	info.drv = drv;
++
++	nlmsg = prepare_vendor_nlmsg(bss->drv, bss->ifname,
++				     QCA_NL80211_VENDOR_SUBCMD_GET_CHAIN_RSSI);
++	if (!nlmsg) {
++		wpa_printf(MSG_ERROR, "Failed to allocate nl message");
++		return -ENOMEM;
++	}
++
++	attr = nla_nest_start(nlmsg, NL80211_ATTR_VENDOR_DATA);
++	if (!attr) {
++		wpa_printf(MSG_ERROR, "Failed to create attribute");
++		ret = -ENOMEM;
++		goto nlmsg_fail;
++	}
++
++	cmd = skip_white_space(cmd);
++	if (os_strncasecmp(cmd, "MAC_ADDR ", 9) != 0) {
++		wpa_printf(MSG_ERROR, "MAC address not present");
++		ret = -EINVAL;
++		goto nlmsg_fail;
++	}
++	cmd += 9;
++	cmd = skip_white_space(cmd);
++	if (convert_string_to_bytes(mac_addr, cmd, MAC_ADDR_LEN) != MAC_ADDR_LEN) {
++		wpa_printf(MSG_ERROR, "MAC ADDR is not correct");
++		ret = -EINVAL;
++		goto nlmsg_fail;
++	}
++
++	ret = nla_put(nlmsg, QCA_WLAN_VENDOR_ATTR_MAC_ADDR,
++		      MAC_ADDR_LEN, mac_addr);
++	if (ret) {
++		wpa_printf(MSG_ERROR, "Failed to put QCA_WLAN_VENDOR_ATTR_MAC_ADDR");
++		goto nlmsg_fail;
++	}
++
++	nla_nest_end(nlmsg, attr);
++
++	ret = send_nlmsg((struct nl_sock *)drv->global->nl, nlmsg,
++			 get_ant_div_response_handler, &info);
++	if (ret)
++		wpa_printf(MSG_ERROR, "Failed to send nl_msg");
++	return ret;
++nlmsg_fail:
++	nlmsg_free(nlmsg);
++	return ret;
++}
++
++/*
++ * wpa_driver_nl80211_driver_cmd_dispatch - named-command dispatcher
++ *
++ * Handles all named DRIVER commands. Sets *handled = true if the command
++ * was recognised (regardless of success/failure), or *handled = false if
++ * the command is unknown so the caller can fall through to the ioctl path.
++ *
++ * Called from wpa_driver_nl80211_driver_cmd() and from
++ * wpa_driver_nl80211_driver_cmd_qca() in driver_nl80211_qca.c.
++ */
++int wpa_driver_nl80211_driver_cmd_dispatch(void *priv, char *cmd, char *buf,
++					   size_t buf_len, bool *handled)
+ {
+ 	struct i802_bss *bss = priv;
+ 	struct wpa_driver_nl80211_data *drv = NULL;
+ 	struct wpa_driver_nl80211_data *driver;
+-	struct ifreq ifr;
+-	android_wifi_priv_cmd priv_cmd;
+ 	int ret = 0, status = 0, lib_n = 0;
+ 
++	*handled = true;
++
+ 	if (bss) {
+ 		drv = bss->drv;
+ 	} else {
+@@ -7493,13 +8023,6 @@
+ 			linux_set_iface_flags(drv->global->ioctl_sock, driver->first_bss->ifname, 1);
+ 			wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STARTED");
+ 		}
+-	} else if (os_strcasecmp(cmd, "MACADDR") == 0) {
+-		u8 macaddr[ETH_ALEN] = {};
+-
+-		ret = linux_get_ifhwaddr(drv->global->ioctl_sock, bss->ifname, macaddr);
+-		if (!ret)
+-			ret = os_snprintf(buf, buf_len,
+-					  "Macaddr = " MAC_ADDR_STR "\n", MAC_ADDR_ARRAY(macaddr));
+ 	} else if (os_strncasecmp(cmd, "SET_CONGESTION_REPORT ", 22) == 0) {
+ 		return wpa_driver_cmd_set_congestion_report(priv, cmd + 22);
+ 	} else if (os_strncasecmp(cmd, "SET_TXPOWER ", 12) == 0) {
+@@ -7753,6 +8276,10 @@
+ 		/* DRIVER SET_TX_RX_NSS <TX_NSS> <RX_NSS> */
+ 		cmd += 14;
+ 		return wpa_driver_set_tx_rx_nss(priv, cmd, buf, buf_len);
++	} else if (os_strncasecmp(cmd, "CONFIG_CHANNEL_WIDTH ", 21) == 0) {
++		/* DRIVER CONFIG_CHANNEL_WIDTH <channel_width> */
++		cmd += 21;
++		return wpa_driver_config_channel_width(priv, cmd, buf, buf_len);
+ 	} else if (os_strncasecmp(cmd, "SPATIAL_REUSE ", 14) == 0) {
+ 		cmd += 14;
+ 		return wpa_driver_sr_cmd(priv, cmd, buf, buf_len);
+@@ -7865,59 +8392,122 @@
+ 		 */
+ 		cmd += 12;
+ 		return wpa_driver_gpio_config_cmd(bss, cmd);
+-	} else { /* Use private command */
+-		memset(&ifr, 0, sizeof(ifr));
+-		memset(&priv_cmd, 0, sizeof(priv_cmd));
+-
+-		if (strlen(cmd) + 1 > buf_len) {
+-			wpa_printf(MSG_ERROR, "%s: cmd length is invalid\n",
+-				   __func__);
+-			return -EINVAL;
+-		}
+-		os_memcpy(buf, cmd, strlen(cmd) + 1);
+-		os_strlcpy(ifr.ifr_name, bss->ifname, IFNAMSIZ);
+-
+-		priv_cmd.buf = buf;
+-		priv_cmd.used_len = buf_len;
+-		priv_cmd.total_len = buf_len;
+-		ifr.ifr_data = &priv_cmd;
+-
+-		if ((ret = ioctl(drv->global->ioctl_sock, SIOCDEVPRIVATE + 1, &ifr)) < 0) {
+-			wpa_printf(MSG_ERROR, "%s: failed to issue private commands, ret:%d, errno:%d\n", __func__, ret, errno);
+-		} else {
+-			drv_errors = 0;
+-			if((os_strncasecmp(cmd, "SETBAND", 7) == 0) &&
+-				ret == DO_NOT_SEND_CHANNEL_CHANGE_EVENT) {
+-				return 0;
+-			}
+-
+-			ret = 0;
+-			if ((os_strcasecmp(cmd, "LINKSPEED") == 0) ||
+-			    (os_strcasecmp(cmd, "RSSI") == 0) ||
+-			    (os_strstr(cmd, "GET") != NULL))
+-				ret = strlen(buf);
+-			else if (os_strcasecmp(cmd, "P2P_DEV_ADDR") == 0)
+-				wpa_printf(MSG_DEBUG, "%s: P2P: Device address ("MACSTR")",
+-					__func__, MAC2STR(buf));
+-			else if (os_strcasecmp(cmd, "P2P_SET_PS") == 0)
+-				wpa_printf(MSG_DEBUG, "%s: P2P: %s ", __func__, buf);
+-			else if (os_strcasecmp(cmd, "P2P_SET_NOA") == 0)
+-				wpa_printf(MSG_DEBUG, "%s: P2P: %s ", __func__, buf);
+-			else if (os_strcasecmp(cmd, "STOP") == 0) {
+-				wpa_printf(MSG_DEBUG, "%s: %s ", __func__, buf);
+-				dl_list_for_each(driver, &drv->global->interfaces, struct wpa_driver_nl80211_data, list) {
+-					linux_set_iface_flags(drv->global->ioctl_sock, driver->first_bss->ifname, 0);
+-					wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STOPPED");
+-				}
+-			}
+-			else
+-				wpa_printf(MSG_DEBUG, "%s %s len = %d, %zu", __func__, buf, ret, buf_len);
+-			wpa_driver_notify_country_change(drv->ctx, cmd);
+-		}
++	} else if (os_strncasecmp(cmd, "SET_ANT_DIV ", 12) == 0) {
++		/**
++		 * Driver command for firmware based Antenna Diversity
++		 * Syntax: DRIVER SET_ANT_DIV ENABLE <enable_val> [CHAIN <chain_val>
++		 * STAY_PERIOD <stay_period> PROBE_PERIOD <probe_period>
++		 * PROBE_COUNT_WLAN <probe_count_wlan> PROBE_COUNT_BT <probe_count_bt>
++		 * WLAN_RSSI_TH <wlan_rssi_th> BT_RSSI_TH <bt_rssi_th>
++		 * WLAN_RSSI_DIFF <wlan_rssi_diff> BT_RSSI_DIFF <bt_rssi_diff>]
++		 * <enable_val> 1 to enable, 0 to disable
++		 */
++		cmd += 12;
++		return wpa_driver_set_ant_div_conf(bss, cmd);
++	} else if (os_strncasecmp(cmd, "GET_ANT_DIV ", 12) == 0) {
++		/**
++		 * Driver command to get current Antenna info
++		 * Driver GET_ANT_DIV MAC_ADDR <mac_addr>
++		 * <mac_addr> is mac address of peer
++		 */
++		cmd += 12;
++		return wpa_driver_get_ant_div_conf(bss, cmd, buf, buf_len);
++	} else {
++		/* Command not recognised — signal caller to try ioctl path */
++		*handled = false;
++		return 0;
+ 	}
+ 	return ret;
+ }
+ 
++int wpa_driver_nl80211_driver_cmd(void *priv, char *cmd, char *buf,
++				  size_t buf_len )
++{
++	struct i802_bss *bss = priv;
++	struct wpa_driver_nl80211_data *drv = NULL;
++	struct wpa_driver_nl80211_data *driver;
++	struct ifreq ifr;
++	android_wifi_priv_cmd priv_cmd;
++	bool handled = false;
++	int ret = 0;
++
++	ret = wpa_driver_nl80211_driver_cmd_dispatch(priv, cmd, buf, buf_len,
++						     &handled);
++	if (handled)
++		return ret;
++
++	/* Command not recognised — fall through to SIOCDEVPRIVATE+1 ioctl */
++	if (bss)
++		drv = bss->drv;
++
++	if (!drv) {
++		wpa_printf(MSG_ERROR, "%s: drv is NULL for cmd %s\n",
++			   __func__, cmd);
++		return -EINVAL;
++	}
++
++	if (os_strcasecmp(cmd, "MACADDR") == 0) {
++		u8 macaddr[ETH_ALEN] = {};
++
++		ret = linux_get_ifhwaddr(drv->global->ioctl_sock, bss->ifname, macaddr);
++		if (!ret)
++			ret = os_snprintf(buf, buf_len,
++					  "Macaddr = " MAC_ADDR_STR "\n", MAC_ADDR_ARRAY(macaddr));
++		return ret;
++	}
++
++	memset(&ifr, 0, sizeof(ifr));
++	memset(&priv_cmd, 0, sizeof(priv_cmd));
++
++	if (strlen(cmd) + 1 > buf_len) {
++		wpa_printf(MSG_ERROR, "%s: cmd length is invalid\n",
++			   __func__);
++		return -EINVAL;
++	}
++	os_memcpy(buf, cmd, strlen(cmd) + 1);
++	os_strlcpy(ifr.ifr_name, bss->ifname, IFNAMSIZ);
++
++	priv_cmd.buf = buf;
++	priv_cmd.used_len = buf_len;
++	priv_cmd.total_len = buf_len;
++	ifr.ifr_data = &priv_cmd;
++
++	if ((ret = ioctl(drv->global->ioctl_sock, SIOCDEVPRIVATE + 1, &ifr)) < 0) {
++		wpa_printf(MSG_ERROR, "%s: failed to issue private commands, ret:%d, errno:%d\n", __func__, ret, errno);
++	} else {
++		drv_errors = 0;
++		if((os_strncasecmp(cmd, "SETBAND", 7) == 0) &&
++			ret == DO_NOT_SEND_CHANNEL_CHANGE_EVENT) {
++			return 0;
++		}
++
++		ret = 0;
++		if ((os_strcasecmp(cmd, "LINKSPEED") == 0) ||
++		    (os_strcasecmp(cmd, "RSSI") == 0) ||
++		    (os_strstr(cmd, "GET") != NULL))
++			ret = strlen(buf);
++		else if (os_strcasecmp(cmd, "P2P_DEV_ADDR") == 0)
++			wpa_printf(MSG_DEBUG, "%s: P2P: Device address ("MACSTR")",
++				__func__, MAC2STR(buf));
++		else if (os_strcasecmp(cmd, "P2P_SET_PS") == 0)
++			wpa_printf(MSG_DEBUG, "%s: P2P: %s ", __func__, buf);
++		else if (os_strcasecmp(cmd, "P2P_SET_NOA") == 0)
++			wpa_printf(MSG_DEBUG, "%s: P2P: %s ", __func__, buf);
++		else if (os_strcasecmp(cmd, "STOP") == 0) {
++			wpa_printf(MSG_DEBUG, "%s: %s ", __func__, buf);
++			dl_list_for_each(driver, &drv->global->interfaces, struct wpa_driver_nl80211_data, list) {
++				linux_set_iface_flags(drv->global->ioctl_sock, driver->first_bss->ifname, 0);
++				wpa_msg(drv->ctx, MSG_INFO, WPA_EVENT_DRIVER_STATE "STOPPED");
++			}
++		}
++		else
++			wpa_printf(MSG_DEBUG, "%s %s len = %d, %zu", __func__, buf, ret, buf_len);
++		wpa_driver_notify_country_change(drv->ctx, cmd);
++	}
++	wpa_printf(MSG_DEBUG, "This debug print is to test coral workflow");
++	return ret;
++}
++
+ int wpa_driver_set_p2p_noa(void *priv, u8 count, int start, int duration)
+ {
+ 	char buf[MAX_DRV_CMD_SIZE];
+diff --git a/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211_oem_data.c b/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211_oem_data.c
+index 395e2f2..f1857ab 100644
+--- a/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211_oem_data.c
++++ b/qcwcn/wpa_supplicant_8_lib/driver_cmd_nl80211_oem_data.c
+@@ -40,6 +40,26 @@
+ #define SIZEOF_TLV_HDR 4
+ #define MAX_OEM_BUF_LEN 1024
+ 
++/*
++ * PA report TLV per-channel record sizes.
++ * Version is auto-detected from the TLV length field.
++ *
++ * v1 record (8 bytes):  4-byte freq + 4-byte pdadc
++ *   pdadc bits  0- 7: chain 0 current
++ *   pdadc bits  8-15: chain 1 current
++ *   pdadc bits 16-23: chain 2 current
++ *   pdadc bits 24-31: chain 3 current
++ *
++ * v2 record (12 bytes): 4-byte freq + 4-byte current_pdadc + 4-byte golden_pdadc
++ *   byte 0: chain 0 current    byte 4: chain 0 golden
++ *   byte 1: chain 1 current    byte 5: chain 1 golden
++ *   byte 2: chain 2 current    byte 6: chain 2 golden
++ *   byte 3: chain 3 current    byte 7: chain 3 golden
++ * Note: 2G only has 2 active chains; FW zero-pads chains 2-3 for uniform layout.
++ */
++#define PA_REPORT_V1_RECORD_SIZE   8
++#define PA_REPORT_V2_RECORD_SIZE  12
++
+ static int oem_data_response_handler(struct nl_msg *msg, void *arg);
+ 
+ struct oem_data_header {
+@@ -317,56 +337,83 @@
+ 			case OEM_DATA_TLV_PA_REPORT:
+ 				valid_report = 1;
+ 				if (tlv.length == 0) {
+-					// No data available
++					/* No PA damage detected */
+ 					wpa_printf(MSG_DEBUG, "PA_REPORT: Empty data");
+-					snprintf(info->reply_buf, info->reply_buf_len, "PA_REPORT: Empty data");
++					snprintf(info->reply_buf, info->reply_buf_len,
++						 "PA_REPORT: Empty data");
++				} else if (tlv.length == PA_REPORT_V1_RECORD_SIZE ||
++					   tlv.length == PA_REPORT_V1_RECORD_SIZE * 2) {
++					/*
++					 * Version 1: each record = 4-byte freq +
++					 * 4-byte pdadc (chain 0-3 packed as bytes)
++					 */
++					int num_ch = tlv.length / PA_REPORT_V1_RECORD_SIZE;
++					int buf_pos = 0;
++					int ch;
++
++					for (ch = 0; ch < num_ch &&
++					     buf_pos < (int)info->reply_buf_len - 1; ch++) {
++						u32 freq  = WPA_GET_LE32(tlv.value + ch * PA_REPORT_V1_RECORD_SIZE);
++						u32 pdadc = WPA_GET_LE32(tlv.value + ch * PA_REPORT_V1_RECORD_SIZE + 4);
++
++						wpa_printf(MSG_DEBUG,
++							   "PA_REPORT v1: Channel[%d] freq=%u, PDADC: "
++							   "chain0=%u chain1=%u chain2=%u chain3=%u",
++							   ch, freq,
++							   pdadc & 0xFF, (pdadc >> 8) & 0xFF,
++							   (pdadc >> 16) & 0xFF, (pdadc >> 24) & 0xFF);
++
++						buf_pos += snprintf(info->reply_buf + buf_pos,
++								    info->reply_buf_len - buf_pos,
++								    "%sPA_REPORT: Channel[%d] freq=%u, PDADC: "
++								    "chain0=%u chain1=%u chain2=%u chain3=%u",
++								    ch ? "\n" : "", ch, freq,
++								    pdadc & 0xFF, (pdadc >> 8) & 0xFF,
++								    (pdadc >> 16) & 0xFF, (pdadc >> 24) & 0xFF);
++					}
++				} else if (tlv.length == PA_REPORT_V2_RECORD_SIZE ||
++					   tlv.length == PA_REPORT_V2_RECORD_SIZE * 2) {
++					/*
++					 * Version 2: each record = 4-byte freq +
++					 * 4-byte current_pdadc + 4-byte golden_pdadc.
++					 * 2G chains 2-3 are zero-padded by FW.
++					 */
++					int num_ch = tlv.length / PA_REPORT_V2_RECORD_SIZE;
++					int buf_pos = 0;
++					int ch;
++
++					for (ch = 0; ch < num_ch &&
++					     buf_pos < (int)info->reply_buf_len - 1; ch++) {
++						u32 freq   = WPA_GET_LE32(tlv.value + ch * PA_REPORT_V2_RECORD_SIZE);
++						u32 cur    = WPA_GET_LE32(tlv.value + ch * PA_REPORT_V2_RECORD_SIZE + 4);
++						u32 golden = WPA_GET_LE32(tlv.value + ch * PA_REPORT_V2_RECORD_SIZE + 8);
++
++						wpa_printf(MSG_DEBUG,
++							   "PA_REPORT v2: Channel[%d] freq=%u, "
++							   "Current PDADC: chain0=%u chain1=%u chain2=%u chain3=%u, "
++							   "Golden PDADC:  chain0=%u chain1=%u chain2=%u chain3=%u",
++							   ch, freq,
++							   cur & 0xFF, (cur >> 8) & 0xFF,
++							   (cur >> 16) & 0xFF, (cur >> 24) & 0xFF,
++							   golden & 0xFF, (golden >> 8) & 0xFF,
++							   (golden >> 16) & 0xFF, (golden >> 24) & 0xFF);
++
++						buf_pos += snprintf(info->reply_buf + buf_pos,
++								    info->reply_buf_len - buf_pos,
++								    "%sPA_REPORT: Channel[%d] freq=%u, "
++								    "Current PDADC: chain0=%u chain1=%u chain2=%u chain3=%u, "
++								    "Golden PDADC:  chain0=%u chain1=%u chain2=%u chain3=%u",
++								    ch ? "\n" : "", ch, freq,
++								    cur & 0xFF, (cur >> 8) & 0xFF,
++								    (cur >> 16) & 0xFF, (cur >> 24) & 0xFF,
++								    golden & 0xFF, (golden >> 8) & 0xFF,
++								    (golden >> 16) & 0xFF, (golden >> 24) & 0xFF);
++					}
+ 				} else {
+-					// Case 1: Single channel info (8 bytes total: 4 freq + 4 pdadc)
+-					if (tlv.length >= 8) {
+-						u32 freq = WPA_GET_LE32(tlv.value);
+-						u32 pdadc = WPA_GET_LE32(tlv.value + 4);
+-
+-						u8 chain0_pdadc = pdadc & 0xFF;
+-						u8 chain1_pdadc = (pdadc >> 8) & 0xFF;
+-						u8 chain2_pdadc = (pdadc >> 16) & 0xFF;
+-						u8 chain3_pdadc = (pdadc >> 24) & 0xFF;
+-
+-						wpa_printf(MSG_DEBUG,
+-						   "PA_REPORT: Channel[0] freq=%u, PDADC values: "
+-						   "chain0=%u, chain1=%u, chain2=%u, chain3=%u",
+-						   freq, chain0_pdadc, chain1_pdadc, chain2_pdadc, chain3_pdadc);
+-
+-						snprintf(info->reply_buf, info->reply_buf_len,
+-						    "PA_REPORT: Channel[0] freq=%u, PDADC values: "
+-						    "chain0=%u, chain1=%u, chain2=%u, chain3=%u",
+-						    freq, chain0_pdadc, chain1_pdadc, chain2_pdadc, chain3_pdadc);
+-					}
+-
+-					// Case 2: Two channel info (16 bytes total: 2*(4 freq + 4 pdadc))
+-					if (tlv.length >= 16) {
+-						u32 freq2 = WPA_GET_LE32(tlv.value + 8);
+-						u32 pdadc2 = WPA_GET_LE32(tlv.value + 12);
+-
+-						u8 chain0_pdadc2 = pdadc2 & 0xFF;
+-						u8 chain1_pdadc2 = (pdadc2 >> 8) & 0xFF;
+-						u8 chain2_pdadc2 = (pdadc2 >> 16) & 0xFF;
+-						u8 chain3_pdadc2 = (pdadc2 >> 24) & 0xFF;
+-
+-						wpa_printf(MSG_DEBUG,
+-						   "PA_REPORT: channel[1] freq=%u, PDADC values: "
+-						   "chain0=%u, chain1=%u, chain2=%u, chain3=%u",
+-						   freq2, chain0_pdadc2, chain1_pdadc2, chain2_pdadc2, chain3_pdadc2);
+-
+-						// For second channel, append to existing buffer
+-						int current_len = strlen(info->reply_buf);
+-						if (current_len < info->reply_buf_len - 1) {
+-							snprintf(info->reply_buf + current_len,
+-							    info->reply_buf_len - current_len,
+-							    "\nPA_REPORT: Channel[1] freq=%u, PDADC values: "
+-							    "chain0=%u, chain1=%u, chain2=%u, chain3=%u",
+-							freq2, chain0_pdadc2, chain1_pdadc2, chain2_pdadc2, chain3_pdadc2);
+-						}
+-					}
++					wpa_printf(MSG_ERROR,
++						   "PA_REPORT: unexpected TLV length %u", tlv.length);
++					snprintf(info->reply_buf, info->reply_buf_len,
++						 "PA_REPORT: unexpected TLV length %u", tlv.length);
+ 				}
+ 				break;
+ 			}

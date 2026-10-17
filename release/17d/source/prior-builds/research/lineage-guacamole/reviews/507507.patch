@@ -1,0 +1,54 @@
+From 590c94850e079642136a4577305d02e4174caabc Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Mon, 12 Oct 2026 08:13:11 +0100
+Subject: [PATCH] libcodec2: Shim legacy Codec2 WorkBundle
+
+Forward the old HIDL BufferPoolSender symbol to its templated
+equivalent for Dolby Codec2 clients.
+
+Assisted-by: LLM
+Change-Id: I3fb502c28a9df356e201940fe6d8bfbe30bc30c3
+---
+
+diff --git a/Android.bp b/Android.bp
+index b6c9f44..05a9ff2 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -232,10 +232,12 @@
+ cc_library_shared {
+     name: "libcodec2_shim",
+     shared_libs: [
++        "libcodec2_hidl@1.0",
+         "libcodec2_vndk",
+     ],
+     srcs: [
+         "libcodec2/C2Fence.cpp",
++        "libcodec2/WorkBundle.cpp",
+     ],
+     vendor: true,
+ }
+diff --git a/libcodec2/WorkBundle.cpp b/libcodec2/WorkBundle.cpp
+new file mode 100644
+index 0000000..2f2dbf2
+--- /dev/null
++++ b/libcodec2/WorkBundle.cpp
+@@ -0,0 +1,19 @@
++//
++// SPDX-FileCopyrightText: The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++extern "C" bool objcpy_current(void* bundle, const void* works, void* sender) __asm__(
++        "_ZN7android8hardware5media2c24V1_05utils6objcpyEPNS3_10WorkBundleERKNSt3__14listINS7_"
++        "10unique_ptrI6C2WorkNS7_14default_deleteISA_EEEENS7_9allocatorISD_EEEEPNS_"
++        "16BufferPoolSenderINS4_15BufferPoolTypesEEE");
++
++extern "C" bool objcpy_legacy(void* bundle, const void* works, void* sender) __asm__(
++        "_ZN7android8hardware5media2c24V1_05utils6objcpyEPNS3_10WorkBundleERKNSt3__14listINS7_"
++        "10unique_ptrI6C2WorkNS7_14default_deleteISA_EEEENS7_9allocatorISD_EEEEPNS4_"
++        "16BufferPoolSenderE");
++
++// BufferPoolSender became a template without changing its HIDL virtual interface.
++extern "C" bool objcpy_legacy(void* bundle, const void* works, void* sender) {
++    return objcpy_current(bundle, works, sender);
++}

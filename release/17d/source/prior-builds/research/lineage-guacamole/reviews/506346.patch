@@ -1,0 +1,362 @@
+From 7f05fbafa3ee37afb6714510a3c986391c581452 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 01:17:08 +0530
+Subject: [PATCH] LatinIME: Add split keyboard toggle to suggestion strip
+
+Like Gboard, add a key at the start of the suggestion strip to split or
+merge the keyboard without going through settings. The key is only
+shown where the split layout applies, on tablets in landscape, and it
+flips the same preference as the settings screen.
+
+Assisted-by: LLM
+Change-Id: I1406c7d974451df4bfe5b0737513ba5a5834c81a
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/res/drawable/ic_split_keyboard.xml b/java/res/drawable/ic_split_keyboard.xml
+new file mode 100644
+index 0000000..61d89a0
+--- /dev/null
++++ b/java/res/drawable/ic_split_keyboard.xml
+@@ -0,0 +1,19 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:fillType="evenOdd"
++        android:pathData="M3,6h7a1,1 0,0 1,1 1v10a1,1 0,0 1,-1 1h-7a1,1 0,0 1,-1 -1v-10a1,1 0,0 1,1 -1zM4,8v2h2v-2zM7,8v2h2v-2zM4,11v2h2v-2zM7,11v2h2v-2zM4,14v2h5v-2z" />
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:fillType="evenOdd"
++        android:pathData="M14,6h7a1,1 0,0 1,1 1v10a1,1 0,0 1,-1 1h-7a1,1 0,0 1,-1 -1v-10a1,1 0,0 1,1 -1zM15,8v2h2v-2zM18,8v2h2v-2zM15,11v2h2v-2zM18,11v2h2v-2zM15,14v2h5v-2z" />
++</vector>
+diff --git a/java/res/layout/suggestions_strip.xml b/java/res/layout/suggestions_strip.xml
+index 47e9a91..dc0284d 100644
+--- a/java/res/layout/suggestions_strip.xml
++++ b/java/res/layout/suggestions_strip.xml
+@@ -53,6 +53,17 @@
+             style="?attr/suggestionWordStyle" />
+     </LinearLayout>
+     <ImageButton
++        android:id="@+id/suggestions_strip_split_key"
++        android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
++        android:layout_height="fill_parent"
++        android:layout_alignParentStart="true"
++        android:layout_alignParentLeft="true"
++        android:layout_centerVertical="true"
++        android:src="@drawable/ic_split_keyboard"
++        android:visibility="invisible"
++        android:contentDescription="@string/spoken_description_split_keyboard"
++        style="?attr/suggestionWordStyle" />
++    <ImageButton
+         android:id="@+id/suggestions_strip_voice_key"
+         android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
+         android:layout_height="fill_parent"
+diff --git a/java/res/values/cm_strings.xml b/java/res/values/cm_strings.xml
+index 5e08121..c578dad 100644
+--- a/java/res/values/cm_strings.xml
++++ b/java/res/values/cm_strings.xml
+@@ -62,4 +62,9 @@
+     <!-- Preference item for showing keys near the middle on both halves of the split keyboard [CHAR LIMIT=65] -->
+     <string name="split_keyboard_duplicate_keys">Duplicate center keys</string>
+     <string name="split_keyboard_duplicate_keys_summary">Show keys near the middle on both halves</string>
++
++    <!-- Spoken description of the suggestion strip key that splits the keyboard into two halves -->
++    <string name="spoken_description_split_keyboard">Split keyboard</string>
++    <!-- Spoken description of the suggestion strip key that joins the split keyboard halves -->
++    <string name="spoken_description_merge_keyboard">Merge keyboard</string>
+ </resources>
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+index 1e93351..57146fe 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+@@ -38,8 +38,6 @@
+ import com.android.inputmethod.latin.R;
+ import com.android.inputmethod.latin.RichInputMethodManager;
+ import com.android.inputmethod.latin.WordComposer;
+-import com.android.inputmethod.latin.common.Constants;
+-import com.android.inputmethod.latin.define.ProductionFlags;
+ import com.android.inputmethod.latin.settings.Settings;
+ import com.android.inputmethod.latin.settings.SettingsValues;
+ import com.android.inputmethod.latin.utils.CapsModeUtils;
+@@ -47,6 +45,7 @@
+ import com.android.inputmethod.latin.utils.RecapitalizeStatus;
+ import com.android.inputmethod.latin.utils.ResourceUtils;
+ import com.android.inputmethod.latin.utils.ScriptUtils;
++import com.android.inputmethod.latin.utils.SplitKeyboardUtils;
+ 
+ import javax.annotation.Nonnull;
+ 
+@@ -132,10 +131,8 @@
+         builder.setNumberRowPasswordEnabled(settingsValues.mShowNumberRowPassword);
+         builder.setLanguageSwitchKeyEnabled(mLatinIME.shouldShowLanguageSwitchKey());
+         builder.setEmojiKeyEnabled(settingsValues.mShowsEmojiKey);
+-        builder.setSplitLayoutEnabledByUser(ProductionFlags.IS_SPLIT_KEYBOARD_SUPPORTED
+-                && settingsValues.mIsSplitKeyboardEnabled
+-                && !Constants.isPhone(Settings.readScreenMetrics(res))
+-                && res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE);
++        builder.setSplitLayoutEnabledByUser(settingsValues.mIsSplitKeyboardEnabled
++                && SplitKeyboardUtils.isSplitKeyboardAvailable(res));
+         builder.setSplitDuplicateKeysEnabled(settingsValues.mSplitKeyboardDuplicateKeys);
+         mKeyboardLayoutSet = builder.build();
+         try {
+diff --git a/java/src/com/android/inputmethod/latin/LatinIME.java b/java/src/com/android/inputmethod/latin/LatinIME.java
+index b6351a5..93ecda0 100644
+--- a/java/src/com/android/inputmethod/latin/LatinIME.java
++++ b/java/src/com/android/inputmethod/latin/LatinIME.java
+@@ -100,6 +100,7 @@
+ import com.android.inputmethod.latin.utils.JniUtils;
+ import com.android.inputmethod.latin.utils.LeakGuardHandlerWrapper;
+ import com.android.inputmethod.latin.utils.StatsUtils;
++import com.android.inputmethod.latin.utils.SplitKeyboardUtils;
+ import com.android.inputmethod.latin.utils.StatsUtilsManager;
+ import com.android.inputmethod.latin.utils.SubtypeLocaleUtils;
+ import com.android.inputmethod.latin.utils.ViewLayoutUtils;
+@@ -1413,6 +1414,16 @@
+     }
+ 
+     @Override
++    public void toggleSplitKeyboard() {
++        SplitKeyboardUtils.toggleSplitKeyboard(PreferenceManager.getDefaultSharedPreferences(this));
++        loadSettings();
++        if (mKeyboardSwitcher.getMainKeyboardView() != null) {
++            mKeyboardSwitcher.loadKeyboard(getCurrentInputEditorInfo(), mSettings.getCurrent(),
++                    getCurrentAutoCapsState(), getCurrentRecapitalizeState());
++        }
++    }
++
++    @Override
+     public void onRequestPermissionsResult(boolean allGranted) {
+         ImportantNoticeUtils.updateContactsNoticeShown(this /* context */);
+         setNeutralSuggestionStrip();
+@@ -1693,6 +1704,7 @@
+                 && currentSettingsValues.isSuggestionsEnabledPerUserSettings();
+         final boolean shouldShowSuggestionsStripUnlessPassword = shouldShowImportantNotice
+                 || currentSettingsValues.mShowsVoiceInputKey
++                || SplitKeyboardUtils.isSplitKeyboardAvailable(getResources())
+                 || shouldShowSuggestionCandidates
+                 || currentSettingsValues.isApplicationSpecifiedCompletionsOn();
+         final boolean shouldShowSuggestionsStrip = shouldShowSuggestionsStripUnlessPassword
+diff --git a/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java b/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java
+index 5dba492..f30f604 100644
+--- a/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java
++++ b/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java
+@@ -52,6 +52,7 @@
+ import com.android.inputmethod.latin.settings.SettingsValues;
+ import com.android.inputmethod.latin.suggestions.MoreSuggestionsView.MoreSuggestionsListener;
+ import com.android.inputmethod.latin.utils.ImportantNoticeUtils;
++import com.android.inputmethod.latin.utils.SplitKeyboardUtils;
+ 
+ import java.util.ArrayList;
+ 
+@@ -61,13 +62,17 @@
+         public void showImportantNoticeContents();
+         public void pickSuggestionManually(SuggestedWordInfo word);
+         public void onCodeInput(int primaryCode, int x, int y, boolean isKeyRepeat);
++        public void toggleSplitKeyboard();
+     }
+ 
+     static final boolean DBG = DebugFlags.DEBUG_ENABLED;
+     private static final float DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.0f;
++    private static final int SPLIT_KEY_ALPHA_ON = 255;
++    private static final int SPLIT_KEY_ALPHA_OFF = 128;
+ 
+     private final ViewGroup mSuggestionsStrip;
+     private final ImageButton mVoiceKey;
++    private final ImageButton mSplitKey;
+     private final View mImportantNoticeStrip;
+     MainKeyboardView mMainKeyboardView;
+ 
+@@ -140,6 +145,7 @@
+ 
+         mSuggestionsStrip = (ViewGroup)findViewById(R.id.suggestions_strip);
+         mVoiceKey = (ImageButton)findViewById(R.id.suggestions_strip_voice_key);
++        mSplitKey = (ImageButton)findViewById(R.id.suggestions_strip_split_key);
+         mImportantNoticeStrip = findViewById(R.id.important_notice_strip);
+         mStripVisibilityGroup = new StripVisibilityGroup(this, mSuggestionsStrip,
+                 mImportantNoticeStrip);
+@@ -178,6 +184,8 @@
+         keyboardAttr.recycle();
+         mVoiceKey.setImageDrawable(iconVoice);
+         mVoiceKey.setOnClickListener(this);
++        mSplitKey.setImageTintList(mWordViews.get(0).getTextColors());
++        mSplitKey.setOnClickListener(this);
+     }
+ 
+     /**
+@@ -194,6 +202,21 @@
+         setVisibility(visibility);
+         final SettingsValues currentSettingsValues = Settings.getInstance().getCurrent();
+         mVoiceKey.setVisibility(currentSettingsValues.mShowsVoiceInputKey ? VISIBLE : INVISIBLE);
++        updateSplitKey();
++    }
++
++    private void updateSplitKey() {
++        if (!SplitKeyboardUtils.isSplitKeyboardAvailable(getResources())) {
++            mSplitKey.setVisibility(INVISIBLE);
++            return;
++        }
++        final boolean isSplit = Settings.getInstance().getCurrent().mIsSplitKeyboardEnabled;
++        mSplitKey.setVisibility(VISIBLE);
++        mSplitKey.setActivated(isSplit);
++        mSplitKey.setImageAlpha(isSplit ? SPLIT_KEY_ALPHA_ON : SPLIT_KEY_ALPHA_OFF);
++        mSplitKey.setContentDescription(getResources().getString(isSplit
++                ? R.string.spoken_description_merge_keyboard
++                : R.string.spoken_description_split_keyboard));
+     }
+ 
+     public void setSuggestions(final SuggestedWords suggestedWords, final boolean isRtlLanguage) {
+@@ -453,6 +476,11 @@
+             mListener.showImportantNoticeContents();
+             return;
+         }
++        if (view == mSplitKey) {
++            mListener.toggleSplitKeyboard();
++            updateSplitKey();
++            return;
++        }
+         if (view == mVoiceKey) {
+             mListener.onCodeInput(Constants.CODE_SHORTCUT,
+                     Constants.SUGGESTION_STRIP_COORDINATE, Constants.SUGGESTION_STRIP_COORDINATE,
+diff --git a/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java b/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
+new file mode 100644
+index 0000000..8c29358
+--- /dev/null
++++ b/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
+@@ -0,0 +1,33 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.latin.utils;
++
++import android.content.SharedPreferences;
++import android.content.res.Configuration;
++import android.content.res.Resources;
++
++import com.android.inputmethod.latin.common.Constants;
++import com.android.inputmethod.latin.define.ProductionFlags;
++import com.android.inputmethod.latin.settings.Settings;
++
++import javax.annotation.Nonnull;
++
++public final class SplitKeyboardUtils {
++    private SplitKeyboardUtils() {
++    }
++
++    public static boolean isSplitKeyboardAvailable(@Nonnull final Resources res) {
++        return ProductionFlags.IS_SPLIT_KEYBOARD_SUPPORTED
++                && !Constants.isPhone(Settings.readScreenMetrics(res))
++                && res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
++    }
++
++    public static boolean toggleSplitKeyboard(@Nonnull final SharedPreferences prefs) {
++        final boolean enabled = !prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, false);
++        prefs.edit().putBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, enabled).apply();
++        return enabled;
++    }
++}
+diff --git a/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java b/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java
+new file mode 100644
+index 0000000..85d27fd
+--- /dev/null
++++ b/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java
+@@ -0,0 +1,89 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.latin.utils;
++
++import static org.junit.Assert.assertFalse;
++import static org.junit.Assert.assertTrue;
++
++import android.content.Context;
++import android.content.SharedPreferences;
++import android.content.res.Configuration;
++import android.content.res.Resources;
++
++import androidx.test.InstrumentationRegistry;
++import androidx.test.filters.SmallTest;
++import androidx.test.runner.AndroidJUnit4;
++
++import com.android.inputmethod.latin.settings.Settings;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++
++@SmallTest
++@RunWith(AndroidJUnit4.class)
++public class SplitKeyboardUtilsTests {
++    private static final int TABLET_SMALLEST_WIDTH_DP = 800;
++    private static final int PHONE_SMALLEST_WIDTH_DP = 400;
++
++    private static Context getContext() {
++        return InstrumentationRegistry.getTargetContext();
++    }
++
++    private static Resources resourcesFor(final int smallestWidthDp, final int orientation) {
++        final Configuration config =
++                new Configuration(getContext().getResources().getConfiguration());
++        config.smallestScreenWidthDp = smallestWidthDp;
++        config.orientation = orientation;
++        return getContext().createConfigurationContext(config).getResources();
++    }
++
++    @Test
++    public void testAvailableOnTabletInLandscape() {
++        assertTrue(SplitKeyboardUtils.isSplitKeyboardAvailable(resourcesFor(
++                TABLET_SMALLEST_WIDTH_DP, Configuration.ORIENTATION_LANDSCAPE)));
++    }
++
++    @Test
++    public void testUnavailableOnTabletInPortrait() {
++        assertFalse(SplitKeyboardUtils.isSplitKeyboardAvailable(resourcesFor(
++                TABLET_SMALLEST_WIDTH_DP, Configuration.ORIENTATION_PORTRAIT)));
++    }
++
++    @Test
++    public void testUnavailableOnPhoneInLandscape() {
++        assertFalse(SplitKeyboardUtils.isSplitKeyboardAvailable(resourcesFor(
++                PHONE_SMALLEST_WIDTH_DP, Configuration.ORIENTATION_LANDSCAPE)));
++    }
++
++    @Test
++    public void testUnavailableOnLargePhonesInLandscape() {
++        for (final int smallestWidthDp : new int[] { 430, 599 }) {
++            assertFalse("sw" + smallestWidthDp, SplitKeyboardUtils.isSplitKeyboardAvailable(
++                    resourcesFor(smallestWidthDp, Configuration.ORIENTATION_LANDSCAPE)));
++        }
++    }
++
++    @Test
++    public void testAvailableOnAllTabletSizesInLandscape() {
++        for (final int smallestWidthDp : new int[] { 600, 768 }) {
++            assertTrue("sw" + smallestWidthDp, SplitKeyboardUtils.isSplitKeyboardAvailable(
++                    resourcesFor(smallestWidthDp, Configuration.ORIENTATION_LANDSCAPE)));
++        }
++    }
++
++    @Test
++    public void testToggleFlipsSplitPreference() {
++        final SharedPreferences prefs = getContext().getSharedPreferences(
++                "split_keyboard_utils_tests", Context.MODE_PRIVATE);
++        prefs.edit().clear().commit();
++
++        assertTrue(SplitKeyboardUtils.toggleSplitKeyboard(prefs));
++        assertTrue(prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, false));
++
++        assertFalse(SplitKeyboardUtils.toggleSplitKeyboard(prefs));
++        assertFalse(prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, true));
++    }
++}

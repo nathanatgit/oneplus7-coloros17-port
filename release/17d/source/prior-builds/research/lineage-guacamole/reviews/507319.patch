@@ -1,0 +1,1398 @@
+From 56fd9f0ed9a36a80a518d1e22ea17196719bd39d Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sat, 10 Oct 2026 14:50:09 +0100
+Subject: [PATCH] compat: Adapt Bluetooth audio configurations for V3 callers
+
+Legacy audio HALs allocate a V3 AudioConfiguration return object,
+while the current session library returns the larger V6 type.
+This corrupts the stack when opening A2DP.
+
+Add a dedicated GetAudioConfV3 entry point that converts through
+AIDL parcels into private V3 types, preserving the native layout
+expected by legacy callers.
+
+Assisted-by: LLM
+Change-Id: Ia0019417a56d53f3ac311cfc83744044ae476a5c
+---
+
+diff --git a/Android.bp b/Android.bp
+index 1af7c43..19009a8 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -76,11 +76,18 @@
+     name: "libbluetooth_audio_session_aidl_shim",
+     shared_libs: [
+         "libbluetooth_audio_session_aidl",
++        "libbinder_ndk",
++        "liblog",
+     ],
+     srcs: [
++        "libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp",
+         "libbluetooth_audio_session_aidl/BluetoothAudioSession.cpp",
+     ],
+     vendor: true,
++    defaults: ["latest_android_hardware_bluetooth_audio_ndk_shared"],
++    static_libs: [
++        "lineage.compat.bluetooth.audio.v3-ndk",
++    ],
+ }
+ 
+ cc_defaults {
+diff --git a/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp b/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp
+new file mode 100644
+index 0000000..f73d689
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp
+@@ -0,0 +1,42 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <aidl/android/hardware/bluetooth/audio/AudioConfiguration.h>
++#include <aidl/lineage/compat/bluetooth/audio/v3/AudioConfiguration.h>
++#include <android/binder_parcel.h>
++#include <log/log.h>
++#include <memory>
++
++namespace current = aidl::android::hardware::bluetooth::audio;
++namespace legacy = aidl::lineage::compat::bluetooth::audio::v3;
++
++// Avoid depending on the private session object's layout.
++extern const current::AudioConfiguration getCurrentAudioConfig(void* session) asm(
++        "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfigEv");
++
++extern const legacy::AudioConfiguration getLegacyAudioConfig(void* session) asm(
++        "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfV3Ev");
++
++const legacy::AudioConfiguration getLegacyAudioConfig(void* session) {
++    const auto config = getCurrentAudioConfig(session);
++    legacy::AudioConfiguration result;
++    // New union alternatives have no V3 representation. A zero-rate PCM
++    // configuration makes the legacy software audio path reject the format.
++    if (static_cast<int>(config.getTag()) >
++        static_cast<int>(legacy::AudioConfiguration::Tag::leAudioBroadcastConfig)) {
++        ALOGE("Bluetooth audio configuration has no V3 representation");
++        return result;
++    }
++    // Stable AIDL parcel encoding provides field conversion without sharing
++    // the incompatible std::variant layout across the native ABI boundary.
++    std::unique_ptr<AParcel, decltype(&AParcel_delete)> parcel(AParcel_create(), AParcel_delete);
++    if (!parcel || config.writeToParcel(parcel.get()) != STATUS_OK ||
++        AParcel_setDataPosition(parcel.get(), 0) != STATUS_OK ||
++        result.readFromParcel(parcel.get()) != STATUS_OK) {
++        ALOGE("Failed to convert Bluetooth audio configuration to V3");
++        return legacy::AudioConfiguration{};
++    }
++    return result;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/Android.bp b/libbluetooth_audio_session_aidl/legacy/Android.bp
+new file mode 100644
+index 0000000..13684d9
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/Android.bp
+@@ -0,0 +1,23 @@
++//
++// SPDX-FileCopyrightText: The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++// Private, namespaced copies of the V3 data types for legacy native callers.
++aidl_interface {
++    name: "lineage.compat.bluetooth.audio.v3",
++    vendor_available: true,
++    unstable: true,
++    srcs: ["lineage/compat/bluetooth/audio/v3/*.aidl"],
++    backend: {
++        java: {
++            enabled: false
++        },
++        cpp: {
++            enabled: false
++        },
++        ndk: {
++            enabled: true
++        },
++    },
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AacConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AacConfiguration.aidl
+new file mode 100644
+index 0000000..536217e
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AacConfiguration.aidl
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable AacConfiguration {
++  lineage.compat.bluetooth.audio.v3.AacObjectType objectType;
++  int sampleRateHz;
++  lineage.compat.bluetooth.audio.v3.ChannelMode channelMode;
++  boolean variableBitRateEnabled;
++  byte bitsPerSample;
++  boolean adaptiveBitRateSupported;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AacObjectType.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AacObjectType.aidl
+new file mode 100644
+index 0000000..5ea99c0
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AacObjectType.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="byte") 
++enum AacObjectType {
++  MPEG2_LC,
++  MPEG4_LC,
++  MPEG4_LTP,
++  MPEG4_SCALABLE,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveChannelMode.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveChannelMode.aidl
+new file mode 100644
+index 0000000..54d7248
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveChannelMode.aidl
+@@ -0,0 +1,42 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="int") 
++enum AptxAdaptiveChannelMode {
++  JOINT_STEREO = 0,
++  MONO = 1,
++  DUAL_MONO = 2,
++  TWS_STEREO = 4,
++  UNKNOWN = 0xFF,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveConfiguration.aidl
+new file mode 100644
+index 0000000..6381828
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveConfiguration.aidl
+@@ -0,0 +1,46 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable AptxAdaptiveConfiguration {
++  int sampleRateHz;
++  lineage.compat.bluetooth.audio.v3.AptxAdaptiveChannelMode channelMode;
++  byte bitsPerSample;
++  lineage.compat.bluetooth.audio.v3.AptxMode aptxMode;
++  lineage.compat.bluetooth.audio.v3.AptxSinkBuffering sinkBufferingMs;
++  lineage.compat.bluetooth.audio.v3.AptxAdaptiveTimeToPlay ttp;
++  lineage.compat.bluetooth.audio.v3.AptxAdaptiveInputMode inputMode;
++  int inputFadeDurationMs;
++  byte[] aptxAdaptiveConfigStream;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveInputMode.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveInputMode.aidl
+new file mode 100644
+index 0000000..b610069
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveInputMode.aidl
+@@ -0,0 +1,39 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="int") 
++enum AptxAdaptiveInputMode {
++  STEREO = 0x00,
++  DUAL_MONO = 0x01,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveLeConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveLeConfiguration.aidl
+new file mode 100644
+index 0000000..0b87dfb
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveLeConfiguration.aidl
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable AptxAdaptiveLeConfiguration {
++  byte pcmBitDepth;
++  int samplingFrequencyHz;
++  int frameDurationUs;
++  int octetsPerFrame;
++  byte blocksPerSdu;
++  int codecMode;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveTimeToPlay.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveTimeToPlay.aidl
+new file mode 100644
+index 0000000..1ee938d
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxAdaptiveTimeToPlay.aidl
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable AptxAdaptiveTimeToPlay {
++  byte lowLowLatency;
++  byte highLowLatency;
++  byte lowHighQuality;
++  byte highHighQuality;
++  byte lowTws;
++  byte highTws;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxConfiguration.aidl
+new file mode 100644
+index 0000000..ca8f9db
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxConfiguration.aidl
+@@ -0,0 +1,40 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable AptxConfiguration {
++  int sampleRateHz;
++  lineage.compat.bluetooth.audio.v3.ChannelMode channelMode;
++  byte bitsPerSample;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxMode.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxMode.aidl
+new file mode 100644
+index 0000000..761612d
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxMode.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="int") 
++enum AptxMode {
++  UNKNOWN = 0x00,
++  HIGH_QUALITY = 0x1000,
++  LOW_LATENCY = 0x2000,
++  ULTRA_LOW_LATENCY = 0x4000,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxSinkBuffering.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxSinkBuffering.aidl
+new file mode 100644
+index 0000000..2c7117b
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AptxSinkBuffering.aidl
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable AptxSinkBuffering {
++  byte minLowLatency;
++  byte maxLowLatency;
++  byte minHighQuality;
++  byte maxHighQuality;
++  byte minTws;
++  byte maxTws;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AudioConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AudioConfiguration.aidl
+new file mode 100644
+index 0000000..ae293b6
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/AudioConfiguration.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++union AudioConfiguration {
++  lineage.compat.bluetooth.audio.v3.PcmConfiguration pcmConfig;
++  lineage.compat.bluetooth.audio.v3.CodecConfiguration a2dpConfig;
++  lineage.compat.bluetooth.audio.v3.LeAudioConfiguration leAudioConfig;
++  lineage.compat.bluetooth.audio.v3.LeAudioBroadcastConfiguration leAudioBroadcastConfig;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/ChannelMode.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/ChannelMode.aidl
+new file mode 100644
+index 0000000..74c9d17
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/ChannelMode.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="byte") 
++enum ChannelMode {
++  UNKNOWN,
++  MONO,
++  STEREO,
++  DUALMONO,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/CodecConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/CodecConfiguration.aidl
+new file mode 100644
+index 0000000..b96810e
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/CodecConfiguration.aidl
+@@ -0,0 +1,59 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable CodecConfiguration {
++  lineage.compat.bluetooth.audio.v3.CodecType codecType;
++  int encodedAudioBitrate;
++  int peerMtu;
++  boolean isScmstEnabled;
++  lineage.compat.bluetooth.audio.v3.CodecConfiguration.CodecSpecific config;
++  
++  parcelable VendorConfiguration {
++    int vendorId;
++    char codecId;
++    ParcelableHolder codecConfig;
++  }
++  
++  union CodecSpecific {
++    lineage.compat.bluetooth.audio.v3.SbcConfiguration sbcConfig;
++    lineage.compat.bluetooth.audio.v3.AacConfiguration aacConfig;
++    lineage.compat.bluetooth.audio.v3.LdacConfiguration ldacConfig;
++    lineage.compat.bluetooth.audio.v3.AptxConfiguration aptxConfig;
++    lineage.compat.bluetooth.audio.v3.AptxAdaptiveConfiguration aptxAdaptiveConfig;
++    lineage.compat.bluetooth.audio.v3.Lc3Configuration lc3Config;
++    lineage.compat.bluetooth.audio.v3.CodecConfiguration.VendorConfiguration vendorConfig;
++    @nullable lineage.compat.bluetooth.audio.v3.OpusConfiguration opusConfig;
++  }
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/CodecType.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/CodecType.aidl
+new file mode 100644
+index 0000000..cde9acd
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/CodecType.aidl
+@@ -0,0 +1,49 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="int") 
++enum CodecType {
++  UNKNOWN,
++  SBC,
++  AAC,
++  APTX,
++  APTX_HD,
++  LDAC,
++  LC3,
++  VENDOR,
++  APTX_ADAPTIVE,
++  OPUS,
++  APTX_ADAPTIVE_LE,
++  APTX_ADAPTIVE_LEX,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/Lc3Configuration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/Lc3Configuration.aidl
+new file mode 100644
+index 0000000..54d7555
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/Lc3Configuration.aidl
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable Lc3Configuration {
++  byte pcmBitDepth;
++  int samplingFrequencyHz;
++  int frameDurationUs;
++  int octetsPerFrame;
++  byte blocksPerSdu;
++  lineage.compat.bluetooth.audio.v3.ChannelMode channelMode;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacChannelMode.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacChannelMode.aidl
+new file mode 100644
+index 0000000..04835b8
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacChannelMode.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="byte") 
++enum LdacChannelMode {
++  UNKNOWN,
++  STEREO,
++  DUAL,
++  MONO,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacConfiguration.aidl
+new file mode 100644
+index 0000000..0851546
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacConfiguration.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable LdacConfiguration {
++  int sampleRateHz;
++  lineage.compat.bluetooth.audio.v3.LdacChannelMode channelMode;
++  lineage.compat.bluetooth.audio.v3.LdacQualityIndex qualityIndex;
++  byte bitsPerSample;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacQualityIndex.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacQualityIndex.aidl
+new file mode 100644
+index 0000000..301f0e3
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LdacQualityIndex.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="byte") 
++enum LdacQualityIndex {
++  HIGH,
++  MID,
++  LOW,
++  ABR,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioBroadcastConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioBroadcastConfiguration.aidl
+new file mode 100644
+index 0000000..7b26a84
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioBroadcastConfiguration.aidl
+@@ -0,0 +1,46 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable LeAudioBroadcastConfiguration {
++  lineage.compat.bluetooth.audio.v3.CodecType codecType;
++  lineage.compat.bluetooth.audio.v3.LeAudioBroadcastConfiguration.BroadcastStreamMap[] streamMap;
++  
++  parcelable BroadcastStreamMap {
++    char streamHandle;
++    int audioChannelAllocation;
++    lineage.compat.bluetooth.audio.v3.LeAudioCodecConfiguration leAudioCodecConfig;
++    char pcmStreamId;
++  }
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioCodecConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioCodecConfiguration.aidl
+new file mode 100644
+index 0000000..86213cc
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioCodecConfiguration.aidl
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++union LeAudioCodecConfiguration {
++  lineage.compat.bluetooth.audio.v3.Lc3Configuration lc3Config;
++  lineage.compat.bluetooth.audio.v3.LeAudioCodecConfiguration.VendorConfiguration vendorConfig;
++  lineage.compat.bluetooth.audio.v3.AptxAdaptiveLeConfiguration aptxAdaptiveLeConfig;
++  
++  parcelable VendorConfiguration {
++    ParcelableHolder extension;
++  }
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioConfiguration.aidl
+new file mode 100644
+index 0000000..b8b80e2
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/LeAudioConfiguration.aidl
+@@ -0,0 +1,48 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable LeAudioConfiguration {
++  lineage.compat.bluetooth.audio.v3.CodecType codecType;
++  lineage.compat.bluetooth.audio.v3.LeAudioConfiguration.StreamMap[] streamMap;
++  int peerDelayUs;
++  lineage.compat.bluetooth.audio.v3.LeAudioCodecConfiguration leAudioCodecConfig;
++  @nullable byte[] vendorSpecificMetadata;
++  
++  parcelable StreamMap {
++    char streamHandle;
++    int audioChannelAllocation;
++    boolean isStreamActive;
++  }
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/OpusConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/OpusConfiguration.aidl
+new file mode 100644
+index 0000000..eefd86b
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/OpusConfiguration.aidl
+@@ -0,0 +1,43 @@
++/*
++ * Copyright 2022 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable OpusConfiguration {
++  byte pcmBitDepth;
++  int samplingFrequencyHz;
++  int frameDurationUs;
++  int octetsPerFrame;
++  byte blocksPerSdu;
++  lineage.compat.bluetooth.audio.v3.ChannelMode channelMode;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/PcmConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/PcmConfiguration.aidl
+new file mode 100644
+index 0000000..efaec34
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/PcmConfiguration.aidl
+@@ -0,0 +1,41 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable PcmConfiguration {
++  int sampleRateHz;
++  lineage.compat.bluetooth.audio.v3.ChannelMode channelMode;
++  byte bitsPerSample;
++  int dataIntervalUs;
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcAllocMethod.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcAllocMethod.aidl
+new file mode 100644
+index 0000000..c6c9a5d
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcAllocMethod.aidl
+@@ -0,0 +1,39 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="byte") 
++enum SbcAllocMethod {
++  ALLOC_MD_S,
++  ALLOC_MD_L,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcChannelMode.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcChannelMode.aidl
+new file mode 100644
+index 0000000..2ad3da7
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcChannelMode.aidl
+@@ -0,0 +1,42 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++@Backing(type="byte") 
++enum SbcChannelMode {
++  UNKNOWN,
++  JOINT_STEREO,
++  STEREO,
++  DUAL,
++  MONO,
++}
+diff --git a/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcConfiguration.aidl b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcConfiguration.aidl
+new file mode 100644
+index 0000000..3c68c44
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/legacy/lineage/compat/bluetooth/audio/v3/SbcConfiguration.aidl
+@@ -0,0 +1,45 @@
++/*
++ * Copyright 2021 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package lineage.compat.bluetooth.audio.v3;
++
++parcelable SbcConfiguration {
++  int sampleRateHz;
++  lineage.compat.bluetooth.audio.v3.SbcChannelMode channelMode;
++  byte blockLength;
++  byte numSubbands;
++  lineage.compat.bluetooth.audio.v3.SbcAllocMethod allocMethod;
++  byte bitsPerSample;
++  int minBitpool;
++  int maxBitpool;
++}

@@ -1,0 +1,33 @@
+From 0d32cd0034b767aa8a6b5fbc8516570af8cf3e5f Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Sun, 04 Oct 2026 21:55:26 -0400
+Subject: [PATCH] etc: Use maxburst instead of Mult for UVC streaming endpoint
+
+Some xHCI hosts (e.g. AMD 1022:43f7) mishandle isoc endpoints with Mult
+at SuperSpeedPlus, advertise the same 3072 bytes as one burst instead.
+
+Without this change, the output is visibly corrupted when UVC is used
+on an AMD 600 Series Chipset USB 3.2 controller (1022:43f7, ASMedia
+subsystem 1b21:1142) at SuperSpeedPlus. An Intel Thunderbolt 4 USB
+controller (Maple Ridge 4C, 8086:1138) on the same machine is not
+affected at the same speed.
+
+Assisted-by: LLM
+Change-Id: Ib59d8d38219b5fbbc7bfed2f666dcee0e45eff46
+---
+
+diff --git a/etc/init.qcom.usb.rc b/etc/init.qcom.usb.rc
+index 20002f3..8fdabe9 100644
+--- a/etc/init.qcom.usb.rc
++++ b/etc/init.qcom.usb.rc
+@@ -2035,8 +2035,8 @@
+ 
+ on property:vendor.usb.uvc.function.init=1
+     write /config/usb_gadget/g1/functions/uvc.0/function_name "Android Webcam"
+-    write /config/usb_gadget/g1/functions/uvc.0/streaming_maxpacket 3072
+-    # write /config/usb_gadget/g1/functions/uvc.0/streaming_maxburst 5
++    write /config/usb_gadget/g1/functions/uvc.0/streaming_maxpacket 1024
++    write /config/usb_gadget/g1/functions/uvc.0/streaming_maxburst 2
+     # write /config/usb_gadget/g1/functions/uvc.0/streaming_interval 2
+     # setup control params
+     mkdir /config/usb_gadget/g1/functions/uvc.0/control/header/h

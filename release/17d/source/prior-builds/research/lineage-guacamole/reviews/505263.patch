@@ -1,0 +1,70 @@
+From cf56d1fcfb3d6535affac89227f67627157b26c6 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Mon, 28 Sep 2026 09:43:23 +0200
+Subject: [PATCH] Settings: Use expressive lottie for face enroll education
+
+AOSP only ships placeholders for the default video and lottie
+illustrations, leaving the screen empty.
+
+Assisted-by: LLM
+Change-Id: I00919fc7807b9ca6f4cf5ffcff5da2054584d2ee
+---
+
+diff --git a/res/layout/face_enroll_education.xml b/res/layout/face_enroll_education.xml
+index 1226f42..5ae0bb5 100644
+--- a/res/layout/face_enroll_education.xml
++++ b/res/layout/face_enroll_education.xml
+@@ -60,7 +60,7 @@
+                 android:scaleType="centerInside"
+                 android:visibility="gone"
+                 app:lottie_autoPlay="false"
+-                app:lottie_loop="false"
++                app:lottie_loop="true"
+                 android:contentDescription="@string/settingslib_illustration_content_description"
+                 app:lottie_speed="1.5" />
+ 
+diff --git a/res/values/config.xml b/res/values/config.xml
+index f836ad1..e3c4548 100644
+--- a/res/values/config.xml
++++ b/res/values/config.xml
+@@ -345,7 +345,7 @@
+     <bool name="config_face_intro_show_require_eyes">true</bool>
+ 
+     <!-- Whether to use the Lottie animation for the face education enrollment screen -->
+-    <bool name="config_face_education_use_lottie">false</bool>
++    <bool name="config_face_education_use_lottie">true</bool>
+ 
+     <!-- Whether to support enrollment during setup wizard flow -->
+     <bool name="config_suw_support_face_enroll">true</bool>
+diff --git a/src/com/android/settings/biometrics/face/FaceEnrollEducation.java b/src/com/android/settings/biometrics/face/FaceEnrollEducation.java
+index e521467..34eb2a3 100644
+--- a/src/com/android/settings/biometrics/face/FaceEnrollEducation.java
++++ b/src/com/android/settings/biometrics/face/FaceEnrollEducation.java
+@@ -171,11 +171,8 @@
+         if (mIsUsingLottie) {
+             mIllustrationDefault.stop();
+             mIllustrationDefault.setVisibility(View.INVISIBLE);
+-            mIllustrationLottie.setAnimation(mIsUsingExpressiveStyle
+-                    ? R.raw.face_education_lottie_expressive : R.raw.face_education_lottie);
+-            if (mIsUsingExpressiveStyle) {
+-                setupllIllustrationAnim(mIllustrationLottie);
+-            }
++            mIllustrationLottie.setAnimation(R.raw.face_education_lottie_expressive);
++            setupllIllustrationAnim(mIllustrationLottie);
+             mIllustrationLottie.setVisibility(View.VISIBLE);
+ 
+             mIllustrationLottie.addAnimatorListener(mA11yUpdater);
+@@ -577,11 +574,8 @@
+ 
+     private void showDefaultIllustration() {
+         if (mIsUsingLottie) {
+-            mIllustrationLottie.setAnimation(mIsUsingExpressiveStyle
+-                    ? R.raw.face_education_lottie_expressive : R.raw.face_education_lottie);
+-            if (mIsUsingExpressiveStyle) {
+-                setupllIllustrationAnim(mIllustrationLottie);
+-            }
++            mIllustrationLottie.setAnimation(R.raw.face_education_lottie_expressive);
++            setupllIllustrationAnim(mIllustrationLottie);
+             mIllustrationLottie.setVisibility(View.VISIBLE);
+             forceConfigureA11yDelegate(true);
+             mIllustrationLottie.setProgress(0f);

@@ -1,0 +1,25 @@
+From 54abaa4e0e8417f6a8b50dd0f312c14181116280 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Mon, 28 Sep 2026 08:35:05 +0300
+Subject: [PATCH] SettingsIntelligence: Remove targetSdkVersion
+
+The manifest pinned targetSdkVersion to 31, while Android.bp sets
+system_current. This requires implementing edge-to-edge, which is
+done in a separate commit.
+
+Change-Id: Iaa9ee7ff21e663acb0428541f7e5405519b3982d
+---
+
+diff --git a/AndroidManifest.xml b/AndroidManifest.xml
+index 4d49922..f394b24 100644
+--- a/AndroidManifest.xml
++++ b/AndroidManifest.xml
+@@ -26,8 +26,6 @@
+     <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
+     <uses-permission android:name="android.permission.MANAGE_FINGERPRINT" />
+ 
+-    <uses-sdk android:targetSdkVersion="31" />
+-
+     <queries>
+         <intent>
+             <action android:name="android.intent.action.MAIN"/>

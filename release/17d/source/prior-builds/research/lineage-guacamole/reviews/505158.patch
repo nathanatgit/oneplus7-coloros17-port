@@ -1,0 +1,22 @@
+From 3705c8582717bcb5dc9040691591de881470866b Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sun, 27 Sep 2026 17:52:24 +0200
+Subject: [PATCH] sepolicy: qti: Let hal_camera_default read vendor_persist_camera_file
+
+W vendor.qti.came: type=1400 audit(0.0:70): avc:  denied  { read } for  name="camera" dev="sda2" ino=53 scontext=u:r:hal_camera_default:s0 tcontext=u:object_r:vendor_persist_camera_file:s0 tclass=dir permissive=0
+
+Change-Id: I0a2dd3fb6d9e8b2af26abe6b28770d440d69c12b
+---
+
+diff --git a/sepolicy/qti/vendor/hal_camera_default.te b/sepolicy/qti/vendor/hal_camera_default.te
+index 7312e59..3b8a93f 100644
+--- a/sepolicy/qti/vendor/hal_camera_default.te
++++ b/sepolicy/qti/vendor/hal_camera_default.te
+@@ -45,6 +45,7 @@
+ 
+ r_dir_file(hal_camera_default, input_device)
+ r_dir_file(hal_camera_default, proc_version)
++r_dir_file(hal_camera_default, vendor_persist_camera_file)
+ r_dir_file(hal_camera_default, vendor_proc_oplus_version)
+ r_dir_file(hal_camera_default, vendor_sysfs_usb_supply)
+ rw_dir_file(hal_camera_default, vendor_proc_camera)

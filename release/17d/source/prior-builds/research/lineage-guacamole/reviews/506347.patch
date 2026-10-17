@@ -1,0 +1,89 @@
+From 50e7b344567cadc04f665d81534de43aa4ad469b Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 11:07:47 +0530
+Subject: [PATCH] LatinIME: Reduce keyboard height on tablets in landscape
+
+Like Gboard, make the keyboard shorter on tablets in landscape so it
+covers less of the screen, whether or not it is split. Using the same
+height in both cases keeps the keyboard from jumping when the split
+layout is toggled.
+
+Assisted-by: LLM
+Change-Id: Id5804cf6210764f41dff62ae1415593a12c3060a
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+index 57146fe..a75c873 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+@@ -124,15 +124,17 @@
+         final Resources res = mThemeContext.getResources();
+         final int keyboardWidth = ResourceUtils.getDefaultKeyboardWidth(mThemeContext);
+         final int keyboardHeight = ResourceUtils.getKeyboardHeight(res, settingsValues);
+-        builder.setKeyboardGeometry(keyboardWidth, keyboardHeight);
++        final boolean isSplitLayout = settingsValues.mIsSplitKeyboardEnabled
++                && SplitKeyboardUtils.isSplitKeyboardAvailable(res);
++        builder.setKeyboardGeometry(keyboardWidth, SplitKeyboardUtils.isSplitKeyboardAvailable(res)
++                ? SplitKeyboardUtils.getSplitKeyboardHeight(keyboardHeight) : keyboardHeight);
+         builder.setSubtype(mRichImm.getCurrentSubtype());
+         builder.setVoiceInputKeyEnabled(settingsValues.mShowsVoiceInputKey);
+         builder.setNumberRowEnabled(settingsValues.mShowNumberRow);
+         builder.setNumberRowPasswordEnabled(settingsValues.mShowNumberRowPassword);
+         builder.setLanguageSwitchKeyEnabled(mLatinIME.shouldShowLanguageSwitchKey());
+         builder.setEmojiKeyEnabled(settingsValues.mShowsEmojiKey);
+-        builder.setSplitLayoutEnabledByUser(settingsValues.mIsSplitKeyboardEnabled
+-                && SplitKeyboardUtils.isSplitKeyboardAvailable(res));
++        builder.setSplitLayoutEnabledByUser(isSplitLayout);
+         builder.setSplitDuplicateKeysEnabled(settingsValues.mSplitKeyboardDuplicateKeys);
+         mKeyboardLayoutSet = builder.build();
+         try {
+diff --git a/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java b/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
+index 8c29358..bec6ddb 100644
+--- a/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
++++ b/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
+@@ -16,6 +16,8 @@
+ import javax.annotation.Nonnull;
+ 
+ public final class SplitKeyboardUtils {
++    public static final float SPLIT_KEYBOARD_HEIGHT_RATIO = 0.78f;
++
+     private SplitKeyboardUtils() {
+     }
+ 
+@@ -25,6 +27,10 @@
+                 && res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+     }
+ 
++    public static int getSplitKeyboardHeight(final int keyboardHeight) {
++        return Math.round(keyboardHeight * SPLIT_KEYBOARD_HEIGHT_RATIO);
++    }
++
+     public static boolean toggleSplitKeyboard(@Nonnull final SharedPreferences prefs) {
+         final boolean enabled = !prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, false);
+         prefs.edit().putBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, enabled).apply();
+diff --git a/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java b/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java
+index 85d27fd..05d2489 100644
+--- a/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java
++++ b/tests/src/com/android/inputmethod/latin/utils/SplitKeyboardUtilsTests.java
+@@ -5,6 +5,7 @@
+ 
+ package com.android.inputmethod.latin.utils;
+ 
++import static org.junit.Assert.assertEquals;
+ import static org.junit.Assert.assertFalse;
+ import static org.junit.Assert.assertTrue;
+ 
+@@ -75,6 +76,12 @@
+     }
+ 
+     @Test
++    public void testSplitKeyboardHeightIsReduced() {
++        assertEquals(780, SplitKeyboardUtils.getSplitKeyboardHeight(1000));
++        assertEquals(0, SplitKeyboardUtils.getSplitKeyboardHeight(0));
++    }
++
++    @Test
+     public void testToggleFlipsSplitPreference() {
+         final SharedPreferences prefs = getContext().getSharedPreferences(
+                 "split_keyboard_utils_tests", Context.MODE_PRIVATE);

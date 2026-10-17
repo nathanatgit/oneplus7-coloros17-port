@@ -1,0 +1,70 @@
+From c9d01fc5de42459953bbe15cfda62f2de50c26a8 Mon Sep 17 00:00:00 2001
+From: Jaideep Sharma <quic_jaidshar@quicinc.com>
+Date: Thu, 06 Feb 2025 13:46:25 +0530
+Subject: [PATCH] effects: Support effect destroy at any state
+
+Effects V3 supports to destroy effect in any state.
+Provide the support in EffectImpl.
+
+For more details check: hardware/interfaces/620f32014ecf29bef7d5bd5452286c61239bc43e
+
+Change-Id: I4866d3b9195450a2fdad56a19aa8bfc2ec637268
+---
+
+diff --git a/hal/effects/EffectImpl.cpp b/hal/effects/EffectImpl.cpp
+index fd5b0c2..07ecd14 100644
+--- a/hal/effects/EffectImpl.cpp
++++ b/hal/effects/EffectImpl.cpp
+@@ -34,16 +34,48 @@
+ using aidl::android::media::audio::common::PcmType;
+ using ::android::hardware::EventFlag;
+ using ::aidl::android::hardware::audio::effect::kEventFlagNotEmpty;
++using ::aidl::android::hardware::audio::effect::kDestroyAnyStateSupportedVersion;
+ 
+ extern "C" binder_exception_t destroyEffect(const std::shared_ptr<IEffect>& instanceSp) {
+-    State state;
+-    ndk::ScopedAStatus status = instanceSp->getState(&state);
+-    if (!status.isOk() || State::INIT != state) {
++    if (!instanceSp) {
++        LOG(ERROR) << __func__ << " nullptr";
++        return EX_ILLEGAL_ARGUMENT;
++    }
++
++    Descriptor desc;
++    ndk::ScopedAStatus status = instanceSp->getDescriptor(&desc);
++    if (!status.isOk()) {
+         LOG(ERROR) << __func__ << " instance " << instanceSp.get()
++                   << " failed to get descriptor, status: " << status.getDescription();
++        return EX_ILLEGAL_STATE;
++    }
++
++    State state;
++    status = instanceSp->getState(&state);
++    if (!status.isOk()) {
++        LOG(ERROR) << __func__ << " " << desc.common.name << " instance " << instanceSp.get()
+                    << " in state: " << toString(state) << ", status: " << status.getDescription();
+         return EX_ILLEGAL_STATE;
+     }
+-    LOG(VERBOSE) << __func__ << " instance " << instanceSp.get() << " destroyed";
++
++    int effectVersion = 0;
++    if (!instanceSp->getInterfaceVersion(&effectVersion).isOk()) {
++        LOG(WARNING) << __func__ << " " << desc.common.name << " failed to get interface version";
++    }
++
++    if (effectVersion < kDestroyAnyStateSupportedVersion) {
++        if (State::INIT != state) {
++            LOG(ERROR) << __func__ << " " << desc.common.name << " can not destroy instance "
++                       << instanceSp.get() << " in state: " << toString(state);
++            return EX_ILLEGAL_STATE;
++        }
++    } else {
++        instanceSp->command(CommandId::RESET);
++        instanceSp->close();
++    }
++
++    LOG(VERBOSE) << __func__ << " " << desc.common.name << " instance " << instanceSp.get()
++               << " destroyed";
+     return EX_NONE;
+ }
+ 

@@ -1,0 +1,51 @@
+From bf8aef12e2e95153f497e30d1791555cf7ff9b07 Mon Sep 17 00:00:00 2001
+From: Pavel Dubrova <pashadubrova@gmail.com>
+Date: Sun, 06 Feb 2022 05:57:15 +0200
+Subject: [PATCH] gralloc: Protect new buffer allocation support for legacy camera
+
+The new buffer allocation mechanism introduced in commit 1ff363d
+("gralloc: Add buffer allocation support for camera utils format.")
+completely depends on newer CamX blobs.
+
+Change-Id: I44e6cff7204e5302909156ba93ee688ef95de257
+Signed-off-by: Pavel Dubrova <pashadubrova@gmail.com>
+---
+
+diff --git a/gralloc/Android.bp b/gralloc/Android.bp
+index 2626d86..5832808 100644
+--- a/gralloc/Android.bp
++++ b/gralloc/Android.bp
+@@ -25,7 +25,10 @@
+         "-Wno-sign-conversion",
+         "-Wno-unused-parameter",
+         "-Wno-unused-variable",
+-    ] + select(soong_config_variable("qtidisplay", "target_no_raw10_custom_format"), {
++    ] + select(soong_config_variable("qtidisplay", "target_no_camera_custom_format"), {
++        "true": ["-DNO_CAMERA_CUSTOM_FORMAT"],
++        default: [],
++    }) + select(soong_config_variable("qtidisplay", "target_no_raw10_custom_format"), {
+         "true": ["-DNO_RAW10_CUSTOM_FORMAT"],
+         default: [],
+     }) + select(soong_config_variable("qtidisplay", "target_uses_ycrcb_camera_preview"), {
+diff --git a/gralloc/gr_utils.cpp b/gralloc/gr_utils.cpp
+index 34f79f5..3660b84 100644
+--- a/gralloc/gr_utils.cpp
++++ b/gralloc/gr_utils.cpp
+@@ -187,7 +187,8 @@
+   return false;
+ }
+ 
+-bool IsCameraCustomFormat(int format) {
++bool IsCameraCustomFormat([[maybe_unused]] int format) {
++#ifndef NO_CAMERA_CUSTOM_FORMAT
+   switch (format) {
+     case HAL_PIXEL_FORMAT_NV21_ZSL:
+       if (CameraInfo::GetInstance() &&
+@@ -211,6 +212,7 @@
+     default:
+       break;
+   }
++#endif
+ 
+   return false;
+ }

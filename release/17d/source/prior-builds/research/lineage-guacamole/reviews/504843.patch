@@ -1,0 +1,664 @@
+From a82deeb631c045c6784ee3007e33fea65a486ed0 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 21:52:47 +0530
+Subject: [PATCH] SUW: Abstract the setup template behind an interface
+
+Change-Id: I766b4e5890ad8c6ebe499caf1964cf644796eb2a
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+index 1bc6709..9b80d62 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+@@ -20,6 +20,7 @@
+ import com.google.android.setupdesign.R as SudR
+ import com.google.android.setupdesign.template.FloatingActionButtonMixin
+ import com.google.android.setupdesign.template.FloatingBackButtonMixin
++import org.lineageos.setupwizard.base.GlifTemplate
+ import org.lineageos.setupwizard.base.SubBaseActivity
+ import org.lineageos.setupwizard.system.DeviceInfoActivity
+ import org.lineageos.setupwizard.util.SetupWizardUtils
+@@ -45,9 +46,11 @@
+             },
+         )
+ 
+-        setupEmergencyCallButton()
+-        setupDeviceInfoButton()
+-        setupSkipButton()
++        if (template is GlifTemplate) {
++            setupEmergencyCallButton()
++            setupDeviceInfoButton()
++            setupSkipButton()
++        }
+ 
+         findViewById<View>(R.id.start).setOnClickListener { onNextPressed() }
+         findViewById<View>(R.id.launch_accessibility).setOnClickListener {
+diff --git a/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt b/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt
+index 277d307..e496ace 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt
+@@ -18,9 +18,7 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        glifLayout.setDescriptionText(
+-            getString(R.string.intro_restore_subtitle, getString(R.string.os_name))
+-        )
++        setDescriptionText(getString(R.string.intro_restore_subtitle, getString(R.string.os_name)))
+         setNextText(R.string.intro_restore_button)
+     }
+ 
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+index 5993813..9c3e5ef 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+@@ -20,13 +20,12 @@
+ import androidx.activity.result.contract.ActivityResultContract
+ import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+ import androidx.appcompat.app.AppCompatActivity
+-import com.android.settingslib.Utils
+ import com.google.android.setupcompat.template.FooterBarMixin
+ import com.google.android.setupcompat.template.FooterButton
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+ import com.google.android.setupcompat.util.WizardManagerHelper
+ import com.google.android.setupdesign.GlifLayout
+-import com.google.android.setupdesign.template.IconMixin
++import com.google.android.setupdesign.items.RecyclerItemAdapter
+ import com.google.android.setupdesign.transition.TransitionHelper
+ import com.google.android.setupdesign.util.ThemeHelper
+ import org.lineageos.setupwizard.EXTRA_ACTION_ID
+@@ -52,7 +51,7 @@
+         nextIntentResultLauncher =
+             registerForActivityResult(StartDecoratedActivityForResult(), this::onNextIntentResult)
+         initLayout()
+-        if (installFooterBar) {
++        if (installFooterBar && template.hasFooterBar) {
+             setupFooterBar()
+         }
+         onBackPressedDispatcher.addCallback(
+@@ -246,25 +245,45 @@
+         if (layoutResId != -1) {
+             setContentView(layoutResId)
+         }
++        if (findViewById<View>(R.id.setup_wizard_layout) == null) {
++            return
++        }
++        if (SetupWizardUtils.hasLeanback(this)) {
++            template.setBackButtonVisible(false)
++        }
++        if (itemEntriesResId != -1) {
++            template.setItems(itemEntriesResId)
++        }
+         if (titleResId != -1) {
+-            val headerText = TextUtils.expandTemplate(getText(titleResId))
+-            glifLayout.setHeaderText(headerText)
++            template.setHeaderText(TextUtils.expandTemplate(getText(titleResId)))
+         }
+         if (iconResId != -1) {
+-            val layout = glifLayout
+-            getDrawable(iconResId)?.mutate()?.let {
+-                it.setTintList(Utils.getColorAccent(layout.context))
+-                layout.setIcon(it)
+-                upscaleIcon(layout)
+-            }
++            getDrawable(iconResId)?.mutate()?.let { template.setIcon(it) }
++        }
++    }
++
++    protected val template: SetupTemplate by lazy {
++        when (val root = requireViewById<View>(R.id.setup_wizard_layout)) {
++            is GlifLayout -> GlifTemplate(root)
++            else -> LeanbackTemplate(root)
+         }
+     }
+ 
+     protected val glifLayout: GlifLayout
+         get() = requireViewById(R.id.setup_wizard_layout)
+ 
+-    private fun upscaleIcon(layout: GlifLayout) =
+-        layout.getMixin(IconMixin::class.java)?.setUpscaleIcon(true)
++    protected fun setDescriptionText(text: CharSequence) = template.setDescriptionText(text)
++
++    // List backed screens
++    protected var itemAdapter: RecyclerItemAdapter
++        get() = template.itemAdapter
++        set(value) {
++            template.itemAdapter = value
++        }
++
++    protected fun scrollItemsToTop() = template.scrollItemsToTop()
++
++    protected fun toggle(id: Int): SetupToggle = template.toggle(id)
+ 
+     protected open val layoutResId = -1
+ 
+@@ -272,6 +291,8 @@
+ 
+     protected open val iconResId = -1
+ 
++    protected open val itemEntriesResId = -1
++
+     protected open val installFooterBar = true
+ 
+     protected open val showSkipButton = false
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/GlifTemplate.kt b/app/src/main/java/org/lineageos/setupwizard/base/GlifTemplate.kt
+new file mode 100644
+index 0000000..037ff8a
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/base/GlifTemplate.kt
+@@ -0,0 +1,66 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.base
++
++import android.graphics.drawable.Drawable
++import android.view.View
++import com.android.settingslib.Utils
++import com.google.android.setupdesign.GlifLayout
++import com.google.android.setupdesign.GlifRecyclerLayout
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++import com.google.android.setupdesign.items.SwitchItem
++import com.google.android.setupdesign.template.FloatingBackButtonMixin
++import com.google.android.setupdesign.template.IconMixin
++
++class GlifTemplate(private val layout: GlifLayout) : SetupTemplate {
++
++    override val hasFooterBar = true
++
++    private val recyclerLayout
++        get() = layout as GlifRecyclerLayout
++
++    override fun setBackButtonVisible(visible: Boolean) {
++        layout
++            .getMixin(FloatingBackButtonMixin::class.java)
++            ?.setVisibility(if (visible) View.VISIBLE else View.GONE)
++    }
++
++    override fun setHeaderText(text: CharSequence) {
++        layout.setHeaderText(text)
++    }
++
++    override fun setDescriptionText(text: CharSequence) {
++        layout.setDescriptionText(text)
++    }
++
++    override fun setIcon(icon: Drawable) {
++        icon.setTintList(Utils.getColorAccent(layout.context))
++        layout.setIcon(icon)
++        layout.getMixin(IconMixin::class.java)?.setUpscaleIcon(true)
++    }
++
++    override var itemAdapter: RecyclerItemAdapter
++        get() = recyclerLayout.adapter as RecyclerItemAdapter
++        set(value) {
++            recyclerLayout.adapter = value
++        }
++
++    override fun scrollItemsToTop() {
++        recyclerLayout.recyclerView.scrollToPosition(0)
++    }
++
++    override fun toggle(id: Int): SetupToggle {
++        if (!rowsToggleOnSelect) {
++            SwitchItemToggle.selectToToggle(itemAdapter)
++            rowsToggleOnSelect = true
++        }
++        return SwitchItemToggle(itemAdapter.findItemById(id) as SwitchItem)
++    }
++
++    override fun setItems(entriesResId: Int) = Unit
++
++    private var rowsToggleOnSelect = false
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/LeanbackTemplate.kt b/app/src/main/java/org/lineageos/setupwizard/base/LeanbackTemplate.kt
+new file mode 100644
+index 0000000..91af2f2
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/base/LeanbackTemplate.kt
+@@ -0,0 +1,67 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.base
++
++import android.graphics.drawable.Drawable
++import android.view.View
++import android.widget.ImageView
++import android.widget.TextView
++import androidx.leanback.widget.VerticalGridView
++import com.google.android.setupdesign.items.ItemGroup
++import com.google.android.setupdesign.items.ItemInflater
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++import com.google.android.setupdesign.items.SwitchItem
++import org.lineageos.setupwizard.R
++
++class LeanbackTemplate(private val root: View) : SetupTemplate {
++
++    override val hasFooterBar = false
++
++    override fun setBackButtonVisible(visible: Boolean) = Unit
++
++    override fun setHeaderText(text: CharSequence) {
++        root.findViewById<TextView>(R.id.setup_header)?.text = text
++    }
++
++    override fun setDescriptionText(text: CharSequence) {
++        root.findViewById<TextView>(R.id.setup_description)?.text = text
++    }
++
++    override fun setIcon(icon: Drawable) {
++        root.findViewById<ImageView>(R.id.setup_icon)?.setImageDrawable(icon)
++    }
++
++    private val itemsView: VerticalGridView
++        get() =
++            root.findViewById(R.id.setup_items)
++                ?: error("This leanback layout declares no setup_items list")
++
++    override var itemAdapter: RecyclerItemAdapter
++        get() = itemsView.adapter as RecyclerItemAdapter
++        set(value) {
++            itemsView.adapter = value
++            itemsView.post { itemsView.requestFocus() }
++        }
++
++    override fun scrollItemsToTop() {
++        itemsView.selectedPosition = 0
++    }
++
++    override fun toggle(id: Int): SetupToggle {
++        if (!rowsToggleOnSelect) {
++            SwitchItemToggle.selectToToggle(itemAdapter)
++            rowsToggleOnSelect = true
++        }
++        return SwitchItemToggle(itemAdapter.findItemById(id) as SwitchItem)
++    }
++
++    override fun setItems(entriesResId: Int) {
++        val items = ItemInflater(root.context).inflate(entriesResId) as ItemGroup
++        itemAdapter = RecyclerItemAdapter(items)
++    }
++
++    private var rowsToggleOnSelect = false
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/SetupTemplate.kt b/app/src/main/java/org/lineageos/setupwizard/base/SetupTemplate.kt
+new file mode 100644
+index 0000000..f717cb7
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/base/SetupTemplate.kt
+@@ -0,0 +1,30 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.base
++
++import android.graphics.drawable.Drawable
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++
++interface SetupTemplate {
++
++    val hasFooterBar: Boolean
++
++    fun setBackButtonVisible(visible: Boolean)
++
++    fun setHeaderText(text: CharSequence)
++
++    fun setDescriptionText(text: CharSequence)
++
++    fun setIcon(icon: Drawable)
++
++    var itemAdapter: RecyclerItemAdapter
++
++    fun scrollItemsToTop()
++
++    fun toggle(id: Int): SetupToggle
++
++    fun setItems(entriesResId: Int)
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/SetupToggle.kt b/app/src/main/java/org/lineageos/setupwizard/base/SetupToggle.kt
+new file mode 100644
+index 0000000..ab275f0
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/base/SetupToggle.kt
+@@ -0,0 +1,17 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.base
++
++interface SetupToggle {
++
++    var isChecked: Boolean
++
++    var isVisible: Boolean
++
++    var summary: CharSequence?
++
++    fun setOnCheckedChangeListener(listener: (isChecked: Boolean) -> Unit)
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/SwitchItemToggle.kt b/app/src/main/java/org/lineageos/setupwizard/base/SwitchItemToggle.kt
+new file mode 100644
+index 0000000..c5f6622
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/base/SwitchItemToggle.kt
+@@ -0,0 +1,42 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.base
++
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++import com.google.android.setupdesign.items.SwitchItem
++
++internal class SwitchItemToggle(private val item: SwitchItem) : SetupToggle {
++
++    override var isChecked: Boolean
++        get() = item.isChecked
++        set(value) {
++            item.isChecked = value
++        }
++
++    override var isVisible: Boolean
++        get() = item.isVisible
++        set(value) {
++            item.isVisible = value
++        }
++
++    override var summary: CharSequence?
++        get() = item.summary
++        set(value) {
++            item.summary = value
++        }
++
++    override fun setOnCheckedChangeListener(listener: (isChecked: Boolean) -> Unit) {
++        item.setOnCheckedChangeListener { _, isChecked -> listener(isChecked) }
++    }
++
++    internal companion object {
++        fun selectToToggle(adapter: RecyclerItemAdapter) {
++            adapter.setOnItemSelectedListener { item ->
++                (item as? SwitchItem)?.let { it.isChecked = !it.isChecked }
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt b/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
+index cbf951e..79ddcae 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
+@@ -32,7 +32,7 @@
+             return
+         }
+ 
+-        glifLayout.setDescriptionText(getString(R.string.sim_missing_summary))
++        setDescriptionText(getString(R.string.sim_missing_summary))
+         setNextAllowed(true)
+     }
+ 
+diff --git a/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
+index 7e673c4..e2bf221 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
+@@ -11,18 +11,12 @@
+ import android.os.Process
+ import android.os.UserManager
+ import android.provider.Settings
+-import com.google.android.setupdesign.GlifRecyclerLayout
+-import com.google.android.setupdesign.items.RecyclerItemAdapter
+ import com.google.android.setupdesign.items.SwitchItem
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.base.BaseSetupWizardActivity
+ 
+ class LocationSettingsActivity : BaseSetupWizardActivity() {
+ 
+-    private val itemAdapter by lazy {
+-        (glifLayout as GlifRecyclerLayout).adapter as RecyclerItemAdapter
+-    }
+-
+     private val locationAccess by lazy {
+         itemAdapter.findItemById(R.id.location_item) as SwitchItem
+     }
+@@ -35,7 +29,7 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        glifLayout.setDescriptionText(getString(R.string.location_summary))
++        setDescriptionText(getString(R.string.location_summary))
+ 
+         locationAgpsAccess.isVisible = userManager.isMainUser
+ 
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt
+index b1db849..7e68e96 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/LineageSettingsActivity.kt
+@@ -10,9 +10,6 @@
+ import android.os.Bundle
+ import android.os.UserHandle
+ import android.text.TextUtils
+-import com.google.android.setupdesign.GlifRecyclerLayout
+-import com.google.android.setupdesign.items.RecyclerItemAdapter
+-import com.google.android.setupdesign.items.SwitchItem
+ import lineageos.hardware.LineageHardwareManager
+ import lineageos.providers.LineageSettings
+ import org.lineageos.setupwizard.DISABLE_NAV_KEYS
+@@ -23,12 +20,8 @@
+ 
+ class LineageSettingsActivity : BaseSetupWizardActivity() {
+ 
+-    private val itemAdapter by lazy {
+-        (glifLayout as GlifRecyclerLayout).adapter as RecyclerItemAdapter
+-    }
+-
+-    private val metricsItem by lazy { itemAdapter.findItemById(R.id.metrics_item) as SwitchItem }
+-    private val navKeysItem by lazy { itemAdapter.findItemById(R.id.nav_keys_item) as SwitchItem }
++    private val metricsItem by lazy { toggle(R.id.metrics_item) }
++    private val navKeysItem by lazy { toggle(R.id.nav_keys_item) }
+ 
+     private var supportsKeyDisabler = false
+ 
+@@ -36,26 +29,20 @@
+         super.onCreate(savedInstanceState)
+ 
+         val osName = getString(R.string.os_name)
+-        glifLayout.setDescriptionText(buildDescription(osName))
++        setDescriptionText(buildDescription(osName))
+ 
+         val metricsHelpImproveLineage = getString(R.string.services_help_improve_cm, osName)
+         metricsItem.summary =
+             getString(R.string.services_metrics_label, metricsHelpImproveLineage, osName, osName)
+-        metricsItem.setOnCheckedChangeListener { _, isChecked ->
++        metricsItem.setOnCheckedChangeListener { isChecked ->
+             SetupWizardApp.settingsBundle.putBoolean(KEY_SEND_METRICS, isChecked)
+         }
+ 
+         supportsKeyDisabler = isKeyDisablerSupported(this)
+         navKeysItem.isVisible = supportsKeyDisabler
+-        navKeysItem.setOnCheckedChangeListener { _, isChecked ->
++        navKeysItem.setOnCheckedChangeListener { isChecked ->
+             SetupWizardApp.settingsBundle.putBoolean(DISABLE_NAV_KEYS, isChecked)
+         }
+-
+-        itemAdapter.setOnItemSelectedListener { item ->
+-            if (item is SwitchItem) {
+-                item.isChecked = !item.isChecked
+-            }
+-        }
+     }
+ 
+     override fun onResume() {
+@@ -70,6 +57,8 @@
+ 
+     override val iconResId = R.drawable.logo
+ 
++    override val itemEntriesResId = R.xml.lineage_settings_items
++
+     private fun buildDescription(osName: String): CharSequence =
+         TextUtils.concat(
+             getString(
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt
+index 557c16f..d106643 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/NavigationSettingsActivity.kt
+@@ -42,7 +42,7 @@
+             )
+         val hasHomeKey = (deviceKeys and KEY_MASK_APP_SWITCH) != 0
+ 
+-        glifLayout.setDescriptionText(getString(R.string.navigation_summary))
++        setDescriptionText(getString(R.string.navigation_summary))
+ 
+         val modeGroup = findViewById<MaterialButtonToggleGroup>(R.id.navigation_mode_group)
+         val gestureButton = findViewById<MaterialButton>(R.id.mode_gesture)
+diff --git a/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
+index 75bf953..73b3625 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/settings/ThemeSettingsActivity.kt
+@@ -27,7 +27,7 @@
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+ 
+-        glifLayout.setDescriptionText(getString(R.string.theme_summary))
++        setDescriptionText(getString(R.string.theme_summary))
+ 
+         val modeGroup = findViewById<MaterialButtonToggleGroup>(R.id.theme_mode_group)
+         val blackTheme = findViewById<MaterialSwitch>(R.id.black_theme)
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt b/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt
+index 9cf8fbd..c347914 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt
+@@ -10,7 +10,6 @@
+ import android.telephony.TelephonyManager
+ import android.telephony.euicc.EuiccManager
+ import android.util.Log
+-import com.google.android.setupdesign.GlifRecyclerLayout
+ import com.google.android.setupdesign.items.ItemGroup
+ import com.google.android.setupdesign.items.RecyclerItemAdapter
+ import org.lineageos.setupwizard.R
+@@ -29,7 +28,7 @@
+ 
+         val adapter = RecyclerItemAdapter(itemGroup)
+         adapter.setOnItemSelectedListener { (it as? DeviceInfoItem)?.toggle() }
+-        (glifLayout as GlifRecyclerLayout).adapter = adapter
++        itemAdapter = adapter
+     }
+ 
+     private fun deviceIdentifiers(): List<Pair<String, String>> {
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+index f15d187..dc70f2b 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+@@ -9,9 +9,6 @@
+ import android.os.SystemProperties
+ import android.util.Log
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+-import com.google.android.setupdesign.GlifRecyclerLayout
+-import com.google.android.setupdesign.items.RecyclerItemAdapter
+-import com.google.android.setupdesign.items.SwitchItem
+ import org.lineageos.setupwizard.ENABLE_RECOVERY_UPDATE
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.SetupWizardApp
+@@ -21,18 +18,12 @@
+ 
+ class UpdateRecoveryActivity : BaseSetupWizardActivity() {
+ 
+-    private val itemAdapter by lazy {
+-        (glifLayout as GlifRecyclerLayout).adapter as RecyclerItemAdapter
+-    }
+-
+-    private val updateRecoveryItem by lazy {
+-        itemAdapter.findItemById(R.id.update_recovery_item) as SwitchItem
+-    }
++    private val updateRecoveryItem by lazy { toggle(R.id.update_recovery_item) }
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+ 
+-        glifLayout.setDescriptionText(
++        setDescriptionText(
+             getString(
+                 R.string.update_recovery_full_description,
+                 getString(R.string.update_recovery_description),
+@@ -46,12 +37,6 @@
+             return
+         }
+ 
+-        itemAdapter.setOnItemSelectedListener { item ->
+-            if (item is SwitchItem) {
+-                item.isChecked = !item.isChecked
+-            }
+-        }
+-
+         // Allow overriding the default switch state
+         if (firstTime) {
+             SetupWizardApp.settingsBundle.putBoolean(
+@@ -83,6 +68,8 @@
+ 
+     override val iconResId = R.drawable.ic_system_update
+ 
++    override val itemEntriesResId = R.xml.update_recovery_items
++
+     companion object {
+         private const val TAG = "UpdateRecoveryActivity"
+         private var firstTime: Boolean = true
+diff --git a/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt b/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt
+index 7c68450..84e91b2 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/time/DateTimeActivity.kt
+@@ -23,9 +23,7 @@
+ import android.widget.TimePicker
+ import androidx.appcompat.app.AlertDialog
+ import com.android.settingslib.datetime.ZoneGetter
+-import com.google.android.setupdesign.GlifRecyclerLayout
+ import com.google.android.setupdesign.items.Item
+-import com.google.android.setupdesign.items.RecyclerItemAdapter
+ import com.google.android.setupdesign.items.SwitchItem
+ import java.util.Calendar
+ import java.util.Date
+@@ -39,10 +37,6 @@
+     TimePickerDialog.OnTimeSetListener,
+     DatePickerDialog.OnDateSetListener {
+ 
+-    private val itemAdapter by lazy {
+-        (glifLayout as GlifRecyclerLayout).adapter as RecyclerItemAdapter
+-    }
+-
+     private val dateItem by lazy { itemAdapter.findItemById(R.id.date_item) as Item }
+     private val dateFormatItem by lazy { itemAdapter.findItemById(R.id.date_format_item) as Item }
+     private val timeItem by lazy { itemAdapter.findItemById(R.id.time_item) as Item }
+@@ -62,7 +56,7 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        glifLayout.setDescriptionText(getString(R.string.date_time_summary))
++        setDescriptionText(getString(R.string.date_time_summary))
+ 
+         dateFormatItem.summary = dateFormatOrder()
+         timeFormatItem.isChecked = DateFormat.is24HourFormat(this)
+diff --git a/app/src/main/res/values/ids.xml b/app/src/main/res/values/ids.xml
+new file mode 100644
+index 0000000..8241243
+--- /dev/null
++++ b/app/src/main/res/values/ids.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <item name="setup_header" type="id" />
++    <item name="setup_description" type="id" />
++    <item name="setup_icon" type="id" />
++    <item name="setup_items" type="id" />
++</resources>

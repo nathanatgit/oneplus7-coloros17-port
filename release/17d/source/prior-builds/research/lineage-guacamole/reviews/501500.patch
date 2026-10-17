@@ -1,0 +1,44 @@
+From bd584d1e2600765855edbf12fb0f6ae97c515c50 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 02:58:42 +0530
+Subject: [PATCH] SUW: Apply footer button partner configs
+
+Change-Id: I79e490ff39487ce621a6f7d44a56a5d0f9470ca3
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/res/values-night/colors.xml b/app/src/main/res/values-night/colors.xml
+index 735a4ad..6d38cf1 100644
+--- a/app/src/main/res/values-night/colors.xml
++++ b/app/src/main/res/values-night/colors.xml
+@@ -5,4 +5,7 @@
+ -->
+ <resources>
+     <color name="divider">#40ffffff</color>
++
++    <color name="setup_compat_footer_primary_button_bg_color">@*android:color/system_primary_dark</color>
++    <color name="setup_compat_footer_primary_button_text_color">@*android:color/system_on_primary_dark</color>
+ </resources>
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index be731d2..99a8394 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -11,4 +11,7 @@
+     <color name="button_bar_text_disabled">#321e1e1e</color>
+ 
+     <color name="divider">#40000000</color>
++
++    <color name="setup_compat_footer_primary_button_bg_color">@*android:color/system_primary_light</color>
++    <color name="setup_compat_footer_primary_button_text_color">@*android:color/system_on_primary_light</color>
+ </resources>
+diff --git a/app/src/main/res/values/dimens.xml b/app/src/main/res/values/dimens.xml
+index 27fc4c5..8880fc6 100644
+--- a/app/src/main/res/values/dimens.xml
++++ b/app/src/main/res/values/dimens.xml
+@@ -20,4 +20,6 @@
+     <dimen name="welcome_title_padding_bottom">16dp</dimen>
+     <dimen name="welcome_title_line_height">64dp</dimen>
+     <dimen name="welcome_accessibility_text_size">20sp</dimen>
++
++    <dimen name="setup_compat_footer_button_radius">@dimen/sud_glif_expressive_footer_button_radius</dimen>
+ </resources>

@@ -1,0 +1,477 @@
+From b75ec20e94b35e067f3af67e628df294b49505d0 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:36:48 +0300
+Subject: [PATCH] Merge tag 'LA.QSSI.17.0.r1-11100-qssi.0' into staging/lineage-24.0_merge-LA.QSSI.17.0.r1-11100-qssi.0
+
+LA.QSSI.17.0.r1-11100-qssi.0
+
+* tag 'LA.QSSI.17.0.r1-11100-qssi.0':
+  Camera: Update V4 hash value of the offlinecamera interface APIs
+  Camera: Freeze V4 of the offlinecamera interface APIs
+
+Change-Id: Iaf2935d29c1b632073a4cb80f99c3bc1a7982734
+---
+
+diff --git a/camera/offlinecamera/aidl/Android.bp b/camera/offlinecamera/aidl/Android.bp
+index 52773f8..c5f4155 100644
+--- a/camera/offlinecamera/aidl/Android.bp
++++ b/camera/offlinecamera/aidl/Android.bp
+@@ -6,7 +6,7 @@
+         "vendor/qti/hardware/camera/offlinecamera/*.aidl",
+     ],
+     imports: [
+-        "android.hardware.camera.device-V3",
++        "android.hardware.camera.device-V4",
+     ],
+     stability: "vintf",
+     backend: {
+@@ -34,6 +34,10 @@
+             version: "3",
+             imports: ["android.hardware.camera.device-V3"],
+         },
++        {
++            version: "4",
++            imports: ["android.hardware.camera.device-V4"],
++        },
+ 
+     ],
+     frozen: true,
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/.hash b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/.hash
+new file mode 100644
+index 0000000..0eb0e28
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/.hash
+@@ -0,0 +1 @@
++393af40949ad28e7dd19c4bb7a2c9cffdb900f1b
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraCallback.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraCallback.aidl
+new file mode 100644
+index 0000000..f5addf5
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraCallback.aidl
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++interface IOfflineCameraCallback {
++  void notify(in android.hardware.camera.device.NotifyMsg[] msgs);
++  void processCaptureResult(in vendor.qti.hardware.camera.offlinecamera.OfflineCaptureResult[] results);
++  android.hardware.camera.device.BufferRequestStatus requestStreamBuffers(in vendor.qti.hardware.camera.offlinecamera.OfflineBufferRequest[] bufReqs, out vendor.qti.hardware.camera.offlinecamera.OfflineStreamBufferRet[] buffers);
++  void returnStreamBuffers(in android.hardware.camera.device.StreamBuffer[] buffers);
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraService.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraService.aidl
+new file mode 100644
+index 0000000..f4fcb95
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraService.aidl
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++interface IOfflineCameraService {
++  vendor.qti.hardware.camera.offlinecamera.OpMode[] getSupportedOpModes();
++  void registerClient(in int clientID, in vendor.qti.hardware.camera.offlinecamera.IOfflineCameraCallback callback);
++  void unRegisterClient(in int clientID);
++  vendor.qti.hardware.camera.offlinecamera.IOfflineCameraSession openOfflineSeesion(in String sessionName, in vendor.qti.hardware.camera.offlinecamera.IOfflineCameraCallback callback);
++  android.hardware.camera.device.CameraMetadata GetOfflineStaticCaps();
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraSession.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraSession.aidl
+new file mode 100644
+index 0000000..02226c9
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/IOfflineCameraSession.aidl
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++interface IOfflineCameraSession {
++  void configureOfflineSession(in vendor.qti.hardware.camera.offlinecamera.OfflineSessionConfigureInfo sessionConfig);
++  int processOfflineRequest(in vendor.qti.hardware.camera.offlinecamera.OfflineRequestInfo[] requests);
++  void closeOfflineSession();
++  void OfflineSessionFlush(in vendor.qti.hardware.camera.offlinecamera.OfflineFlushInfo flush);
++  void OfflineSessionDump();
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineBufferRequest.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineBufferRequest.aidl
+new file mode 100644
+index 0000000..6058266
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineBufferRequest.aidl
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineBufferRequest {
++  android.hardware.camera.device.Stream streamInfo;
++  int numBuffersRequested;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineCaptureResult.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineCaptureResult.aidl
+new file mode 100644
+index 0000000..6f439b6
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineCaptureResult.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineCaptureResult {
++  int frameNumber;
++  vendor.qti.hardware.camera.offlinecamera.OfflineFrameInfo result;
++  vendor.qti.hardware.camera.offlinecamera.OfflineFrameInfo input;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineFlushInfo.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineFlushInfo.aidl
+new file mode 100644
+index 0000000..d0a81a7
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineFlushInfo.aidl
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineFlushInfo {
++  int frameNumber;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineFrameInfo.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineFrameInfo.aidl
+new file mode 100644
+index 0000000..6637a1d
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineFrameInfo.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineFrameInfo {
++  android.hardware.camera.device.StreamBuffer[] buffers;
++  int numPartialMetadata;
++  android.hardware.camera.device.CameraMetadata configureSetting;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineOpMode.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineOpMode.aidl
+new file mode 100644
+index 0000000..41c6d2b
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineOpMode.aidl
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@Backing(type="int") @VintfStability
++enum OfflineOpMode {
++  OfflineOpModeStart = 0x8000,
++  OpModeOfflineBayer2Yuv = 0x8001,
++  OpModeOfflineYuv2Jpeg = 0x8002,
++  OpModeOfflineYuv2Yuv = 0x8003,
++  OpModeOfflineQLL = 0x8004,
++  OpModeOfflineHWMF = 0x8005,
++  OpModeOfflineRaw2Raw = 0x8006,
++  OpModeOfflineRaw2Jpeg = 0x8007,
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineRequestInfo.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineRequestInfo.aidl
+new file mode 100644
+index 0000000..ba9211d
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineRequestInfo.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineRequestInfo {
++  int frameNumber;
++  vendor.qti.hardware.camera.offlinecamera.OfflineFrameInfo[] inputInfo;
++  vendor.qti.hardware.camera.offlinecamera.OfflineFrameInfo resultInfo;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineSessionConfigureInfo.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineSessionConfigureInfo.aidl
+new file mode 100644
+index 0000000..f4fc1e0
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineSessionConfigureInfo.aidl
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineSessionConfigureInfo {
++  String cameraId;
++  android.hardware.camera.device.Stream[] streams;
++  vendor.qti.hardware.camera.offlinecamera.OpMode mode;
++  android.hardware.camera.device.CameraMetadata configureSetting;
++  int opModes;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineStreamBufferRet.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineStreamBufferRet.aidl
+new file mode 100644
+index 0000000..2c0d2ca
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OfflineStreamBufferRet.aidl
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@VintfStability
++parcelable OfflineStreamBufferRet {
++  android.hardware.camera.device.Stream streamInfo;
++  android.hardware.camera.device.StreamBuffersVal val;
++}
+diff --git a/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OpMode.aidl b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OpMode.aidl
+new file mode 100644
+index 0000000..0c95df9
+--- /dev/null
++++ b/camera/offlinecamera/aidl/aidl_api/vendor.qti.hardware.camera.offlinecamera/4/vendor/qti/hardware/camera/offlinecamera/OpMode.aidl
+@@ -0,0 +1,33 @@
++/*
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++ * SPDX-License-Identifier: BSD-3-Clause-Clear}
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.qti.hardware.camera.offlinecamera;
++@Backing(type="int") @VintfStability
++enum OpMode {
++  OFFLINEBAYER2YUV = 0,
++  OFFLINEYUV2JPEG = 1,
++  OFFLINEYUV2YUV = 2,
++  OFFLINEHWMF = 3,
++  OFFLINEQLL = 4,
++  OFFLINERAW2RAW = 5,
++  OFFLINERAW2JPEG = 6,
++}

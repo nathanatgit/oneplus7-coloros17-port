@@ -1,0 +1,608 @@
+From eb5d8f1e9d02069a7729ba1b81f3f2ab23e5c862 Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 15:46:35 +0200
+Subject: [PATCH] Canvas: Add tooltips to actions
+
+Change-Id: I2e06fbaae07584ffee69468b3faf86e50028621a
+---
+
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt
+index 48b6dfb..0236ef8 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasBottomBar.kt
+@@ -118,31 +118,37 @@
+ 
+ @Composable
+ private fun CancelActionFloatingButton(onClick: () -> Unit) {
+-    FloatingActionButton(
+-        onClick = onClick,
+-        shape = CircleShape,
+-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+-    ) {
+-        Icon(
+-            imageVector = Icons.Filled.Close,
+-            contentDescription = stringResource(R.string.cancel_action),
+-        )
++    val description = stringResource(R.string.cancel_action)
++    ToolbarTooltip(description) {
++        FloatingActionButton(
++            onClick = onClick,
++            shape = CircleShape,
++            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
++            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
++        ) {
++            Icon(
++                imageVector = Icons.Filled.Close,
++                contentDescription = description,
++            )
++        }
+     }
+ }
+ 
+ @Composable
+ private fun ConfirmActionFloatingButton(onClick: () -> Unit) {
+-    FloatingActionButton(
+-        onClick = onClick,
+-        shape = CircleShape,
+-        containerColor = MaterialTheme.colorScheme.primaryContainer,
+-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+-    ) {
+-        Icon(
+-            imageVector = Icons.Filled.Check,
+-            contentDescription = stringResource(R.string.confirm_action),
+-        )
++    val description = stringResource(R.string.confirm_action)
++    ToolbarTooltip(description) {
++        FloatingActionButton(
++            onClick = onClick,
++            shape = CircleShape,
++            containerColor = MaterialTheme.colorScheme.primaryContainer,
++            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
++        ) {
++            Icon(
++                imageVector = Icons.Filled.Check,
++                contentDescription = description,
++            )
++        }
+     }
+ }
+ 
+@@ -204,14 +210,17 @@
+         verticalAlignment = Alignment.CenterVertically,
+         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+     ) {
+-        FloatingActionButton(
+-            onClick = onBack,
+-            shape = CircleShape,
+-        ) {
+-            Icon(
+-                imageVector = Icons.Filled.Close,
+-                contentDescription = stringResource(R.string.back),
+-            )
++        val backDescription = stringResource(R.string.back)
++        ToolbarTooltip(backDescription) {
++            FloatingActionButton(
++                onClick = onBack,
++                shape = CircleShape,
++            ) {
++                Icon(
++                    imageVector = Icons.Filled.Close,
++                    contentDescription = backDescription,
++                )
++            }
+         }
+ 
+         HorizontalFloatingToolbar(
+@@ -241,15 +250,18 @@
+     @StringRes contentDescription: Int,
+     modifier: Modifier = Modifier,
+ ) {
+-    IconButton(
+-        onClick = onDo,
+-        enabled = canDo,
+-        modifier = modifier,
+-    ) {
+-        Icon(
+-            imageVector = imageVector,
+-            contentDescription = stringResource(contentDescription),
+-        )
++    val description = stringResource(contentDescription)
++    ToolbarTooltip(description) {
++        IconButton(
++            onClick = onDo,
++            enabled = canDo,
++            modifier = modifier,
++        ) {
++            Icon(
++                imageVector = imageVector,
++                contentDescription = description,
++            )
++        }
+     }
+ }
+ 
+@@ -262,18 +274,27 @@
+     onCategorySelected: (EditMode.Category) -> Unit,
+     modifier: Modifier = Modifier,
+ ) {
+-    IconButton(
+-        onClick = { onCategorySelected(category) },
+-        modifier = modifier,
+-    ) {
+-        Icon(
+-            imageVector = when (category) {
+-                EditMode.Category.TRANSFORMATION -> Icons.Filled.Transform
+-                EditMode.Category.DRAWING -> Icons.Filled.Draw
+-                EditMode.Category.ADJUSTMENTS -> Icons.Filled.Exposure
+-            },
+-            contentDescription = category.name,
+-        )
++    val description = stringResource(
++        when (category) {
++            EditMode.Category.TRANSFORMATION -> R.string.category_transformation
++            EditMode.Category.DRAWING -> R.string.category_drawing
++            EditMode.Category.ADJUSTMENTS -> R.string.category_adjustments
++        }
++    )
++    ToolbarTooltip(description) {
++        IconButton(
++            onClick = { onCategorySelected(category) },
++            modifier = modifier,
++        ) {
++            Icon(
++                imageVector = when (category) {
++                    EditMode.Category.TRANSFORMATION -> Icons.Filled.Transform
++                    EditMode.Category.DRAWING -> Icons.Filled.Draw
++                    EditMode.Category.ADJUSTMENTS -> Icons.Filled.Exposure
++                },
++                contentDescription = description,
++            )
++        }
+     }
+ }
+ 
+@@ -286,29 +307,34 @@
+     onEditModeSelected: (EditMode) -> Unit,
+     modifier: Modifier = Modifier,
+ ) {
+-    IconButton(
+-        onClick = { onEditModeSelected(editMode) },
+-        modifier = modifier,
+-    ) {
+-        Icon(
+-            imageVector = when (editMode) {
+-                EditMode.CROP -> Icons.Filled.Crop
+-                EditMode.ROTATION -> Icons.Filled.CropRotate
+-                EditMode.MARKER -> ImageVector.vectorResource(R.drawable.ic_ink_pen)
+-                EditMode.HIGHLIGHTER -> ImageVector.vectorResource(R.drawable.ic_ink_highlighter)
+-                EditMode.TEXT -> Icons.Filled.TextFields
+-                EditMode.BRIGHTNESS -> Icons.Filled.BrightnessMedium
+-                EditMode.CONTRAST -> Icons.Filled.Contrast
+-            },
+-            contentDescription = when (editMode) {
+-                EditMode.CROP -> R.string.edit_mode_crop
+-                EditMode.ROTATION -> R.string.edit_mode_rotation
+-                EditMode.MARKER -> R.string.edit_mode_marker
+-                EditMode.HIGHLIGHTER -> R.string.edit_mode_highlighter
+-                EditMode.TEXT -> R.string.edit_mode_text
+-                EditMode.BRIGHTNESS -> R.string.edit_mode_brightness
+-                EditMode.CONTRAST -> R.string.edit_mode_contrast
+-            }.let { stringResource(it) },
+-        )
++    val description = stringResource(
++        when (editMode) {
++            EditMode.CROP -> R.string.edit_mode_crop
++            EditMode.ROTATION -> R.string.edit_mode_rotation
++            EditMode.MARKER -> R.string.edit_mode_marker
++            EditMode.HIGHLIGHTER -> R.string.edit_mode_highlighter
++            EditMode.TEXT -> R.string.edit_mode_text
++            EditMode.BRIGHTNESS -> R.string.edit_mode_brightness
++            EditMode.CONTRAST -> R.string.edit_mode_contrast
++        }
++    )
++    ToolbarTooltip(description) {
++        IconButton(
++            onClick = { onEditModeSelected(editMode) },
++            modifier = modifier,
++        ) {
++            Icon(
++                imageVector = when (editMode) {
++                    EditMode.CROP -> Icons.Filled.Crop
++                    EditMode.ROTATION -> Icons.Filled.CropRotate
++                    EditMode.MARKER -> ImageVector.vectorResource(R.drawable.ic_ink_pen)
++                    EditMode.HIGHLIGHTER -> ImageVector.vectorResource(R.drawable.ic_ink_highlighter)
++                    EditMode.TEXT -> Icons.Filled.TextFields
++                    EditMode.BRIGHTNESS -> Icons.Filled.BrightnessMedium
++                    EditMode.CONTRAST -> Icons.Filled.Contrast
++                },
++                contentDescription = description,
++            )
++        }
+     }
+ }
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt
+index dfe4a49..8e5ad51 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/CanvasTopAppBar.kt
+@@ -23,16 +23,12 @@
+ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.IconButton
+-import androidx.compose.material3.PlainTooltip
+ import androidx.compose.material3.SplitButtonDefaults
+ import androidx.compose.material3.SplitButtonLayout
+ import androidx.compose.material3.Text
+ import androidx.compose.material3.TooltipAnchorPosition
+-import androidx.compose.material3.TooltipBox
+-import androidx.compose.material3.TooltipDefaults
+ import androidx.compose.material3.TopAppBar
+ import androidx.compose.material3.TopAppBarDefaults
+-import androidx.compose.material3.rememberTooltipState
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+@@ -82,13 +78,14 @@
+         modifier = modifier,
+         navigationIcon = {
+             if (canClose) {
+-                IconButton(
+-                    onClick = onClose
+-                ) {
+-                    Icon(
+-                        imageVector = Icons.Filled.Close,
+-                        contentDescription = null,
+-                    )
++                val description = stringResource(R.string.close)
++                ToolbarTooltip(description, TooltipAnchorPosition.Below) {
++                    IconButton(onClick = onClose) {
++                        Icon(
++                            imageVector = Icons.Filled.Close,
++                            contentDescription = description,
++                        )
++                    }
+                 }
+             }
+         },
+@@ -105,37 +102,32 @@
+                                     false -> stringResource(R.string.share)
+                                 }
+ 
+-                                SplitButtonDefaults.LeadingButton(
+-                                    onClick = when (isWritable) {
+-                                        true -> onSave
+-                                        false -> onShare
+-                                    },
+-                                ) {
+-                                    Icon(
+-                                        imageVector = when (isWritable) {
+-                                            true -> Icons.Default.Save
+-                                            false -> Icons.Default.Share
++                                ToolbarTooltip(description, TooltipAnchorPosition.Below) {
++                                    SplitButtonDefaults.LeadingButton(
++                                        onClick = when (isWritable) {
++                                            true -> onSave
++                                            false -> onShare
+                                         },
+-                                        modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+-                                        contentDescription = description,
+-                                    )
++                                    ) {
++                                        Icon(
++                                            imageVector = when (isWritable) {
++                                                true -> Icons.Default.Save
++                                                false -> Icons.Default.Share
++                                            },
++                                            modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
++                                            contentDescription = description,
++                                        )
+ 
+-                                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
++                                        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+ 
+-                                    Text(description)
++                                        Text(description)
++                                    }
+                                 }
+                             },
+                             trailingButton = {
+                                 val description = stringResource(R.string.more)
+ 
+-                                TooltipBox(
+-                                    positionProvider =
+-                                        TooltipDefaults.rememberTooltipPositionProvider(
+-                                            TooltipAnchorPosition.Above
+-                                        ),
+-                                    tooltip = { PlainTooltip { Text(description) } },
+-                                    state = rememberTooltipState(),
+-                                ) {
++                                ToolbarTooltip(description, TooltipAnchorPosition.Below) {
+                                     SplitButtonDefaults.TrailingButton(
+                                         checked = checked,
+                                         onCheckedChange = { checked = it },
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/StrokeColorPalette.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/StrokeColorPalette.kt
+index 8f2db6b..521d082 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/composables/StrokeColorPalette.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/StrokeColorPalette.kt
+@@ -71,19 +71,21 @@
+                     label = "stroke color size",
+                 )
+ 
+-                IconButton(
+-                    onClick = { onColorSelected(option.color) },
+-                    modifier = Modifier.semantics {
+-                        contentDescription = description
+-                        selected = isSelected
+-                        role = Role.RadioButton
+-                    },
+-                ) {
+-                    Spacer(
+-                        modifier = Modifier
+-                            .size(size.value)
+-                            .background(option.color, CircleShape)
+-                    )
++                ToolbarTooltip(description) {
++                    IconButton(
++                        onClick = { onColorSelected(option.color) },
++                        modifier = Modifier.semantics {
++                            contentDescription = description
++                            selected = isSelected
++                            role = Role.RadioButton
++                        },
++                    ) {
++                        Spacer(
++                            modifier = Modifier
++                                .size(size.value)
++                                .background(option.color, CircleShape)
++                        )
++                    }
+                 }
+             }
+         }
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/TextEditorOverlay.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/TextEditorOverlay.kt
+index be190d3..5f5b2c8 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/composables/TextEditorOverlay.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/TextEditorOverlay.kt
+@@ -47,6 +47,8 @@
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.TextStyle
+ import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.font.FontStyle
+@@ -96,7 +98,7 @@
+             strikethrough -> TextDecoration.LineThrough
+             else -> TextDecoration.None
+         },
+-        textAlign = TextAlign.Center
++        textAlign = TextAlign.Center,
+     )
+ 
+     Column(
+@@ -111,31 +113,36 @@
+             horizontalArrangement = Arrangement.SpaceBetween,
+             verticalAlignment = Alignment.CenterVertically
+         ) {
+-            IconButton(onClick = onDismiss) {
+-                Icon(
+-                    Icons.Default.Close,
+-                    contentDescription = null,
+-                )
++            val cancelDescription = stringResource(R.string.cancel_action)
++            ToolbarTooltip(cancelDescription) {
++                IconButton(onClick = onDismiss) {
++                    Icon(
++                        Icons.Default.Close,
++                        contentDescription = cancelDescription,
++                    )
++                }
+             }
+ 
+-            IconButton(
+-                onClick = {
+-                    val text = textFieldState.text.trim()
+-                    when (text.isNotBlank()) {
+-                        true -> onConfirm(
+-                            text.toString(),
+-                            textStyle,
+-                        )
++            val confirmDescription = stringResource(R.string.confirm_action)
++            ToolbarTooltip(confirmDescription) {
++                IconButton(
++                    onClick = {
++                        val text = textFieldState.text.trim()
++                        when (text.isNotBlank()) {
++                            true -> onConfirm(
++                                text.toString(),
++                                textStyle,
++                            )
+ 
+-                        false -> {}
+-                    }
+-                },
+-                enabled = textFieldState.text.isNotBlank()
+-            ) {
+-                Icon(
+-                    imageVector = Icons.Default.Check,
+-                    contentDescription = null,
+-                )
++                            false -> {}
++                        }
++                    }, enabled = textFieldState.text.isNotBlank()
++                ) {
++                    Icon(
++                        imageVector = Icons.Default.Check,
++                        contentDescription = confirmDescription,
++                    )
++                }
+             }
+         }
+ 
+@@ -238,14 +245,17 @@
+     @StringRes contentDescription: Int,
+     onCheckedChange: (Boolean) -> Unit,
+ ) {
+-    FilledIconToggleButton(
+-        checked = checked,
+-        onCheckedChange = onCheckedChange,
+-    ) {
+-        Icon(
+-            imageVector = imageVector,
+-            contentDescription = stringResource(contentDescription),
+-        )
++    val description = stringResource(contentDescription)
++    ToolbarTooltip(description) {
++        FilledIconToggleButton(
++            checked = checked,
++            onCheckedChange = onCheckedChange,
++        ) {
++            Icon(
++                imageVector = imageVector,
++                contentDescription = description,
++            )
++        }
+     }
+ }
+ 
+@@ -257,23 +267,27 @@
+     onClick: (color: Color) -> Unit,
+ ) {
+     val checked = color == currentColor
++    val description = stringResource(contentDescription)
+ 
+-    OutlinedIconButton(
+-        onClick = { onClick(color) },
+-        colors = IconButtonDefaults.filledIconButtonColors(
+-            containerColor = color.copy(
+-                alpha = when (checked) {
+-                    true -> 0.5f
+-                    false -> 1f
+-                }
+-            ),
+-        )
+-    ) {
+-        if (checked) {
+-            Icon(
+-                imageVector = Icons.Default.Check,
+-                contentDescription = stringResource(contentDescription),
++    ToolbarTooltip(description) {
++        OutlinedIconButton(
++            onClick = { onClick(color) },
++            modifier = Modifier.semantics { this.contentDescription = description },
++            colors = IconButtonDefaults.filledIconButtonColors(
++                containerColor = color.copy(
++                    alpha = when (checked) {
++                        true -> 0.5f
++                        false -> 1f
++                    }
++                ),
+             )
++        ) {
++            if (checked) {
++                Icon(
++                    imageVector = Icons.Default.Check,
++                    contentDescription = null,
++                )
++            }
+         }
+     }
+ }
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/composables/ToolbarTooltip.kt b/app/src/main/java/org/lineageos/canvas/ui/composables/ToolbarTooltip.kt
+new file mode 100644
+index 0000000..09e95b0
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/canvas/ui/composables/ToolbarTooltip.kt
+@@ -0,0 +1,30 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.canvas.ui.composables
++
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.PlainTooltip
++import androidx.compose.material3.Text
++import androidx.compose.material3.TooltipAnchorPosition
++import androidx.compose.material3.TooltipBox
++import androidx.compose.material3.TooltipDefaults
++import androidx.compose.material3.rememberTooltipState
++import androidx.compose.runtime.Composable
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++fun ToolbarTooltip(
++    text: String,
++    position: TooltipAnchorPosition = TooltipAnchorPosition.Above,
++    content: @Composable () -> Unit,
++) {
++    TooltipBox(
++        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position),
++        tooltip = { PlainTooltip { Text(text) } },
++        state = rememberTooltipState(),
++        content = content,
++    )
++}
+diff --git a/app/src/main/java/org/lineageos/canvas/ui/screens/RotationScreen.kt b/app/src/main/java/org/lineageos/canvas/ui/screens/RotationScreen.kt
+index c0b0a81..90942d0 100644
+--- a/app/src/main/java/org/lineageos/canvas/ui/screens/RotationScreen.kt
++++ b/app/src/main/java/org/lineageos/canvas/ui/screens/RotationScreen.kt
+@@ -36,6 +36,7 @@
+ import org.lineageos.canvas.models.RotationStep
+ import org.lineageos.canvas.ui.composables.CanvasBottomBar
+ import org.lineageos.canvas.ui.composables.CanvasImage
++import org.lineageos.canvas.ui.composables.ToolbarTooltip
+ import kotlin.math.PI
+ import kotlin.math.abs
+ import kotlin.math.cos
+@@ -120,18 +121,24 @@
+     onRotateClockwise: () -> Unit,
+ ) {
+     HorizontalFloatingToolbar(expanded = true) {
+-        IconButton(onClick = onRotateCounterclockwise) {
+-            Icon(
+-                imageVector = Icons.AutoMirrored.Filled.RotateLeft,
+-                contentDescription = stringResource(R.string.rotate_counterclockwise),
+-            )
++        val counterclockwiseDescription = stringResource(R.string.rotate_counterclockwise)
++        ToolbarTooltip(counterclockwiseDescription) {
++            IconButton(onClick = onRotateCounterclockwise) {
++                Icon(
++                    imageVector = Icons.AutoMirrored.Filled.RotateLeft,
++                    contentDescription = counterclockwiseDescription,
++                )
++            }
+         }
+ 
+-        IconButton(onClick = onRotateClockwise) {
+-            Icon(
+-                imageVector = Icons.AutoMirrored.Filled.RotateRight,
+-                contentDescription = stringResource(R.string.rotate_clockwise),
+-            )
++        val clockwiseDescription = stringResource(R.string.rotate_clockwise)
++        ToolbarTooltip(clockwiseDescription) {
++            IconButton(onClick = onRotateClockwise) {
++                Icon(
++                    imageVector = Icons.AutoMirrored.Filled.RotateRight,
++                    contentDescription = clockwiseDescription,
++                )
++            }
+         }
+     }
+ }
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 7c2a566..5cf4fd5 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -14,6 +14,9 @@
+     <string name="share">Share</string>
+     <string name="more">More…</string>
+     <string name="back">Back</string>
++    <string name="category_transformation">Transform image</string>
++    <string name="category_drawing">Drawing tools</string>
++    <string name="category_adjustments">Image adjustments</string>
+     <string name="cancel_action">Cancel action</string>
+     <string name="confirm_action">Confirm action</string>
+ 

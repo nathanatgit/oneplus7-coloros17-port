@@ -1,0 +1,77 @@
+From 4e6f5ebb4544df2dbd8f73ccee5ec3fef539ed9b Mon Sep 17 00:00:00 2001
+From: Khargosxh18 <khargosxh18@gmail.com>
+Date: Fri, 09 Oct 2026 03:46:57 +0000
+Subject: [PATCH] power-libperfmgr: Fix SessionRecords null deref on ADPF profile switch
+
+mSessionRecords is only created in the PowerHintSession constructor,
+but the ADPF profile can change while the session is alive. A session
+switched to a heuristic-boost profile then dereferences a null
+SessionRecords in reportActualWorkDuration().
+
+Recreate the records (or drop them) in setAdpfProfile() so they match
+the active profile.
+
+Test: start a game while game hint toggles the ADPF profile; no crash
+Assisted-by: LLM
+Change-Id: I72edfae9c4f11875a46bad0b21a4c868329a9bdc
+---
+
+diff --git a/power-libperfmgr/aidl/PowerHintSession.cpp b/power-libperfmgr/aidl/PowerHintSession.cpp
+index d1ea479..40688bb 100644
+--- a/power-libperfmgr/aidl/PowerHintSession.cpp
++++ b/power-libperfmgr/aidl/PowerHintSession.cpp
+@@ -168,12 +168,7 @@
+               HintManager::GetInstance()->GetOtherConfigs().enableMetricCollection.value_or(false)),
+       mOnAdpfUpdate(
+               [this](const std::shared_ptr<AdpfConfig> config) { this->setAdpfProfile(config); }),
+-      mSessionRecords(getAdpfProfile()->mHeuristicBoostOn.has_value() &&
+-                                      getAdpfProfile()->mHeuristicBoostOn.value()
+-                              ? std::make_unique<SessionRecords>(
+-                                        getAdpfProfile()->mMaxRecordsNum.value(),
+-                                        getAdpfProfile()->mJankCheckTimeFactor.value())
+-                              : nullptr) {
++      mSessionRecords(makeSessionRecords(*getAdpfProfile())) {
+     ATRACE_CALL();
+     ATRACE_INT(mAppDescriptorTrace->trace_target.c_str(), mDescriptor->targetNs.count());
+     ATRACE_INT(mAppDescriptorTrace->trace_active.c_str(), mDescriptor->is_active.load());
+@@ -723,7 +718,27 @@
+         const std::shared_ptr<AdpfConfig> profile) {
+     // Must prevent profile from being changed in a binder call duration.
+     std::scoped_lock lock{mPowerHintSessionLock};
++    if (profile == mAdpfProfile) {
++        return;
++    }
+     mAdpfProfile = profile;
++    // The profile can be switched while the session is alive (e.g. by game mode), so keep the
++    // heuristic boost state consistent with it: reportActualWorkDuration() relies on
++    // mSessionRecords being set whenever the active profile enables heuristic boost.
++    mSessionRecords = makeSessionRecords(*profile);
++    mJankyLevel = SessionJankyLevel::LIGHT;
++    mJankyFrameNum = 0;
++}
++
++template <class HintManagerT, class PowerSessionManagerT>
++std::unique_ptr<SessionRecords>
++PowerHintSession<HintManagerT, PowerSessionManagerT>::makeSessionRecords(
++        const AdpfConfig &config) {
++    if (!config.mHeuristicBoostOn.has_value() || !config.mHeuristicBoostOn.value()) {
++        return nullptr;
++    }
++    return std::make_unique<SessionRecords>(config.mMaxRecordsNum.value(),
++                                            config.mJankCheckTimeFactor.value());
+ }
+ 
+ std::string AppHintDesc::toString() const {
+diff --git a/power-libperfmgr/aidl/PowerHintSession.h b/power-libperfmgr/aidl/PowerHintSession.h
+index a2fa769..f325079 100644
+--- a/power-libperfmgr/aidl/PowerHintSession.h
++++ b/power-libperfmgr/aidl/PowerHintSession.h
+@@ -92,6 +92,8 @@
+     void updateHeuristicBoost() REQUIRES(mPowerHintSessionLock);
+     void resetSessionHeuristicStates() REQUIRES(mPowerHintSessionLock);
+     const std::shared_ptr<AdpfConfig> getAdpfProfile() const;
++    // SessionRecords exist only while the given profile has heuristic boost enabled.
++    static std::unique_ptr<SessionRecords> makeSessionRecords(const AdpfConfig &config);
+     ndk::ScopedAStatus setModeLocked(SessionMode mode, bool enabled)
+             REQUIRES(mPowerHintSessionLock);
+ 

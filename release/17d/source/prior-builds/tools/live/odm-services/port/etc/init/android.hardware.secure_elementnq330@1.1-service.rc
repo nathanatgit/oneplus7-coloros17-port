@@ -1,0 +1,14 @@
+# OnePlus7Port: stock H.40 eSE HAL (NQ330) on the LOS24 kernel + drivers/nfc/ese/p73.c (CONFIG_NFC_P73_ESE).
+# LD_PRELOAD: stock libs import android::base::Trim(const std::string&) which LOS24 libbase lacks (tools/live/odm-shim).
+service vendor.secure_element_hal_service_1_1 /odm/bin/hw/android.hardware.secure_elementnq330@1.1-service
+    class hal
+    user secure_element
+    group secure_element
+    setenv LD_PRELOAD /odm/lib64/libport_shim_trim.so
+    oneshot
+
+on post-fs-data
+    mkdir /data/vendor/secure_element 0777 secure_element secure_element
+    chmod 0660 /dev/p73
+    chown secure_element secure_element /dev/p73
+    setprop vendor.nfc_se.config_ready true

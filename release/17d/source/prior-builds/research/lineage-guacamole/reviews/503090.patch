@@ -1,0 +1,113 @@
+From 83a7443993dda9761ff231d7d0ae78a85bc29408 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 16:00:28 +0530
+Subject: [PATCH] Settings: Add glif expressive setup wizard theme
+
+Change-Id: Idb943a0d0126bc71c8b9afb448e2954cfb39c102
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/res/values-night/themes_suw.xml b/res/values-night/themes_suw.xml
+index 527918b..7222741 100644
+--- a/res/values-night/themes_suw.xml
++++ b/res/values-night/themes_suw.xml
+@@ -22,6 +22,7 @@
+     <style name="GlifV2Theme.DayNight" parent="GlifV2Theme" />
+     <style name="GlifV3Theme.DayNight" parent="GlifV3Theme" />
+     <style name="GlifV4Theme.DayNight" parent="GlifV4Theme" />
++    <style name="GlifExpressiveTheme.DayNight" parent="GlifExpressiveTheme" />
+     <style name="GlifV3Theme.DayNight.NoActionBar" parent="GlifV3Theme.NoActionBar" />
+     <style name="GlifV2Theme.DayNight.Transparent" parent="GlifV2Theme.Transparent" />
+     <style name="GlifV3Theme.DayNight.Transparent" parent="GlifV3Theme.Transparent" />
+diff --git a/res/values/themes_suw.xml b/res/values/themes_suw.xml
+index d423999..a7bfef3 100644
+--- a/res/values/themes_suw.xml
++++ b/res/values/themes_suw.xml
+@@ -170,6 +170,44 @@
+         <item name="*android:lockPatternStyle">@style/LockPatternStyle</item>
+     </style>
+ 
++    <style name="GlifExpressiveTheme" parent="SudThemeGlifExpressive.DayNight">
++        <!-- For all AndroidX Alert Dialogs -->
++        <item name="alertDialogTheme">@style/GlifV2ThemeAlertDialog</item>
++        <item name="android:windowBackground">@color/materialColorSurfaceContainer</item>
++        <item name="*android:preferencePanelStyle">@*android:style/PreferencePanel.Dialog</item>
++        <item name="fingerprint_layout_theme">@style/FingerprintLayoutTheme</item>
++        <item name="face_layout_theme">@style/FaceLayoutTheme</item>
++        <item name="ic_menu_moreoverflow">@*android:drawable/ic_menu_moreoverflow_material</item>
++        <item name="side_margin">0dip</item>
++        <item name="wifi_signal_color">@color/setup_wizard_wifi_color_dark</item>
++        <item name="wifi_signal">@drawable/wifi_signal</item>
++        <item name="wifi_friction">@drawable/wifi_friction</item>
++        <item name="preferenceBackgroundColor">@color/materialColorSurfaceContainer</item>
++        <item name="preferenceTheme">@style/PreferenceTheme.SetupWizard</item>
++
++        <!-- LockPatternView colors -->
++        <item name="*android:lockPatternStyle">@style/LockPatternStyle</item>
++    </style>
++
++    <style name="GlifExpressiveTheme.Light" parent="SudThemeGlifExpressive.Light">
++        <!-- For all AndroidX Alert Dialogs -->
++        <item name="alertDialogTheme">@style/GlifV2ThemeAlertDialog.Light</item>
++        <item name="android:windowBackground">@color/materialColorSurfaceContainer</item>
++        <item name="*android:preferencePanelStyle">@*android:style/PreferencePanel.Dialog</item>
++        <item name="fingerprint_layout_theme">@style/FingerprintLayoutTheme</item>
++        <item name="face_layout_theme">@style/FaceLayoutTheme</item>
++        <item name="ic_menu_moreoverflow">@*android:drawable/ic_menu_moreoverflow_material</item>
++        <item name="side_margin">0dip</item>
++        <item name="wifi_signal_color">@color/setup_wizard_wifi_color_light</item>
++        <item name="wifi_signal">@drawable/wifi_signal</item>
++        <item name="wifi_friction">@drawable/wifi_friction</item>
++        <item name="preferenceBackgroundColor">@color/materialColorSurfaceContainer</item>
++        <item name="preferenceTheme">@style/PreferenceTheme.SetupWizard</item>
++
++        <!-- LockPatternView colors -->
++        <item name="*android:lockPatternStyle">@style/LockPatternStyle</item>
++    </style>
++
+     <style name="GlifV3Theme.Light.NoActionBar" parent="GlifV3Theme.Light">
+         <item name="android:windowActionBar">false</item>
+     </style>
+@@ -287,6 +325,7 @@
+     <style name="GlifV2Theme.DayNight" parent="GlifV2Theme.Light" />
+     <style name="GlifV3Theme.DayNight" parent="GlifV3Theme.Light" />
+     <style name="GlifV4Theme.DayNight" parent="GlifV4Theme.Light" />
++    <style name="GlifExpressiveTheme.DayNight" parent="GlifExpressiveTheme.Light" />
+     <style name="GlifV3Theme.DayNight.NoActionBar" parent="GlifV3Theme.Light.NoActionBar" />
+     <style name="GlifV2Theme.DayNight.Transparent" parent="GlifV2Theme.Light.Transparent" />
+     <style name="GlifV3Theme.DayNight.Transparent" parent="GlifV3Theme.Light.Transparent" />
+diff --git a/src/com/android/settings/SetupWizardUtils.java b/src/com/android/settings/SetupWizardUtils.java
+index 57adeee..f712822 100644
+--- a/src/com/android/settings/SetupWizardUtils.java
++++ b/src/com/android/settings/SetupWizardUtils.java
+@@ -51,6 +51,9 @@
+             if (WizardManagerHelper.isAnySetupWizard(intent)) {
+                 if (ThemeHelper.isSetupWizardDayNightEnabled(context)) {
+                     switch (theme) {
++                        case ThemeHelper.THEME_GLIF_EXPRESSIVE_LIGHT:
++                        case ThemeHelper.THEME_GLIF_EXPRESSIVE:
++                            return R.style.GlifExpressiveTheme_DayNight;
+                         case ThemeHelper.THEME_GLIF_V4_LIGHT:
+                         case ThemeHelper.THEME_GLIF_V4:
+                             return R.style.GlifV4Theme_DayNight;
+@@ -66,6 +69,10 @@
+                     }
+                 } else {
+                     switch (theme) {
++                        case ThemeHelper.THEME_GLIF_EXPRESSIVE_LIGHT:
++                            return R.style.GlifExpressiveTheme_Light;
++                        case ThemeHelper.THEME_GLIF_EXPRESSIVE:
++                            return R.style.GlifExpressiveTheme;
+                         case ThemeHelper.THEME_GLIF_V4_LIGHT:
+                             return R.style.GlifV4Theme_Light;
+                         case ThemeHelper.THEME_GLIF_V4:
+@@ -86,6 +93,9 @@
+                 }
+             } else {
+                 switch (theme) {
++                    case ThemeHelper.THEME_GLIF_EXPRESSIVE_LIGHT:
++                    case ThemeHelper.THEME_GLIF_EXPRESSIVE:
++                        return R.style.GlifExpressiveTheme;
+                     case ThemeHelper.THEME_GLIF_V4_LIGHT:
+                     case ThemeHelper.THEME_GLIF_V4:
+                         return R.style.GlifV4Theme;

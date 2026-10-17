@@ -1,0 +1,42 @@
+From adc0fb9abe4add0b5b9a202ec36c21668da796c6 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:42:47 +0300
+Subject: [PATCH] Merge tag 'AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0' into staging/lineage-24.0_merge-AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0
+
+AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0
+
+* tag 'AUDIO_HANDSET.LA.11.0.r1-12300-kaanapali.0':
+  hal: core: remove hardcoded 1 ms ULL buffer override for boutzi
+
+Change-Id: I5b6ca5d29286187a7c4d4ad32269cd80bdfbc896
+---
+
+diff --git a/hal/core/StreamOutPrimary.cpp b/hal/core/StreamOutPrimary.cpp
+index 432f077..469a0b4 100644
+--- a/hal/core/StreamOutPrimary.cpp
++++ b/hal/core/StreamOutPrimary.cpp
+@@ -1127,12 +1127,18 @@
+     }
+     auto bufConfig = getBufferConfig();
+     if (mTag == Usecase::ULL_PLAYBACK) {
+-        //The buffer size for ULL_PLAYBACK set to PAL should not be more than 2ms
+-        const size_t durationMs = 1; // set to 1ms
+-        size_t frameSizeInBytes = getFrameSizeInBytes(
+-                mMixPortConfig.format.value(), mMixPortConfig.channelMask.value());
+-        bufConfig.bufferSize = durationMs *
+-                    (mMixPortConfig.sampleRate.value().value /1000) * frameSizeInBytes;
++        char vendor_sku[PROPERTY_VALUE_MAX] = {'\0'};
++        if (property_get("ro.boot.product.vendor.sku", vendor_sku, "") <= 0) {
++            LOG(WARNING) << __func__ << mLogPrefix << " failed to get property for the vendor_sku";
++        }
++        if (strcmp(vendor_sku, "bourtzi") != 0) {
++            //The buffer size for ULL_PLAYBACK set to PAL should not be more than 2ms
++            const size_t durationMs = 1; // set to 1ms
++            size_t frameSizeInBytes = getFrameSizeInBytes(
++                    mMixPortConfig.format.value(), mMixPortConfig.channelMask.value());
++            bufConfig.bufferSize = durationMs *
++                        (mMixPortConfig.sampleRate.value().value /1000) * frameSizeInBytes;
++        }
+     }
+     size_t ringBufSizeInBytes = bufConfig.bufferSize;
+     const size_t ringBufCount = bufConfig.bufferCount;

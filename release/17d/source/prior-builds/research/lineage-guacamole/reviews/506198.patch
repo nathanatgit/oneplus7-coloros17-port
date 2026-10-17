@@ -1,0 +1,44 @@
+From 6378be8bf2cae4e322ef0e90e8690600e0a7f548 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Sat, 03 Oct 2026 22:26:00 -0400
+Subject: [PATCH] sepolicy: Include versioned genfs labels in recovery
+
+Commit 9b32308a797d ("Add BOARD_GENFS_LABELS_VERSION") moved genfscon
+rules to plat_sepolicy_genfs_<ver>.cil but missed sepolicy.recovery,
+so nodes like firmware_config kept generic labels in recovery. Select
+the genfs file for recovery the same way the precompiled policy does.
+
+This fixes an issue seen on the Solana Saga where writes to force
+sysfs fallback were failing, leading to delayed recovery/fastbootd
+boot up.
+
+Test: Boot recovery, confirm force_sysfs_fallback has correct label
+Change-Id: I65a7161d282adf18fe6a9d22a25d06c452b9e9a5
+---
+
+diff --git a/Android.bp b/Android.bp
+index c7bdd54..e10d906 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -741,9 +741,20 @@
+     recovery: true,
+ }
+ 
++filegroup {
++    name: "recovery_sepolicy_genfs_srcs",
++    device_first_srcs: select(soong_config_variable("ANDROID", "BOARD_GENFS_LABELS_VERSION"), {
++        any @ ver: [":plat_sepolicy_genfs_" + ver + ".cil"],
++        default: [],
++    }),
++}
++
+ se_policy_binary {
+     name: "sepolicy.recovery",
+-    srcs: [":recovery_sepolicy.cil"],
++    srcs: [
++        ":recovery_sepolicy.cil",
++        ":recovery_sepolicy_genfs_srcs",
++    ],
+     stem: "sepolicy",
+     recovery: true,
+ }

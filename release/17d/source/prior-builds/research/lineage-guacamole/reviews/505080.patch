@@ -1,0 +1,28 @@
+From fbd3e92a492a2d192595e6ae0237cc5eb32f74cb Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:36:43 +0300
+Subject: [PATCH] Merge tag 'LA.QSSI.17.0.r1-11100-qssi.0' into staging/lineage-24.0_merge-LA.QSSI.17.0.r1-11100-qssi.0
+
+LA.QSSI.17.0.r1-11100-qssi.0
+
+* tag 'LA.QSSI.17.0.r1-11100-qssi.0':
+  commonsys-intf: display: fix for custom tuning metadata
+
+Change-Id: I5c28372aa16de3f3f1c0a3c5f5f9748dc3922d2f
+---
+
+diff --git a/gralloc/mapperInterfaces/CustomTuningMetadata.h b/gralloc/mapperInterfaces/CustomTuningMetadata.h
+index 24a144a..0ea688a 100644
+--- a/gralloc/mapperInterfaces/CustomTuningMetadata.h
++++ b/gralloc/mapperInterfaces/CustomTuningMetadata.h
+@@ -16,8 +16,8 @@
+ typedef struct vendor_qti_hardware_display_common_CustomTuningMetadata {
+   /** Payload size in bytes */
+   uint32_t size;
+-  uint8_t payload[QTI_CUSTOM_TUNING_METADATA_SIZE];
+   vendor_qti_hardware_display_common_CustomTuningMetadataFlags flag;
++  uint8_t payload[QTI_CUSTOM_TUNING_METADATA_SIZE];
+ } vendor_qti_hardware_display_common_CustomTuningMetadata;
+ 
+ #endif  // __COMMON_CUSTOMTUNINGMETADATA_H__
+\ No newline at end of file

@@ -1,0 +1,219 @@
+From 58d8300a1e72163929ddb382e3b710b98e34fe0f Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:38:42 +0300
+Subject: [PATCH] Merge tag 'LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0' into staging/lineage-24.0_merge-LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0
+
+LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0
+
+* tag 'LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0':
+  hal: add NN NS model file into product package
+  hal : Fix crash caused by race condition during stream access
+  hal: fix for ringtone playback over A2DP is mute
+  hal: Add support for hdmi out device
+  hal: Decrease Deep buffer platform delay by 20 ms
+  configs: Disable C2 audio compilation in target make files
+  configs: add new flag to disable C2 compilation by default
+  hal: configs: flag for dev prepare and graph start
+  AHAL: ravelin: Add spatial audio head_tracker permission
+
+Change-Id: Iedd493c98f1f867ba3d5963dd909280bbc06a513
+---
+
+diff --git a/configs/audio_vendor_product.mk b/configs/audio_vendor_product.mk
+index 2e88516..04dc3ec 100644
+--- a/configs/audio_vendor_product.mk
++++ b/configs/audio_vendor_product.mk
+@@ -67,3 +67,13 @@
+ else
+ $(call add_soong_config_var_value,vendor_audio_hwasan_config,use_hwasan,false)
+ endif
++
++#----------------------------------------------------------------------
++# audio specific
++#----------------------------------------------------------------------
++
++# C2 compilation is disabled by default.
++# for target specific enablement, set it to true in the target specific .mk file.
++TARGET_USES_VENDOR_C2_AUDIO_HAL := false
++$(warning "C2 audio compilation disabled by default")
++
+diff --git a/configs/parrot/parrot.mk b/configs/parrot/parrot.mk
+index be4ee6b..c057e52 100755
+--- a/configs/parrot/parrot.mk
++++ b/configs/parrot/parrot.mk
+@@ -9,6 +9,8 @@
+ endif
+ endif
+ 
++TARGET_USES_VENDOR_C2_AUDIO_HAL := false
++$(warning "C2 audio compilation disabled")
+ 
+ #BOARD_USES_GENERIC_AUDIO := true
+ 
+@@ -94,6 +96,7 @@
+ BUILD_AUDIO_TECHPACK_SOURCE := true
+ AUDIO_FEATURE_ENABLED_MCS := true
+ AUDIO_FEATURE_ENABLED_MIC_OCCLUSION := true
++AUDIO_FEATURE_ENABLED_DEVICE_PREPARE_SEQ := true
+ ##AUDIO_FEATURE_FLAGS
+ #AGM
+ AUDIO_AGM := libagmclient
+@@ -252,11 +255,15 @@
+     $(CONFIG_HAL_SRC_DIR)/mixer_paths_parrot_idp_sku1.xml:$(CONFIG_SKU_OUT_DIR)/mixer_paths_parrot_idp_sku1.xml \
+     $(CONFIG_PAL_SRC_DIR)/resourcemanager_parrot_idp_sku1.xml:$(CONFIG_SKU_OUT_DIR)/resourcemanager_parrot_idp_sku1.xml \
+     $(CONFIG_PAL_SRC_DIR)/usecaseKvManager.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usecaseKvManager.xml \
+-    vendor/qcom/opensource/audio-hal/primary-hal/configs/common/media_codecs_vendor_audio.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_vendor_audio.xml \
+     frameworks/native/data/etc/android.hardware.audio.pro.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.pro.xml \
+     frameworks/native/data/etc/android.hardware.audio.low_latency.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.low_latency.xml \
+     frameworks/native/data/etc/android.hardware.sensor.dynamic.head_tracker.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/sku_$(DEVICE_SKU)/android.hardware.sensor.dynamic.head_tracker.xml
+ 
++ifeq ($(TARGET_USES_VENDOR_C2_AUDIO_HAL), true)
++PRODUCT_COPY_FILES +=  \
++    vendor/qcom/opensource/audio-hal/primary-hal/configs/common/media_codecs_vendor_audio.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_vendor_audio.xml
++endif
++
+ # Copy AudioEffects config
+ PRODUCT_COPY_FILES += \
+     hardware/interfaces/audio/aidl/default/audio_effects_config.xml:$(CONFIG_SKU_OUT_DIR)/audio_effects_config_stub.xml
+@@ -332,9 +339,6 @@
+     $(CONFIG_PAL_SRC_DIR)/resourcemanager_ravelin_idp.xml:$(CONFIG_SKU_OUT_DIR)/resourcemanager_ravelin_idp.xml \
+     $(CONFIG_PAL_SRC_DIR)/resourcemanager_ravelin_idp_wsahac.xml:$(CONFIG_SKU_OUT_DIR)/resourcemanager_ravelin_idp_wsahac.xml \
+     $(CONFIG_PAL_SRC_DIR)/resourcemanager_upd.xml:$(CONFIG_SKU_OUT_DIR)/resourcemanager_upd.xml \
+-
+-# Copy AudioEffects config
+-PRODUCT_COPY_FILES += \
+     hardware/interfaces/audio/aidl/default/audio_effects_config.xml:$(CONFIG_SKU_OUT_DIR)/audio_effects_config_stub.xml \
+     frameworks/native/data/etc/android.hardware.sensor.dynamic.head_tracker.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/sku_$(DEVICE_SKU)/android.hardware.sensor.dynamic.head_tracker.xml
+ 
+diff --git a/configs/sun/audio_module_config_primary.xml b/configs/sun/audio_module_config_primary.xml
+index 84892aa..8444107 100644
+--- a/configs/sun/audio_module_config_primary.xml
++++ b/configs/sun/audio_module_config_primary.xml
+@@ -18,7 +18,7 @@
+         <mixPort name="haptics_out" role="source" flags="FAST">
+             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO_HAPTIC_A" formatType="PCM" pcmType="INT_16_BIT" />
+         </mixPort>
+-        <mixPort name="deep_buffer_out" role="source" flags="DEEP_BUFFER">
++        <mixPort name="deep_buffer_out" role="source" flags="DEEP_BUFFER" recommendedMuteDurationMs="300">
+             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="INT_16_BIT" />
+             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="FIXED_Q_8_24" />
+             <profile samplingRates="48000" channelLayouts="LAYOUT_STEREO" formatType="PCM" pcmType="INT_24_BIT" />
+diff --git a/configs/sun/sun.mk b/configs/sun/sun.mk
+index a2fa283..fc53665 100644
+--- a/configs/sun/sun.mk
++++ b/configs/sun/sun.mk
+@@ -71,6 +71,8 @@
+ PRODUCT_PACKAGES += fai__8.0.2_0.0__3.0.0_0.0__3.1.2_0.0__3.2.0_0.1__eai_4.6_enpuv5.pmd
+ PRODUCT_PACKAGES += fai__8.0.3_0.0__3.0.0_0.0__3.1.2_0.0__3.2.0_0.1__eai_4.6_enpuv5.pmd
+ PRODUCT_PACKAGES += fai__3.0.0_0.0__eai_4.6_enpuv5.pmd
++PRODUCT_PACKAGES += fai__4.6.5_0.0__3.0.0_0.0__3.1.2_0.0__3.2.0_0.1__eai_4.6.0_enpuv5.pmd
++PRODUCT_PACKAGES += fai__4.6.5_1.0__3.0.0_0.0__3.1.2_0.0__3.2.0_0.1__eai_4.6.0_enpuv5.pmd
+ 
+ # Audio configuration xml's related to Lanai
+ QCV_FAMILY_SKUS := sun
+diff --git a/hal/core/StreamInPrimary.cpp b/hal/core/StreamInPrimary.cpp
+index 9fe4d85..a5672fc 100644
+--- a/hal/core/StreamInPrimary.cpp
++++ b/hal/core/StreamInPrimary.cpp
+@@ -536,8 +536,10 @@
+         return 0;
+     }
+     auto removeStreams = [&](std::weak_ptr<StreamIn> streamIn) -> bool {
+-        if (!streamIn.lock()) return true;
+-        return streamIn.lock()->isClosed();
++         if (auto sharedStream = streamIn.lock()) {
++            return sharedStream->isClosed();
++         }
++         return true;
+     };
+ 
+     inStreams.erase(std::remove_if(inStreams.begin(), inStreams.end(), removeStreams),
+diff --git a/hal/core/StreamOutPrimary.cpp b/hal/core/StreamOutPrimary.cpp
+index 4df2a84..9cd4fa7 100644
+--- a/hal/core/StreamOutPrimary.cpp
++++ b/hal/core/StreamOutPrimary.cpp
+@@ -803,8 +803,10 @@
+         return 0;
+     }
+     auto removeStreams = [&](std::weak_ptr<StreamOut> streamOut) -> bool {
+-        if (!streamOut.lock()) return true;
+-        return streamOut.lock()->isClosed();
++         if (auto sharedStream = streamOut.lock()) {
++             return sharedStream->isClosed();
++         }
++         return true;
+     };
+     outStreams.erase(std::remove_if(outStreams.begin(), outStreams.end(), removeStreams),
+                      outStreams.end());
+diff --git a/hal/core/platform/Platform.cpp b/hal/core/platform/Platform.cpp
+index 9e19321..123df48 100644
+--- a/hal/core/platform/Platform.cpp
++++ b/hal/core/platform/Platform.cpp
+@@ -549,12 +549,20 @@
+                    << device.toString();
+         return std::nullopt;
+     }
+-    pal_device_id_t deviceId = PAL_DEVICE_OUT_AUX_DIGITAL;
++
+     LOG(DEBUG) << __func__ << " controller " << controller << " stream " << stream;
+-    if (stream) {
+-        deviceId = PAL_DEVICE_OUT_AUX_DIGITAL_1;
+-        LOG(DEBUG) << __func__ << " override palDevice with PAL_DEVICE_OUT_AUX_DIGITAL_1";
++    pal_device_id_t deviceId = PAL_DEVICE_NONE;
++
++    if (controller == 0) {
++        deviceId = PAL_DEVICE_OUT_AUX_DIGITAL;
++        if (stream) {
++            deviceId = PAL_DEVICE_OUT_AUX_DIGITAL_1;
++            LOG(DEBUG) << __func__ << " override palDevice with PAL_DEVICE_OUT_AUX_DIGITAL_1";
++        }
++    } else if (controller == 1) {
++        deviceId = PAL_DEVICE_OUT_HDMI;
+     }
++
+     struct HdmiParameters hdmiParam = {
+             .controller = controller, .stream = stream, .deviceId = deviceId};
+     return hdmiParam;
+@@ -881,7 +889,8 @@
+ 
+         param_bt_a2dp.dev_id = PAL_DEVICE_OUT_BLUETOOTH_A2DP;
+ 
+-        param_bt_a2dp.is_in_call = (mCallMode != AUDIO_MODE_NORMAL);
++        param_bt_a2dp.is_in_call = ((mCallMode == AUDIO_MODE_IN_CALL) ||
++                        (mCallMode == AUDIO_MODE_IN_COMMUNICATION));
+ 
+         LOG(VERBOSE) << __func__ << " BT A2DP Suspended = " << value;
+         std::unique_lock<std::mutex> guard(AudioExtension::reconfig_wait_mutex_);
+@@ -1116,7 +1125,8 @@
+ 
+         param_bt_a2dp.dev_id = PAL_DEVICE_IN_BLUETOOTH_A2DP;
+ 
+-        param_bt_a2dp.is_in_call = (mCallMode != AUDIO_MODE_NORMAL);
++        param_bt_a2dp.is_in_call = ((mCallMode == AUDIO_MODE_IN_CALL) ||
++                        (mCallMode == AUDIO_MODE_IN_COMMUNICATION));
+ 
+         LOG(VERBOSE) << __func__ << " BT A2DP Capture Suspended " << value << "command received";
+         std::unique_lock<std::mutex> guard(AudioExtension::reconfig_wait_mutex_);
+@@ -1136,7 +1146,8 @@
+             param_bt_a2dp.a2dp_capture_suspended = false;
+         }
+ 
+-        param_bt_a2dp.is_in_call = (mCallMode != AUDIO_MODE_NORMAL);
++        param_bt_a2dp.is_in_call = ((mCallMode == AUDIO_MODE_IN_CALL) ||
++                        (mCallMode == AUDIO_MODE_IN_COMMUNICATION));
+ 
+         LOG(INFO) << __func__ << " BT LEA Suspended = ," << value << " command received";
+         // Synchronize the suspend/resume calls from setparams and reconfig_cb
+diff --git a/hal/core/platform/include/qti-audio-core/AudioUsecase.h b/hal/core/platform/include/qti-audio-core/AudioUsecase.h
+index f532f83..1cfa143 100644
+--- a/hal/core/platform/include/qti-audio-core/AudioUsecase.h
++++ b/hal/core/platform/include/qti-audio-core/AudioUsecase.h
+@@ -151,7 +151,7 @@
+   public:
+     constexpr static size_t kPeriodCount = 2;
+     constexpr static size_t kPeriodDurationMs = 40;
+-    constexpr static size_t kPlatformDelayMs = 49;
++    constexpr static size_t kPlatformDelayMs = 29;
+ 
+     static size_t getFrameCount(
+             const ::aidl::android::media::audio::common::AudioPortConfig& mixPortConfig);

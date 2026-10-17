@@ -1,0 +1,264 @@
+From 75a883d5ac3c38d1eb84c3f38760348e19deef2e Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sat, 10 Oct 2026 19:17:40 +0200
+Subject: [PATCH] sensors: fusionlight: Support black-frame V2.1 profiles
+
+Profiles with BlackFrame30Support skip screen captures and report lux
+from the raw channels, as do V2.1 profiles without a leakage model.
+Default CWBScreenshotPeriod to 250ms, implement IR ratio formula 2,
+select V2.1 IR brightness levels by upper bound, treat brightness below
+2 as screen off and apply LowLightAccuracy on every profile, like stock.
+
+Assisted-by: LLM
+Change-Id: Ic3987598501f102317535c2bc82e1b2a12f4f6d5
+---
+
+diff --git a/sensors/fusionlight/FusionLightProcessor.cpp b/sensors/fusionlight/FusionLightProcessor.cpp
+index 51a6d9a..15aaa95 100644
+--- a/sensors/fusionlight/FusionLightProcessor.cpp
++++ b/sensors/fusionlight/FusionLightProcessor.cpp
+@@ -73,6 +73,18 @@
+     return brightness <= config.segment_brightness[1] ? 1 : 0;
+ }
+ 
++// V2.1 selects the first IR brightness range whose upper bound covers the
++// brightness, ignoring lower bounds. Unmatched brightness falls back to the
++// first range.
++int FindUpperRange(const std::vector<ValueRange>& ranges, double value) {
++    for (int level = 0; level < ranges.size(); ++level) {
++        if (value <= ranges[level].max) {
++            return level;
++        }
++    }
++    return 0;
++}
++
+ // Stock compares IR ratios and lux in fixed point with 1e-7 resolution.
+ int64_t ToFixedPoint(double value) {
+     constexpr double kLimit = 9.2e18;
+@@ -126,17 +138,33 @@
+ }
+ 
+ double IrRatio(const FusionConfig& config, const Channels& channels) {
+-    if (ToFixedPoint(channels[3]) <= 0) {
++    const bool has_clear = ToFixedPoint(channels[3]) > 0;
++    if (config.ir_ratio_formula == 2) {
++        if (!has_clear) {
++            return 1.0;
++        }
++        return std::max(1.0 - (channels[0] * 0.4379 + channels[1] * 0.243 + channels[2] * 0.2435) /
++                                        channels[3],
++                        0.0);
++    }
++    if (!has_clear) {
+         return 0.0;
+     }
+     double ratio = (channels[0] + channels[1] + channels[2] - channels[3]) / channels[3] * 0.5;
+-    // Stock folds negative view model ratios back for these sensor modules.
+-    if (!config.screenshot_v2_1_supported && HasAbsoluteIrRatio(config.sensor_module_id)) {
++    // Stock folds negative ratios back for these sensor modules.
++    if (HasAbsoluteIrRatio(config.sensor_module_id)) {
+         ratio = std::abs(ratio);
+     }
+     return std::max(ratio, 0.0);
+ }
+ 
++// Black-frame profiles, and V2.1 profiles without a leakage model, report lux
++// from the raw channels without screen captures.
++bool UsesScreenCapture(const FusionConfig& config) {
++    return !config.black_frame_supported &&
++           (!config.screenshot_v2_1_supported || !config.leakage.empty());
++}
++
+ double EvaluatePolynomial(const Polynomial& polynomial, double x) {
+     return ((polynomial[0] * x + polynomial[1]) * x + polynomial[2]) * x + polynomial[3];
+ }
+@@ -159,7 +187,7 @@
+             table = &config.channel_count_coefficients[band];
+         } else if (config.screenshot_v2_1_supported) {
+             table = &config.lux_coefficients[band];
+-            level = FindRange(config.ir_brightness, brightness);
++            level = FindUpperRange(config.ir_brightness, brightness);
+         } else {
+             const auto& segment = config.segments[FindViewSegment(config, brightness)];
+             table = &segment.lux_coefficients[band];
+@@ -174,8 +202,7 @@
+     if (!std::isfinite(lux)) {
+         return std::nullopt;
+     }
+-    if (!config.screenshot_v2_1_supported &&
+-        ToFixedPoint(lux) < ToFixedPoint(config.low_light_accuracy)) {
++    if (ToFixedPoint(lux) < ToFixedPoint(config.low_light_accuracy)) {
+         lux = 0.0;
+     }
+     return std::max(lux, 0.0);
+@@ -448,7 +475,9 @@
+ 
+     std::vector<Channels> calibration;
+     std::vector<ViewCalibration> view_calibration;
+-    if (config->screenshot_v2_1_supported) {
++    if (!UsesScreenCapture(*config)) {
++        LOG(INFO) << "FusionLight profile does not use screen captures";
++    } else if (config->screenshot_v2_1_supported) {
+         calibration = LoadCalibration(*config);
+     } else {
+         view_calibration = LoadViewCalibration(*config);
+@@ -554,19 +583,33 @@
+             return;
+         }
+     }
+-    const int32_t brightness = event.u.data[3];
++    int32_t brightness = event.u.data[3];
++    // Stock treats brightness below 2 as screen off.
++    if (brightness < 2) {
++        brightness = 0;
++    }
+     // Bit 1 of the event flags reports DC dimming.
+     const bool dc_mode = static_cast<int32_t>(event.u.data[2]) & 0x2;
+ 
+     bool available;
++    bool screen_capture = false;
+     {
+         std::lock_guard lock(state_->mutex);
+         if (!state_->active) {
+             return;
+         }
+         available = state_->available;
++        if (available && brightness > 0) {
++            screen_capture = UsesScreenCapture(state_->config);
++            const auto lux =
++                    screen_capture ? std::nullopt
++                                   : CalculateLux(state_->config, raw_channels, brightness, false);
++            if (lux.has_value()) {
++                fusion_light_event.u.scalar = *lux;
++            }
++        }
+     }
+-    if (!available) {
++    if (!available || (brightness > 0 && !screen_capture)) {
+         enqueueReady(std::move(fusion_light_event));
+         return;
+     }
+diff --git a/sensors/fusionlight/FusionLightUtils.cpp b/sensors/fusionlight/FusionLightUtils.cpp
+index 922a60a..db79e85 100644
+--- a/sensors/fusionlight/FusionLightUtils.cpp
++++ b/sensors/fusionlight/FusionLightUtils.cpp
+@@ -34,6 +34,7 @@
+ constexpr int32_t kMainPanelStageFeature = 0x22;
+ constexpr int32_t kDefaultPanelStage = 4;
+ constexpr auto kCwbWeightsPath = "/odm/etc/display/cwb_weightspos.json";
++constexpr auto kDefaultScreenshotPeriod = 250ms;
+ 
+ bool ReadNumber(const Json::Value& value, double& result) {
+     if (value.isString()) {
+@@ -377,15 +378,27 @@
+         !ParseRanges(root["IRBrightness_V2_1"], "BrightnessMin", "BrightnessMax",
+                      config.ir_brightness) ||
+         !ParseRanges(root["IRThreshold_V2_1"], "IR_Ratio_Min", "IR_Ratio_Max",
+-                     config.ir_thresholds) ||
+-        !ParseChannelModels(root["LinearityCompensation"], config.linearity) ||
+-        !ParseChannelModels(root["LightLeakageCalculation"], config.leakage) ||
+-        !ParseChannelModels(root["LightLeakageRatio"], config.leakage_ratio) ||
+-        !ParseGolden(root["LightLeakageGolden"], config.leakage_golden)) {
++                     config.ir_thresholds)) {
+         error = "invalid V2.1 model";
+         return false;
+     }
+ 
++    // Profiles may omit the leakage model entirely. Stock then keeps zeroed
++    // tables, which leaves the raw channels uncompensated.
++    constexpr const char* kLeakageTables[] = {"LinearityCompensation", "LightLeakageCalculation",
++                                              "LightLeakageRatio", "LightLeakageGolden"};
++    const bool has_leakage_model =
++            std::any_of(std::begin(kLeakageTables), std::end(kLeakageTables),
++                        [&](const char* name) { return !root[name].isNull(); });
++    if (has_leakage_model &&
++        (!ParseChannelModels(root["LinearityCompensation"], config.linearity) ||
++         !ParseChannelModels(root["LightLeakageCalculation"], config.leakage) ||
++         !ParseChannelModels(root["LightLeakageRatio"], config.leakage_ratio) ||
++         !ParseGolden(root["LightLeakageGolden"], config.leakage_golden))) {
++        error = "invalid V2.1 leakage model";
++        return false;
++    }
++
+     constexpr std::array<const char*, kIrBandCount> kDefaultTables = {
+             "LuxCoeffLIR_V2_1", "LuxCoeffHIR_V2_1", "LuxCoeffSuperHIR_V2_1"};
+     for (int band = 0; band < kIrBandCount; ++band) {
+@@ -396,8 +409,9 @@
+     }
+ 
+     const size_t levels = config.linearity_brightness.size();
+-    if (config.linearity.size() != levels || config.leakage.size() != levels ||
+-        config.leakage_ratio.size() != levels || config.leakage_golden.size() != levels ||
++    if ((has_leakage_model &&
++         (config.linearity.size() != levels || config.leakage.size() != levels ||
++          config.leakage_ratio.size() != levels || config.leakage_golden.size() != levels)) ||
+         config.ir_brightness.empty()) {
+         error = "inconsistent V2.1 model dimensions";
+         return false;
+@@ -412,18 +426,6 @@
+ }
+ 
+ bool ParseViewModel(const Json::Value& root, FusionConfig& config, std::string& error) {
+-    const auto& common = root["CommonConfig"];
+-    int32_t ir_ratio_formula = 0;
+-    if (common.isMember("IRRatioFormulaType") &&
+-        !ReadInt(common["IRRatioFormulaType"], ir_ratio_formula)) {
+-        error = "invalid IRRatioFormulaType";
+-        return false;
+-    }
+-    if (ir_ratio_formula != 0) {
+-        error = "unsupported IR ratio formula " + std::to_string(ir_ratio_formula);
+-        return false;
+-    }
+-
+     if (!ParseRanges(root["LinearityBrightnessRange"], "BrightnessMin", "BrightnessMax",
+                      config.linearity_brightness) ||
+         !ParseRanges(root["IRThreshold"], "IR_Ratio_Min", "IR_Ratio_Max", config.ir_thresholds) ||
+@@ -478,7 +480,10 @@
+         !ReadRequiredInt(crop, "RightBottomY", config.cwb.crop_bottom) ||
+         !ReadRequiredInt(resolution, "Width", config.cwb.reference_width) ||
+         !ReadRequiredInt(resolution, "Height", config.cwb.reference_height) ||
+-        !ReadRequiredDuration(common, "CWBScreenshotPeriod", config.cwb.screenshot_period) ||
++        (common.isMember("CWBScreenshotPeriod") &&
++         !ReadRequiredDuration(common, "CWBScreenshotPeriod", config.cwb.screenshot_period)) ||
++        (common.isMember("IRRatioFormulaType") &&
++         !ReadInt(common["IRRatioFormulaType"], config.ir_ratio_formula)) ||
+         (common.isMember("LowLightAccuracy") &&
+          !ReadNumber(common["LowLightAccuracy"], config.low_light_accuracy)) ||
+         (common["SensorModule"].isMember("SensorModuleId") &&
+@@ -486,9 +491,17 @@
+         error = "invalid CommonConfig";
+         return false;
+     }
++    if (!common.isMember("CWBScreenshotPeriod")) {
++        config.cwb.screenshot_period = kDefaultScreenshotPeriod;
++    }
++    if (config.ir_ratio_formula != 0 && config.ir_ratio_formula != 2) {
++        error = "unsupported IR ratio formula " + std::to_string(config.ir_ratio_formula);
++        return false;
++    }
+ 
+     config.fusion_rgb_supported = common["FusionRGBSupported"].asBool();
+     config.cwb_supported = common["CWBSupported"].asBool();
++    config.black_frame_supported = common["BlackFrame30Support"].asBool();
+     config.cwb.screenshot_weighted = common["SupportCWBScreenshotWeighted"].asBool();
+     config.screenshot_v2_1_supported = common["SupportScreenshotAlgorithm_V2_1"].asBool();
+     config.screen_off_lux_supported = common["ScreenOffCalLuxSupported"].asBool();
+diff --git a/sensors/fusionlight/FusionLightUtils.h b/sensors/fusionlight/FusionLightUtils.h
+index ba39c23..ec2698a 100644
+--- a/sensors/fusionlight/FusionLightUtils.h
++++ b/sensors/fusionlight/FusionLightUtils.h
+@@ -60,10 +60,12 @@
+ 
+ struct FusionConfig {
+     int32_t sensor_module_id = 0;
++    int32_t ir_ratio_formula = 0;
+     double low_light_accuracy = 0.0;
+ 
+     bool fusion_rgb_supported = false;
+     bool cwb_supported = false;
++    bool black_frame_supported = false;
+     bool screenshot_v2_1_supported = false;
+     bool screen_off_lux_supported = false;
+     bool channel_count_policy_supported = false;

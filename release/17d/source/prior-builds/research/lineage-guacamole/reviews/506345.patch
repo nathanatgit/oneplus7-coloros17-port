@@ -1,0 +1,370 @@
+From 5e72e87c348cc907d67de9313dd01e0c78669921 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Sun, 04 Oct 2026 23:13:48 +0530
+Subject: [PATCH] LatinIME: Add option to duplicate center keys in split layout
+
+Like Gboard, optionally show keys straddling the middle of the split
+keyboard on both halves so either thumb can reach them. Also clarify
+that the split keyboard is only used in landscape.
+
+Assisted-by: LLM
+Change-Id: I0f57c3e78b5b1321c11b81f959a2cf916d0bb243
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/res/values/cm_strings.xml b/java/res/values/cm_strings.xml
+index f161122..5e08121 100644
+--- a/java/res/values/cm_strings.xml
++++ b/java/res/values/cm_strings.xml
+@@ -55,4 +55,11 @@
+     <!-- Preference item for always showing the emoji key -->
+     <string name="show_emoji_key">Show emoji key</string>
+     <string name="show_emoji_key_summary">Always show emoji key. When this option is enabled, the language switch key cannot be shown.</string>
++
++    <!-- Summary of the preference item for enabling the split keyboard layout [CHAR LIMIT=65] -->
++    <string name="enable_split_keyboard_summary">Only in landscape</string>
++
++    <!-- Preference item for showing keys near the middle on both halves of the split keyboard [CHAR LIMIT=65] -->
++    <string name="split_keyboard_duplicate_keys">Duplicate center keys</string>
++    <string name="split_keyboard_duplicate_keys_summary">Show keys near the middle on both halves</string>
+ </resources>
+diff --git a/java/res/xml/prefs_screen_appearance.xml b/java/res/xml/prefs_screen_appearance.xml
+index 036b665..3341839 100644
+--- a/java/res/xml/prefs_screen_appearance.xml
++++ b/java/res/xml/prefs_screen_appearance.xml
+@@ -29,6 +29,14 @@
+     <CheckBoxPreference
+         android:key="pref_split_keyboard"
+         android:title="@string/enable_split_keyboard"
++        android:summary="@string/enable_split_keyboard_summary"
+         android:persistent="true"
+         android:defaultValue="false" />
++    <CheckBoxPreference
++        android:key="pref_split_keyboard_duplicate_keys"
++        android:title="@string/split_keyboard_duplicate_keys"
++        android:summary="@string/split_keyboard_duplicate_keys_summary"
++        android:dependency="pref_split_keyboard"
++        android:persistent="true"
++        android:defaultValue="true" />
+ </PreferenceScreen>
+diff --git a/java/src/com/android/inputmethod/keyboard/Keyboard.java b/java/src/com/android/inputmethod/keyboard/Keyboard.java
+index 7318d47..fa9ea74 100644
+--- a/java/src/com/android/inputmethod/keyboard/Keyboard.java
++++ b/java/src/com/android/inputmethod/keyboard/Keyboard.java
+@@ -208,6 +208,20 @@
+         }
+     }
+ 
++    // Native proximity info keeps only the last key per code, so taps on other copies move there.
++    public int getSplitDuplicateOffsetX(@Nonnull final Key key) {
++        if (!mId.mIsSplitDuplicateKeys) {
++            return 0;
++        }
++        Key scoredKey = key;
++        for (final Key k : getSortedKeys()) {
++            if (k.getCode() == key.getCode() && !k.isSpacer()) {
++                scoredKey = k;
++            }
++        }
++        return scoredKey.getX() - key.getX();
++    }
++
+     public boolean hasKey(@Nonnull final Key aKey) {
+         if (mKeyCache.indexOfValue(aKey) >= 0) {
+             return true;
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardId.java b/java/src/com/android/inputmethod/keyboard/KeyboardId.java
+index f2c8b39..5944a4b 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardId.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardId.java
+@@ -84,6 +84,7 @@
+     public final String mCustomActionLabel;
+     public final boolean mHasShortcutKey;
+     public final boolean mIsSplitLayout;
++    public final boolean mIsSplitDuplicateKeys;
+ 
+     private final int mHashCode;
+ 
+@@ -103,6 +104,7 @@
+                 ? mEditorInfo.actionLabel.toString() : null;
+         mHasShortcutKey = params.mVoiceInputKeyEnabled;
+         mIsSplitLayout = params.mIsSplitLayoutEnabled;
++        mIsSplitDuplicateKeys = mIsSplitLayout && params.mSplitDuplicateKeysEnabled;
+ 
+         mHashCode = computeHashCode(this);
+     }
+@@ -125,7 +127,8 @@
+                 id.navigateNext(),
+                 id.navigatePrevious(),
+                 id.mSubtype,
+-                id.mIsSplitLayout
++                id.mIsSplitLayout,
++                id.mIsSplitDuplicateKeys
+         });
+     }
+ 
+@@ -148,7 +151,8 @@
+                 && other.navigateNext() == navigateNext()
+                 && other.navigatePrevious() == navigatePrevious()
+                 && other.mSubtype.equals(mSubtype)
+-                && other.mIsSplitLayout == mIsSplitLayout;
++                && other.mIsSplitLayout == mIsSplitLayout
++                && other.mIsSplitDuplicateKeys == mIsSplitDuplicateKeys;
+     }
+ 
+     private static boolean isAlphabetKeyboard(final int elementId) {
+@@ -199,7 +203,7 @@
+ 
+     @Override
+     public String toString() {
+-        return String.format(Locale.ROOT, "[%s %s:%s %dx%d %s %s%s%s%s%s%s%s%s%s]",
++        return String.format(Locale.ROOT, "[%s %s:%s %dx%d %s %s%s%s%s%s%s%s%s%s%s%s%s]",
+                 elementIdToName(mElementId),
+                 mSubtype.getLocale(),
+                 mSubtype.getExtraValueOf(KEYBOARD_LAYOUT_SET),
+@@ -215,7 +219,8 @@
+                 (mLanguageSwitchKeyEnabled ? " languageSwitchKeyEnabled" : ""),
+                 (mEmojiKeyEnabled ? " emojiKeyEnabled" : ""),
+                 (isMultiLine() ? " isMultiLine" : ""),
+-                (mIsSplitLayout ? " isSplitLayout" : "")
++                (mIsSplitLayout ? " isSplitLayout" : ""),
++                (mIsSplitDuplicateKeys ? " isSplitDuplicateKeys" : "")
+         );
+     }
+ 
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+index 0c93efb..0ea241b 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+@@ -133,6 +133,7 @@
+         // Indicates if split layout is actually enabled, taking into account
+         // whether the user has enabled it, and the keyboard layout supports it.
+         boolean mIsSplitLayoutEnabled;
++        boolean mSplitDuplicateKeysEnabled;
+         // Sparse array of KeyboardLayoutSet element parameters indexed by element's id.
+         final SparseArray<ElementParams> mKeyboardLayoutSetElementIdToParamsMap =
+                 new SparseArray<>();
+@@ -355,6 +356,11 @@
+             return this;
+         }
+ 
++        public Builder setSplitDuplicateKeysEnabled(final boolean enabled) {
++            mParams.mSplitDuplicateKeysEnabled = enabled;
++            return this;
++        }
++
+         // Super redux version of reading the script ID for some subtype from Xml.
+         static int readScriptId(final Resources resources, final InputMethodSubtype subtype) {
+             final String layoutSetName = KEYBOARD_LAYOUT_SET_RESOURCE_PREFIX
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+index cfd7f3f..1e93351 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+@@ -136,6 +136,7 @@
+                 && settingsValues.mIsSplitKeyboardEnabled
+                 && !Constants.isPhone(Settings.readScreenMetrics(res))
+                 && res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE);
++        builder.setSplitDuplicateKeysEnabled(settingsValues.mSplitKeyboardDuplicateKeys);
+         mKeyboardLayoutSet = builder.build();
+         try {
+             mState.onLoadKeyboard(currentAutoCapsState, currentRecapitalizeState);
+diff --git a/java/src/com/android/inputmethod/keyboard/PointerTracker.java b/java/src/com/android/inputmethod/keyboard/PointerTracker.java
+index ea41ea7..99ff33f 100644
+--- a/java/src/com/android/inputmethod/keyboard/PointerTracker.java
++++ b/java/src/com/android/inputmethod/keyboard/PointerTracker.java
+@@ -309,7 +309,8 @@
+                 sListener.onTextInput(key.getOutputText());
+             } else if (code != Constants.CODE_UNSPECIFIED) {
+                 if (mKeyboard.hasProximityCharsCorrection(code)) {
+-                    sListener.onCodeInput(code, x, y, isKeyRepeat);
++                    sListener.onCodeInput(code, x + mKeyboard.getSplitDuplicateOffsetX(key), y,
++                            isKeyRepeat);
+                 } else {
+                     sListener.onCodeInput(code,
+                             Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, isKeyRepeat);
+diff --git a/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java b/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java
+index 80858db..c63cc32 100644
+--- a/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java
++++ b/java/src/com/android/inputmethod/keyboard/internal/KeyboardBuilder.java
+@@ -876,7 +876,7 @@
+ 
+     private void endKeyboard() {
+         if (mParams.mId.mIsSplitLayout) {
+-            mParams.applySplitLayout(false /* duplicateCenterKeys */);
++            mParams.applySplitLayout(mParams.mId.mIsSplitDuplicateKeys);
+         }
+         mParams.removeRedundantMoreKeys();
+         // {@link #parseGridRows(XmlPullParser,boolean)} may populate keyboard rows higher than
+diff --git a/java/src/com/android/inputmethod/latin/settings/AppearanceSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/AppearanceSettingsFragment.java
+index 554edc8..49bf171 100644
+--- a/java/src/com/android/inputmethod/latin/settings/AppearanceSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/AppearanceSettingsFragment.java
+@@ -33,6 +33,7 @@
+         if (!ProductionFlags.IS_SPLIT_KEYBOARD_SUPPORTED ||
+                 Constants.isPhone(Settings.readScreenMetrics(getResources()))) {
+             removePreference(Settings.PREF_ENABLE_SPLIT_KEYBOARD);
++            removePreference(Settings.PREF_SPLIT_KEYBOARD_DUPLICATE_KEYS);
+         }
+     }
+ 
+diff --git a/java/src/com/android/inputmethod/latin/settings/Settings.java b/java/src/com/android/inputmethod/latin/settings/Settings.java
+index 2f7a3ab..d75bd04 100644
+--- a/java/src/com/android/inputmethod/latin/settings/Settings.java
++++ b/java/src/com/android/inputmethod/latin/settings/Settings.java
+@@ -84,6 +84,8 @@
+             "pref_include_other_imes_in_language_switch_list";
+     public static final String PREF_CUSTOM_INPUT_STYLES = "custom_input_styles";
+     public static final String PREF_ENABLE_SPLIT_KEYBOARD = "pref_split_keyboard";
++    public static final String PREF_SPLIT_KEYBOARD_DUPLICATE_KEYS =
++            "pref_split_keyboard_duplicate_keys";
+     // TODO: consolidate key preview dismiss delay with the key preview animation parameters.
+     public static final String PREF_KEY_PREVIEW_POPUP_DISMISS_DELAY =
+             "pref_key_preview_popup_dismiss_delay";
+diff --git a/java/src/com/android/inputmethod/latin/settings/SettingsValues.java b/java/src/com/android/inputmethod/latin/settings/SettingsValues.java
+index 854ffa8..7801160 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SettingsValues.java
++++ b/java/src/com/android/inputmethod/latin/settings/SettingsValues.java
+@@ -94,6 +94,7 @@
+     public final boolean mShouldShowLxxSuggestionUi;
+     // Use split layout for keyboard.
+     public final boolean mIsSplitKeyboardEnabled;
++    public final boolean mSplitKeyboardDuplicateKeys;
+     public final int mScreenMetrics;
+ 
+     // From the input box
+@@ -168,6 +169,8 @@
+         mHasHardwareKeyboard = Settings.readHasHardwareKeyboard(res.getConfiguration());
+         mEnableMetricsLogging = prefs.getBoolean(Settings.PREF_ENABLE_METRICS_LOGGING, true);
+         mIsSplitKeyboardEnabled = prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, false);
++        mSplitKeyboardDuplicateKeys = prefs.getBoolean(
++                Settings.PREF_SPLIT_KEYBOARD_DUPLICATE_KEYS, true);
+         mScreenMetrics = Settings.readScreenMetrics(res);
+ 
+         mShouldShowLxxSuggestionUi = Settings.SHOULD_SHOW_LXX_SUGGESTION_UI
+diff --git a/tests/src/com/android/inputmethod/keyboard/KeyboardLayoutSetTestsBase.java b/tests/src/com/android/inputmethod/keyboard/KeyboardLayoutSetTestsBase.java
+index 1f13b41..39a8371 100644
+--- a/tests/src/com/android/inputmethod/keyboard/KeyboardLayoutSetTestsBase.java
++++ b/tests/src/com/android/inputmethod/keyboard/KeyboardLayoutSetTestsBase.java
+@@ -153,6 +153,15 @@
+     protected KeyboardLayoutSet createKeyboardLayoutSet(final InputMethodSubtype subtype,
+             final EditorInfo editorInfo, final boolean voiceInputKeyEnabled,
+             final boolean languageSwitchKeyEnabled, final boolean splitLayoutEnabled) {
++        return createKeyboardLayoutSet(subtype, editorInfo, voiceInputKeyEnabled,
++                languageSwitchKeyEnabled, splitLayoutEnabled,
++                false /* splitDuplicateKeysEnabled */);
++    }
++
++    protected KeyboardLayoutSet createKeyboardLayoutSet(final InputMethodSubtype subtype,
++            final EditorInfo editorInfo, final boolean voiceInputKeyEnabled,
++            final boolean languageSwitchKeyEnabled, final boolean splitLayoutEnabled,
++            final boolean splitDuplicateKeysEnabled) {
+         final Context context = getContext();
+         final Resources res = context.getResources();
+         final int keyboardWidth = ResourceUtils.getDefaultKeyboardWidth(context);
+@@ -162,7 +171,8 @@
+                 .setSubtype(RichInputMethodSubtype.getRichInputMethodSubtype(subtype))
+                 .setVoiceInputKeyEnabled(voiceInputKeyEnabled)
+                 .setLanguageSwitchKeyEnabled(languageSwitchKeyEnabled)
+-                .setSplitLayoutEnabledByUser(splitLayoutEnabled);
++                .setSplitLayoutEnabledByUser(splitLayoutEnabled)
++                .setSplitDuplicateKeysEnabled(splitDuplicateKeysEnabled);
+         return builder.build();
+     }
+ }
+diff --git a/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java b/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
+index 5be55cf..7079492 100644
+--- a/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
++++ b/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
+@@ -14,8 +14,11 @@
+ 
+ import java.util.ArrayList;
+ import java.util.Collections;
++import java.util.HashMap;
++import java.util.HashSet;
+ import java.util.List;
+ import java.util.Locale;
++import java.util.Map;
+ 
+ @SmallTest
+ public class SplitKeyboardLayoutTests extends KeyboardLayoutSetTestsBase {
+@@ -175,4 +178,81 @@
+             assertTrue("stale alt-code key " + key, sorted.contains(key));
+         }
+     }
++
++    private Keyboard buildDuplicate(final boolean duplicate) {
++        final InputMethodSubtype subtype = getSubtype(Locale.US, "qwerty");
++        return createKeyboardLayoutSet(subtype, new EditorInfo(), false, false,
++                true /* split */, duplicate).getKeyboard(KeyboardId.ELEMENT_ALPHABET);
++    }
++
++    public void testDuplicateFlagChangesKeyboardId() {
++        final Keyboard off = buildDuplicate(false);
++        final Keyboard on = buildDuplicate(true);
++        assertFalse(off.mId.mIsSplitDuplicateKeys);
++        assertTrue(on.mId.mIsSplitDuplicateKeys);
++        assertFalse(off.mId.equals(on.mId));
++    }
++
++    public void testDuplicateFlagIgnoredWhenNotSplit() {
++        final InputMethodSubtype subtype = getSubtype(Locale.US, "qwerty");
++        final Keyboard keyboard = createKeyboardLayoutSet(subtype, new EditorInfo(), false,
++                false, false /* split */, true /* duplicate */)
++                .getKeyboard(KeyboardId.ELEMENT_ALPHABET);
++        assertFalse(keyboard.mId.mIsSplitDuplicateKeys);
++    }
++
++    public void testDuplicatedKeysAppearOncePerSide() {
++        final Keyboard off = buildDuplicate(false);
++        final Keyboard on = buildDuplicate(true);
++        assertEquals(new HashSet<>(describeKeys(off)), new HashSet<>(describeKeys(on)));
++        assertTrue(on.getSortedKeys().size() >= off.getSortedKeys().size());
++
++        final float mid = on.mOccupiedWidth / 2.0f;
++        final Map<String, Integer> leftCount = new HashMap<>();
++        final Map<String, Integer> rightCount = new HashMap<>();
++        for (final Key key : on.getSortedKeys()) {
++            if (key.isSpacer() || key.getCode() == Constants.CODE_SPACE) continue;
++            final String id = key.getY() + ":" + key.getCode() + ":" + key.getLabel();
++            final Map<String, Integer> side = key.getX() < mid ? leftCount : rightCount;
++            side.put(id, side.containsKey(id) ? side.get(id) + 1 : 1);
++        }
++        for (final Map.Entry<String, Integer> e : leftCount.entrySet()) {
++            assertEquals(e.getKey() + " left", 1, (int) e.getValue());
++        }
++        for (final Map.Entry<String, Integer> e : rightCount.entrySet()) {
++            assertEquals(e.getKey() + " right", 1, (int) e.getValue());
++        }
++        assertHalves("duplicate", on);
++        assertNoOverlapInRows("duplicate", on);
++    }
++
++    public void testDuplicateTapsMapOntoScoredCopy() {
++        final Keyboard on = buildDuplicate(true);
++        final Map<Integer, List<Key>> keysByCode = new HashMap<>();
++        for (final Key key : on.getSortedKeys()) {
++            if (key.isSpacer()) continue;
++            if (!keysByCode.containsKey(key.getCode())) {
++                keysByCode.put(key.getCode(), new ArrayList<Key>());
++            }
++            keysByCode.get(key.getCode()).add(key);
++        }
++        int duplicatedCodes = 0;
++        for (final List<Key> copies : keysByCode.values()) {
++            final Key scored = copies.get(copies.size() - 1);
++            assertEquals(scored.toString(), 0, on.getSplitDuplicateOffsetX(scored));
++            if (copies.size() < 2) continue;
++            duplicatedCodes++;
++            final Key other = copies.get(0);
++            assertEquals(other.toString(), scored.getX() - other.getX(),
++                    on.getSplitDuplicateOffsetX(other));
++        }
++        assertTrue("no duplicated keys", duplicatedCodes > 0);
++    }
++
++    public void testNoDuplicateOffsetWithoutDuplicates() {
++        final Keyboard off = buildDuplicate(false);
++        for (final Key key : off.getSortedKeys()) {
++            assertEquals(key.toString(), 0, off.getSplitDuplicateOffsetX(key));
++        }
++    }
+ }

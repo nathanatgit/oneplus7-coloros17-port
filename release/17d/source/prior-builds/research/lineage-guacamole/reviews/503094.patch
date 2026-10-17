@@ -1,0 +1,64 @@
+From dd9fbff1e567be635aca249645b57dd7ba5dc306 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 20:37:39 +0530
+Subject: [PATCH] Settings: Keep our expressive theme in network setup
+
+Change-Id: I471762c633cb12eb64e2486358969d37291217fe
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/res/values/themes_suw.xml b/res/values/themes_suw.xml
+index a7bfef3..09252f2 100644
+--- a/res/values/themes_suw.xml
++++ b/res/values/themes_suw.xml
+@@ -309,6 +309,12 @@
+         <item name="preferenceFragmentCompatStyle">@style/SetupWizardPreferenceFragmentStyle</item>
+         <!-- For Expressive Switch -->
+         <item name="expressiveSwitchStyle">@style/SettingslibSwitchStyle.Expressive</item>
++        <item name="android:listPreferredItemPaddingStart">@dimen/settingslib_expressive_space_small1</item>
++        <item name="android:listPreferredItemPaddingLeft">@dimen/settingslib_expressive_space_small1</item>
++        <item name="android:listPreferredItemPaddingEnd">@dimen/settingslib_expressive_space_small1</item>
++        <item name="android:listPreferredItemPaddingRight">@dimen/settingslib_expressive_space_small1</item>
++        <item name="listPreferredItemPaddingLeft">@dimen/settingslib_expressive_space_small1</item>
++        <item name="listPreferredItemPaddingRight">@dimen/settingslib_expressive_space_small1</item>
+     </style>
+ 
+     <style name="SuwSliderStyle.Expressive" parent="">
+diff --git a/src/com/android/settings/network/NetworkSetupActivity.java b/src/com/android/settings/network/NetworkSetupActivity.java
+index bc492e4..0c268b4 100644
+--- a/src/com/android/settings/network/NetworkSetupActivity.java
++++ b/src/com/android/settings/network/NetworkSetupActivity.java
+@@ -27,18 +27,17 @@
+ import com.android.settings.R;
+ import com.android.settings.SettingsActivity;
+ import com.android.settings.SetupWizardUtils;
+-import com.android.settings.Utils;
+ import com.android.settings.wifi.p2p.WifiP2pSettings;
+ import com.android.settings.wifi.savedaccesspoints2.SavedAccessPointsWifiSettings2;
+ import com.android.settingslib.widget.SettingsThemeHelper;
+ 
++import com.google.android.setupcompat.partnerconfig.PartnerConfigHelper;
+ import com.google.android.setupdesign.util.ThemeHelper;
+ 
+ public class NetworkSetupActivity extends SettingsActivity implements ButtonBarHandler {
+ 
+     @Override
+     protected void onCreate(Bundle savedInstanceState) {
+-        super.onCreate(savedInstanceState);
+         setTheme(SetupWizardUtils.getTheme(this, getIntent()));
+         if (SettingsThemeHelper.isExpressiveTheme(this)) {
+             setTheme(R.style.SettingsPreferenceTheme_SetupWizard_Expressive);
+@@ -46,10 +45,11 @@
+             setTheme(R.style.SettingsPreferenceTheme_SetupWizard);
+         }
+         ThemeHelper.trySetDynamicColor(this);
+-        if (ThemeHelper.shouldApplyGlifExpressiveStyle(getApplicationContext())) {
++        if (ThemeHelper.shouldApplyGlifExpressiveStyle(getApplicationContext())
++                && !PartnerConfigHelper.isGlifExpressiveEnabled(this)) {
+             ThemeHelper.trySetSuwTheme(this);
+         }
+-        Utils.setupEdgeToEdge(this);
++        super.onCreate(savedInstanceState);
+     }
+ 
+     @Override

@@ -1,0 +1,25 @@
+From 52e2a183b8f82c077a98aeeb545380d8ceb13c5e Mon Sep 17 00:00:00 2001
+From: Edwin Moquete <edwinmmoquete@gmail.com>
+Date: Mon, 14 Jul 2025 14:52:16 +0000
+Subject: [PATCH] hal: Add support for sdm845
+
+Change-Id: I0b468695720fb17e9394f709544d724921c5b299
+---
+
+diff --git a/hal/Android.bp b/hal/Android.bp
+index 75d06cf..c162940 100644
+--- a/hal/Android.bp
++++ b/hal/Android.bp
+@@ -75,6 +75,12 @@
+         "true": ["-DSOUND_TRIGGER_ENABLED"],
+         default: [],
+     }) + select(soong_config_variable("ANDROID", "target_board_platform"), {
++        "sdm845": [
++            "-DPLATFORM_SDM845",
++            "-DMAX_TARGET_SPECIFIC_CHANNEL_CNT=8",
++            "-DINCALL_STEREO_CAPTURE_ENABLED",
++            "-DSOUND_TRIGGER_PLATFORM_NAME=sdm845",
++        ],
+         "kona": [
+             "-DPLATFORM_KONA",
+             "-DMAX_TARGET_SPECIFIC_CHANNEL_CNT=4",

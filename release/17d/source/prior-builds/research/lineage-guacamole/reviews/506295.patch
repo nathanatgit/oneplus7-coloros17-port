@@ -1,0 +1,30 @@
+From 9bb250b8804b2a26c607c2cd85312f854fe124f5 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sun, 04 Oct 2026 17:33:45 +0200
+Subject: [PATCH] Canvas: Make app_name/adjustment_percent untranslatable
+
+Change-Id: I01ef524acdf462dc124dc5815154bf9acfe71450
+---
+
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 885b0db..f79d317 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -5,7 +5,7 @@
+ -->
+ <resources>
+     <!-- App -->
+-    <string name="app_name">Canvas</string>
++    <string name="app_name" translatable="false">Canvas</string>
+ 
+     <!-- Navigation and actions -->
+     <string name="close">Close</string>
+@@ -39,7 +39,7 @@
+     <string name="rotate_clockwise">Rotate clockwise</string>
+ 
+     <!-- Adjustments -->
+-    <string name="adjustment_percent">%1$.0f%%</string>
++    <string name="adjustment_percent" translatable="false">%1$.0f%%</string>
+ 
+     <!-- Filters -->
+     <string name="filter_none">Original</string>

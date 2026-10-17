@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="FlashCamera.Mode.Back">OFF</string>
+    <string name="Resolution.Video.HIS.Back">1920x1080</string>
+    <int name="Version" value="1" />
+    <string name="Resolution.Video.Front">1920x1080</string>
+    <string name="Resolution.Video.Back">1920x1080@60.0000#60.00</string>
+</map>

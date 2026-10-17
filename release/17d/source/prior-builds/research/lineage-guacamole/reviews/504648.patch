@@ -1,0 +1,2266 @@
+From b77fe0acfb3d7495350b72c9d90da7355ba67500 Mon Sep 17 00:00:00 2001
+From: dianlujitao <dianlujitao@lineageos.org>
+Date: Sat, 08 Feb 2025 21:04:00 +0800
+Subject: [PATCH] sensors: fusionlight: Implement ALS correction algorithm
+
+Assisted-by: LLM
+Change-Id: I84ba1ff0a507fbac091f252adc1ec1ced93dfcf2
+---
+
+diff --git a/Android.bp b/Android.bp
+index 8e59414..41237b8 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -4,6 +4,9 @@
+ //
+ 
+ soong_namespace {
++    imports: [
++        "vendor/qcom/opensource/commonsys-intf/display",
++    ],
+ }
+ 
+ prebuilt_hidl_interfaces {
+diff --git a/sensors/fusionlight/Android.bp b/sensors/fusionlight/Android.bp
+index 853963f..9f59305 100644
+--- a/sensors/fusionlight/Android.bp
++++ b/sensors/fusionlight/Android.bp
+@@ -7,18 +7,34 @@
+     name: "sensors.fusionlight",
+     defaults: ["hidl_defaults"],
+     srcs: [
++        "CwbSampler.cpp",
++        "FusionLightUtils.cpp",
++        "FusionLightProcessor.cpp",
+         "SensorsSubHal.cpp",
+     ],
+     shared_libs: [
+         "android.hardware.sensors@2.0",
+         "android.hardware.sensors@2.0-ScopedWakelock",
+         "android.hardware.sensors@2.1",
++        "android.hardware.common-V2-ndk",
+         "libbase",
++        "libbinder_ndk",
++        "libcutils",
+         "libhidlbase",
++        "libjsoncpp",
++        "libui",
+         "libutils",
++        "vendor.oplus.hardware.displaypanelfeature-V1-ndk",
++        "vendor.oplus.hardware.oplusSensor-V1-ndk",
++        "vendor.qti.hardware.display.config-V12-ndk",
++    ],
++    static_libs: [
++        "libaidlcommonsupport",
+     ],
+     header_libs: [
+         "android.hardware.sensors@2.X-multihal.header",
++        "libeigen",
++        "libhardware_headers",
+     ],
+     cflags: [
+         "-DLOG_TAG=\"sensors.fusionlight\"",
+diff --git a/sensors/fusionlight/CwbSampler.cpp b/sensors/fusionlight/CwbSampler.cpp
+new file mode 100644
+index 0000000..d26083b
+--- /dev/null
++++ b/sensors/fusionlight/CwbSampler.cpp
+@@ -0,0 +1,388 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include "CwbSampler.h"
++
++#include <aidl/vendor/qti/hardware/display/config/BnDisplayConfigCallback.h>
++#include <aidl/vendor/qti/hardware/display/config/IDisplayConfig.h>
++#include <aidlcommonsupport/NativeHandle.h>
++#include <android-base/logging.h>
++#include <ui/ColorSpace.h>
++#include <ui/GraphicBuffer.h>
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++namespace fusionlight {
++namespace {
++
++using namespace std::chrono_literals;
++
++using aidl::android::hardware::common::NativeHandle;
++using aidl::vendor::qti::hardware::display::config::Attributes;
++using aidl::vendor::qti::hardware::display::config::BnDisplayConfigCallback;
++using aidl::vendor::qti::hardware::display::config::CameraSmoothOp;
++using aidl::vendor::qti::hardware::display::config::Concurrency;
++using aidl::vendor::qti::hardware::display::config::DisplayType;
++using aidl::vendor::qti::hardware::display::config::IDisplayConfig;
++using aidl::vendor::qti::hardware::display::config::Rect;
++using aidl::vendor::qti::hardware::display::config::TUIEventType;
++
++constexpr auto kServiceRetryPeriod = 2s;
++constexpr auto kRequestTimeout = 1s;
++constexpr int32_t kPrimaryDisplay = static_cast<int32_t>(DisplayType::PRIMARY);
++constexpr uint64_t kBufferUsage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN;
++
++std::chrono::nanoseconds GetBootTime() {
++    timespec time;
++    if (clock_gettime(CLOCK_BOOTTIME, &time) != 0) {
++        return 0ns;
++    }
++    return std::chrono::seconds(time.tv_sec) + std::chrono::nanoseconds(time.tv_nsec);
++}
++
++const std::array<float, 256>& GetSrgbToLinearLut() {
++    static const std::array<float, 256> lut = [] {
++        std::array<float, 256> values;
++        const auto decode = ColorSpace::sRGB().getEOTF();
++        for (int value = 0; value < values.size(); ++value) {
++            values[value] = decode(value / 255.0f);
++        }
++        return values;
++    }();
++    return lut;
++}
++
++float SrgbToLinear(uint8_t value) {
++    return GetSrgbToLinearLut()[value];
++}
++
++int32_t LinearToSrgb(float value) {
++    const auto& lut = GetSrgbToLinearLut();
++    const auto result = std::lower_bound(lut.begin(), lut.end(), std::clamp(value, 0.0f, 1.0f));
++    return result == lut.end() ? 255 : result - lut.begin();
++}
++
++Rect ScaleCrop(const CwbConfig& config, int32_t width, int32_t height) {
++    Rect crop;
++    crop.left = config.crop_left * width / config.reference_width;
++    crop.top = config.crop_top * height / config.reference_height;
++    crop.right = config.crop_right * width / config.reference_width;
++    crop.bottom = config.crop_bottom * height / config.reference_height;
++    return crop;
++}
++
++std::optional<CwbSample> ReadSample(const sp<GraphicBuffer>& buffer, const Rect& crop,
++                                    const CwbConfig& config, std::chrono::nanoseconds frame_start,
++                                    std::chrono::nanoseconds frame_end) {
++    void* base = nullptr;
++    const status_t status = buffer->lock(GRALLOC_USAGE_SW_READ_OFTEN, &base);
++    if (status != NO_ERROR || base == nullptr) {
++        LOG(WARNING) << "Unable to map CWB buffer: " << status;
++        return std::nullopt;
++    }
++
++    const int32_t crop_width = crop.right - crop.left;
++    const int32_t crop_height = crop.bottom - crop.top;
++    const bool use_weights =
++            config.screenshot_weighted && config.weights.size() == crop_width * crop_height;
++    const int32_t step = use_weights ? 1 : 3;
++    const auto* pixels = static_cast<const uint8_t*>(base);
++    const size_t row_bytes = static_cast<size_t>(buffer->getStride()) * 3;
++    float red = 0.0f;
++    float green = 0.0f;
++    float blue = 0.0f;
++    float weight_sum = 0.0f;
++    for (int32_t y = crop.top; y < crop.bottom; y += step) {
++        for (int32_t x = crop.left; x < crop.right; x += step) {
++            float weight = 1.0f;
++            if (use_weights) {
++                const int32_t index = (y - crop.top) * crop_width + x - crop.left;
++                weight = config.weights[index];
++            }
++            const size_t offset = y * row_bytes + x * 3;
++            red += SrgbToLinear(pixels[offset]) * weight;
++            green += SrgbToLinear(pixels[offset + 1]) * weight;
++            blue += SrgbToLinear(pixels[offset + 2]) * weight;
++            weight_sum += weight;
++        }
++    }
++    buffer->unlock();
++
++    if (weight_sum <= 0.0f) {
++        LOG(WARNING) << "CWB crop has no usable pixels";
++        return std::nullopt;
++    }
++    return CwbSample{
++            LinearToSrgb(red / weight_sum),
++            LinearToSrgb(green / weight_sum),
++            LinearToSrgb(blue / weight_sum),
++            frame_start,
++            frame_end,
++    };
++}
++
++}  // namespace
++
++struct CwbSampler::SharedState {
++    explicit SharedState(SampleCallback callback) : sample_callback(std::move(callback)) {}
++
++    std::mutex mutex;
++    std::condition_variable condition;
++    const SampleCallback sample_callback;
++    uint64_t active_request = 0;
++    uint64_t completed_request = 0;
++    int32_t completed_error = 0;
++    std::chrono::nanoseconds completed_time{0};
++    bool active = false;
++    bool immediate = false;
++};
++
++class CwbSampler::DisplayCallback final : public BnDisplayConfigCallback {
++  public:
++    DisplayCallback(std::weak_ptr<SharedState> state, uint64_t request)
++        : state_(std::move(state)), request_(request) {}
++
++    ndk::ScopedAStatus notifyCWBBufferDone(int32_t error, const NativeHandle&) override {
++        const auto state = state_.lock();
++        if (state == nullptr) {
++            return ndk::ScopedAStatus::ok();
++        }
++        {
++            std::lock_guard lock(state->mutex);
++            if (!state->active || state->active_request != request_) {
++                return ndk::ScopedAStatus::ok();
++            }
++            state->completed_request = request_;
++            state->completed_error = error;
++            state->completed_time = GetBootTime();
++        }
++        state->condition.notify_all();
++        return ndk::ScopedAStatus::ok();
++    }
++
++    ndk::ScopedAStatus notifyQsyncChange(bool, int32_t, int32_t) override {
++        return ndk::ScopedAStatus::ok();
++    }
++
++    ndk::ScopedAStatus notifyIdleStatus(bool) override { return ndk::ScopedAStatus::ok(); }
++
++    ndk::ScopedAStatus notifyCameraSmoothInfo(CameraSmoothOp, int32_t) override {
++        return ndk::ScopedAStatus::ok();
++    }
++
++    ndk::ScopedAStatus notifyResolutionChange(int32_t, const Attributes&) override {
++        return ndk::ScopedAStatus::ok();
++    }
++
++    ndk::ScopedAStatus notifyFpsMitigation(int32_t, const Attributes&, Concurrency) override {
++        return ndk::ScopedAStatus::ok();
++    }
++
++    ndk::ScopedAStatus notifyTUIEventDone(int32_t, DisplayType, TUIEventType) override {
++        return ndk::ScopedAStatus::ok();
++    }
++
++    ndk::ScopedAStatus notifyContentFps(const std::string&, int32_t) override {
++        return ndk::ScopedAStatus::ok();
++    }
++
++  private:
++    std::weak_ptr<SharedState> state_;
++    uint64_t request_;
++};
++
++CwbSampler::CwbSampler(SampleCallback sample_callback)
++    : state_(std::make_shared<SharedState>(std::move(sample_callback))) {}
++
++CwbSampler::~CwbSampler() {
++    stop();
++}
++
++void CwbSampler::setConfig(CwbConfig config) {
++    config_ = std::move(config);
++}
++
++void CwbSampler::start() {
++    {
++        std::lock_guard lock(state_->mutex);
++        if (state_->active) {
++            return;
++        }
++        state_->active = true;
++        state_->immediate = true;
++    }
++    thread_ = std::thread(&CwbSampler::threadLoop, this);
++}
++
++void CwbSampler::stop() {
++    {
++        std::lock_guard lock(state_->mutex);
++        if (!state_->active) {
++            return;
++        }
++        state_->active = false;
++        state_->immediate = false;
++        ++state_->active_request;
++    }
++    state_->condition.notify_all();
++    if (thread_.joinable()) {
++        thread_.join();
++    }
++}
++
++void CwbSampler::requestSample() {
++    {
++        std::lock_guard lock(state_->mutex);
++        if (!state_->active) {
++            return;
++        }
++        state_->immediate = true;
++    }
++    state_->condition.notify_all();
++}
++
++void CwbSampler::threadLoop() {
++    const auto& state = state_;
++    const auto& config = config_;
++    const auto& sample_callback = state->sample_callback;
++    const auto period = config.screenshot_period;
++    auto next_sample = std::chrono::steady_clock::now();
++    std::shared_ptr<IDisplayConfig> service;
++    sp<GraphicBuffer> buffer;
++    Rect crop;
++
++    for (;;) {
++        {
++            std::unique_lock lock(state->mutex);
++            state->condition.wait_until(lock, next_sample,
++                                        [&] { return !state->active || state->immediate; });
++            if (!state->active) {
++                return;
++            }
++            state->immediate = false;
++        }
++
++        if (service == nullptr || service->asBinder().get() == nullptr ||
++            !AIBinder_isAlive(service->asBinder().get())) {
++            service = GetService<IDisplayConfig>();
++            buffer.clear();
++        }
++        if (service == nullptr) {
++            LOG(WARNING) << "IDisplayConfig is unavailable";
++            if (sample_callback) {
++                sample_callback(std::nullopt);
++            }
++            next_sample = std::chrono::steady_clock::now() + kServiceRetryPeriod;
++            continue;
++        }
++
++        if (buffer == nullptr) {
++            Attributes attributes;
++            const auto status = service->getActiveBuiltinDisplayAttributes(&attributes);
++            if (!status.isOk() || attributes.xRes <= 0 || attributes.yRes <= 0) {
++                LOG(WARNING) << "Unable to get active display resolution: "
++                             << status.getDescription();
++                if (sample_callback) {
++                    sample_callback(std::nullopt);
++                }
++                next_sample = std::chrono::steady_clock::now() + kServiceRetryPeriod;
++                continue;
++            }
++            const int32_t width = attributes.xRes;
++            const int32_t height = attributes.yRes;
++            crop = ScaleCrop(config, width, height);
++            buffer = sp<GraphicBuffer>::make(width, height, PIXEL_FORMAT_RGB_888, 1, kBufferUsage,
++                                             "FusionLightCWB");
++            if (buffer->initCheck() != NO_ERROR) {
++                LOG(ERROR) << "Unable to allocate FusionLight CWB buffer: " << buffer->initCheck();
++                buffer.clear();
++                if (sample_callback) {
++                    sample_callback(std::nullopt);
++                }
++                next_sample = std::chrono::steady_clock::now() + kServiceRetryPeriod;
++                continue;
++            }
++            const int32_t crop_size = (crop.right - crop.left) * (crop.bottom - crop.top);
++            const bool weighted = config.screenshot_weighted && config.weights.size() == crop_size;
++            LOG(INFO) << "FusionLight CWB geometry=" << width << 'x' << height << " crop=["
++                      << crop.left << ',' << crop.top << ',' << crop.right << ',' << crop.bottom
++                      << "] weighted=" << weighted;
++            if (config.screenshot_weighted && !weighted) {
++                LOG(WARNING) << "CWB crop size changed from the profile; using unweighted "
++                                "sampling";
++            }
++        }
++
++        uint64_t request;
++        {
++            std::lock_guard lock(state->mutex);
++            request = ++state->active_request;
++        }
++        const auto frame_start = GetBootTime();
++        const auto callback = ndk::SharedRefBase::make<DisplayCallback>(state, request);
++        const auto request_status = service->setCWBOutputBuffer(
++                callback, kPrimaryDisplay, crop, true, ::android::dupToAidl(buffer->handle));
++        if (!request_status.isOk()) {
++            LOG(WARNING) << "IDisplayConfig::setCWBOutputBuffer failed: "
++                         << request_status.getDescription();
++            service.reset();
++            buffer.clear();
++            if (sample_callback) {
++                sample_callback(std::nullopt);
++            }
++            next_sample = std::chrono::steady_clock::now() + kServiceRetryPeriod;
++            continue;
++        }
++
++        int32_t error;
++        std::chrono::nanoseconds frame_end;
++        bool completed;
++        {
++            std::unique_lock lock(state->mutex);
++            completed = state->condition.wait_for(lock, kRequestTimeout, [&] {
++                return !state->active || state->completed_request == request;
++            });
++            if (!state->active) {
++                return;
++            }
++            if (completed) {
++                error = state->completed_error;
++                frame_end = state->completed_time;
++            } else {
++                ++state->active_request;
++            }
++        }
++
++        std::optional<CwbSample> sample;
++        if (!completed) {
++            LOG(WARNING) << "Timed out waiting for CWB completion";
++            buffer.clear();
++        } else if (error != 0) {
++            LOG(WARNING) << "CWB capture failed with error " << error;
++        } else {
++            sample = ReadSample(buffer, crop, config, frame_start, frame_end);
++        }
++
++        if (sample_callback) {
++            sample_callback(std::move(sample));
++        }
++        next_sample += period;
++        if (next_sample < std::chrono::steady_clock::now()) {
++            next_sample = std::chrono::steady_clock::now();
++        }
++    }
++}
++
++}  // namespace fusionlight
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/fusionlight/CwbSampler.h b/sensors/fusionlight/CwbSampler.h
+new file mode 100644
+index 0000000..d096754
+--- /dev/null
++++ b/sensors/fusionlight/CwbSampler.h
+@@ -0,0 +1,61 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#pragma once
++
++#include "FusionLightUtils.h"
++
++#include <android-base/macros.h>
++
++#include <thread>
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++namespace fusionlight {
++
++struct CwbSample {
++    int32_t r = 0;
++    int32_t g = 0;
++    int32_t b = 0;
++    std::chrono::nanoseconds frame_start{0};
++    std::chrono::nanoseconds frame_end{0};
++};
++
++class CwbSampler final {
++  public:
++    using SampleCallback = std::function<void(std::optional<CwbSample>)>;
++
++    explicit CwbSampler(SampleCallback sample_callback);
++    ~CwbSampler();
++
++    DISALLOW_COPY_AND_ASSIGN(CwbSampler);
++
++    void setConfig(CwbConfig config);
++    void start();
++    void stop();
++    void requestSample();
++
++  private:
++    struct SharedState;
++    class DisplayCallback;
++
++    void threadLoop();
++
++    std::shared_ptr<SharedState> state_;
++    CwbConfig config_;
++    std::thread thread_;
++};
++
++}  // namespace fusionlight
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/fusionlight/FusionLightProcessor.cpp b/sensors/fusionlight/FusionLightProcessor.cpp
+new file mode 100644
+index 0000000..35a4fc5
+--- /dev/null
++++ b/sensors/fusionlight/FusionLightProcessor.cpp
+@@ -0,0 +1,569 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include "FusionLightProcessor.h"
++
++#include <android-base/logging.h>
++#include <android-base/properties.h>
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++namespace fusionlight {
++
++using namespace std::chrono_literals;
++
++namespace {
++
++constexpr size_t kMaxScreenSamples = 5;
++constexpr int64_t kSampleGracePeriods = 2;
++constexpr int64_t kCaptureStallPeriods = 8;
++
++struct PendingEvent {
++    Event event;
++    Channels raw_channels = Channels::Zero();
++    int32_t brightness = 0;
++};
++
++int FindRange(const std::vector<ValueRange>& ranges, double value) {
++    for (int level = 0; level < ranges.size(); ++level) {
++        if (value >= ranges[level].min && value < ranges[level].max) {
++            return level;
++        }
++    }
++    // Some profile tables use adjacent inclusive integer ranges (for example,
++    // 1..419 followed by 420..728). Recover their upper endpoint only when no
++    // half-open range matched.
++    for (int level = 0; level < ranges.size(); ++level) {
++        if (value >= ranges[level].min && value <= ranges[level].max) {
++            return level;
++        }
++    }
++    return -1;
++}
++
++int FindIrBand(const std::vector<ValueRange>& thresholds, double ratio) {
++    for (int level = 0; level < thresholds.size(); ++level) {
++        if (ratio >= thresholds[level].min && ratio <= thresholds[level].max) {
++            return level;
++        }
++    }
++    return thresholds.empty() ? -1 : 0;
++}
++
++int FindChannelPolicy(const FusionConfig& config, const Channels& channels) {
++    if (!config.channel_count_policy_supported) {
++        return -1;
++    }
++    for (int level = 0; level < config.channel_thresholds.size(); ++level) {
++        bool matches = true;
++        for (int channel = 0; channel < kChannelCount; ++channel) {
++            const int max = config.channel_thresholds[level][channel];
++            matches &= max == -1 || channels[channel] < max;
++        }
++        if (matches) {
++            return level;
++        }
++    }
++    return -1;
++}
++
++int FindCZeroLevel(const FusionConfig& config, double clear) {
++    int level = 0;
++    for (int candidate = 0; candidate < config.c_zero_thresholds.size(); ++candidate) {
++        if (clear >= config.c_zero_thresholds[candidate]) {
++            level = candidate;
++        }
++    }
++    return level;
++}
++
++double IrRatio(const Channels& channels) {
++    if (channels[3] <= 0.0) {
++        return 0.0;
++    }
++    return std::max((channels[0] + channels[1] + channels[2] - channels[3]) / channels[3] * 0.5,
++                    0.0);
++}
++
++std::optional<double> CalculateLux(const FusionConfig& config, const Channels& channels,
++                                   int32_t brightness, bool screen_off) {
++    const int band = FindIrBand(config.ir_thresholds, IrRatio(channels));
++    if (band < 0 || band >= kIrBandCount) {
++        return std::nullopt;
++    }
++
++    const std::vector<Channels>* table;
++    int level;
++    if (screen_off) {
++        if (!config.screen_off_lux_supported) {
++            return std::nullopt;
++        }
++        table = &config.screen_off_coefficients[band];
++        level = FindCZeroLevel(config, channels[3]);
++    } else {
++        level = FindChannelPolicy(config, channels);
++        if (level >= 0) {
++            table = &config.channel_count_coefficients[band];
++        } else {
++            table = &config.lux_coefficients[band];
++            level = FindRange(config.ir_brightness, brightness);
++        }
++    }
++
++    if (level < 0 || level >= table->size()) {
++        return std::nullopt;
++    }
++    const double lux = channels.dot((*table)[level]);
++    return std::isfinite(lux) ? std::optional(std::max(lux, 0.0)) : std::nullopt;
++}
++
++LeakageModel LeakageTerms(double linearity, double r, double g, double b) {
++    const double l2 = linearity * linearity;
++    const double r2 = r * r;
++    const double g2 = g * g;
++    const double b2 = b * b;
++    LeakageModel terms;
++    terms << 1.0, linearity, r, g, b, l2, linearity * r, linearity * g, linearity * b, r2, r * g,
++            r * b, g2, g * b, b2, l2 * linearity, l2 * r, l2 * g, l2 * b, linearity * r2,
++            linearity * r * g, linearity * r * b, linearity * g2, linearity * g * b, linearity * b2,
++            r2 * r, r2 * g, r2 * b, r * g2, r * g * b, r * b2, g2 * g, g2 * b, g * b2, b2 * b;
++    return terms;
++}
++
++RatioModel RatioTerms(double r, double g, double b) {
++    const double r2 = r * r;
++    const double g2 = g * g;
++    const double b2 = b * b;
++    RatioModel terms;
++    terms << 1.0, r, g, b, r2, r * g, r * b, g2, g * b, b2, r2 * r, r2 * g, r2 * b, r * g2,
++            r * g * b, r * b2, g2 * g, g2 * b, g * b2, b2 * b;
++    return terms;
++}
++
++std::optional<double> CalculateCorrectedLux(const FusionConfig& config,
++                                            const std::vector<Channels>& calibration,
++                                            const PendingEvent& pending_event,
++                                            const CwbSample& sample) {
++    const Channels& raw_channels = pending_event.raw_channels;
++    const int32_t brightness = pending_event.brightness;
++    const int level = FindRange(config.linearity_brightness, brightness);
++    if (level < 0 || level >= calibration.size()) {
++        LOG(WARNING) << "FusionLight calibration invalid level ts_ns="
++                     << pending_event.event.timestamp << " brightness=" << brightness
++                     << " level=" << level;
++        return std::nullopt;
++    }
++
++    const auto ratio_basis = RatioTerms(sample.r, sample.g, sample.b);
++    Channels compensated;
++    for (int channel = 0; channel < kChannelCount; ++channel) {
++        const auto& polynomial = config.linearity[level][channel];
++        const double x = brightness;
++        const double linearity =
++                ((polynomial[0] * x + polynomial[1]) * x + polynomial[2]) * x + polynomial[3];
++        const auto leakage_basis = LeakageTerms(linearity, sample.r, sample.g, sample.b);
++        const double parameter = config.leakage[level][channel].dot(leakage_basis);
++        const double ratio = config.leakage_ratio[level][channel].dot(ratio_basis);
++        const double leakage = std::max(parameter * ratio * calibration[level][channel], 0.0);
++        compensated[channel] = std::max(raw_channels[channel] - leakage, 0.0);
++    }
++    return CalculateLux(config, compensated, brightness, false);
++}
++
++std::optional<CwbSample> SelectScreenSample(std::chrono::nanoseconds event_time,
++                                            const std::deque<CwbSample>& samples) {
++    for (auto sample = samples.rbegin(); sample != samples.rend(); ++sample) {
++        if (sample->frame_end <= event_time) {
++            return *sample;
++        }
++    }
++    return std::nullopt;
++}
++
++Event MakeFusionLightEvent(const Event& event, int32_t fusion_light_handle, float lux) {
++    Event result = event;
++    result.sensorHandle = fusion_light_handle;
++    result.sensorType = SensorType::LIGHT;
++    result.u.scalar = lux;
++    return result;
++}
++
++}  // namespace
++
++struct FusionLightProcessor::SharedState {
++    explicit SharedState(EmitCallback callback) : emit(std::move(callback)) {}
++
++    bool startDispatchLocked() {
++        if (dispatching || delivery.empty()) {
++            return false;
++        }
++        dispatching = true;
++        return true;
++    }
++
++    void enqueueDeliveryLocked(Event event) { delivery.push_back(std::move(event)); }
++
++    void finishWaitingLocked() {
++        if (!waiting_for_sample.has_value()) {
++            return;
++        }
++        if (cwb_failed) {
++            enqueueDeliveryLocked(std::move(waiting_for_sample->event));
++        }
++        waiting_for_sample.reset();
++    }
++
++    void checkCwbStallLocked(std::chrono::nanoseconds event_time) {
++        const auto last_capture =
++                screen_samples.empty() ? minimum_frame_start : screen_samples.back().frame_end;
++        if (!cwb_failed && last_capture > 0ns && event_time > last_capture &&
++            event_time - last_capture > config.cwb.screenshot_period * kCaptureStallPeriods) {
++            LOG(WARNING) << "FusionLight CWB stalled since_ns=" << last_capture.count()
++                         << " event_ns=" << event_time.count();
++            cwb_failed = true;
++            finishWaitingLocked();
++        }
++    }
++
++    void calibrateWithSampleLocked(PendingEvent& pending_event, const CwbSample& sample) {
++        const auto lux = CalculateCorrectedLux(config, calibration, pending_event, sample);
++        if (lux.has_value()) {
++            pending_event.event.u.scalar = *lux;
++        } else {
++            LOG(WARNING) << "FusionLight RAW ts_ns=" << pending_event.event.timestamp
++                         << " brightness=" << pending_event.brightness
++                         << " reason=invalid_calibration lux=" << pending_event.event.u.scalar;
++        }
++    }
++
++    bool updateCalibrationLocked(PendingEvent& pending_event) {
++        const auto event_time = std::chrono::nanoseconds(pending_event.event.timestamp);
++        const auto sample = SelectScreenSample(event_time, screen_samples);
++        if (!sample.has_value()) {
++            return false;
++        }
++        const auto age = event_time - sample->frame_end;
++        if (cwb_failed && age > config.cwb.screenshot_period * kSampleGracePeriods) {
++            return false;
++        }
++        calibrateWithSampleLocked(pending_event, *sample);
++        return true;
++    }
++
++    void finishWaitingWithSampleLocked() {
++        if (!waiting_for_sample.has_value() || screen_samples.empty()) {
++            return;
++        }
++        if (updateCalibrationLocked(*waiting_for_sample)) {
++            enqueueDeliveryLocked(std::move(waiting_for_sample->event));
++            waiting_for_sample.reset();
++            return;
++        }
++        const auto& sample = screen_samples.back();
++        const auto event_time = std::chrono::nanoseconds(waiting_for_sample->event.timestamp);
++        // A pending event may use a later capture only within two sample periods.
++        if (sample.frame_end >= event_time &&
++            sample.frame_end - event_time <= config.cwb.screenshot_period * kSampleGracePeriods) {
++            calibrateWithSampleLocked(*waiting_for_sample, sample);
++            enqueueDeliveryLocked(std::move(waiting_for_sample->event));
++            waiting_for_sample.reset();
++            return;
++        }
++        finishWaitingLocked();
++    }
++
++    void dispatch() {
++        for (;;) {
++            Event event;
++            EmitCallback callback;
++            {
++                std::lock_guard lock(mutex);
++                if (delivery.empty()) {
++                    dispatching = false;
++                    return;
++                }
++                event = std::move(delivery.front());
++                delivery.pop_front();
++                callback = emit;
++            }
++            if (callback) {
++                callback(std::move(event));
++            }
++        }
++    }
++
++    std::mutex mutex;
++    EmitCallback emit;
++    FusionConfig config;
++    std::vector<Channels> calibration;
++    std::optional<PendingEvent> waiting_for_sample;
++    std::deque<Event> delivery;
++    std::deque<CwbSample> screen_samples;
++    std::chrono::nanoseconds minimum_frame_start{0};
++    int32_t brightness = -1;
++    bool active = false;
++    bool available = false;
++    bool cwb_failed = false;
++    bool dispatching = false;
++};
++
++bool FusionLightProcessor::initialize(const std::string& sensor_name) {
++    std::lock_guard lifecycle_lock(lifecycle_mutex_);
++    profile_sensor_name_ = sensor_name;
++    return initializeLocked();
++}
++
++bool FusionLightProcessor::initializeLocked() {
++    if (state_->available) {
++        return true;
++    }
++
++    if (!android::base::GetBoolProperty("ro.vendor.oplus.sensor.high_pwm_rgb", false)) {
++        LOG(INFO) << "High-PWM RGB property is disabled; FusionLight will pass raw lux";
++        return false;
++    }
++
++    auto config = profile_sensor_name_.empty() ? std::optional<FusionConfig>{}
++                                               : LoadConfig(profile_sensor_name_);
++    if (!config.has_value() || !config->cwb_supported || !config->fusion_rgb_supported ||
++        !config->screenshot_v2_1_supported) {
++        LOG(WARNING) << "FusionLight V2.1 is disabled or unavailable; passing raw lux";
++        return false;
++    }
++
++    std::vector<Channels> calibration = LoadCalibration(*config);
++    sampler_.setConfig(config->cwb);
++    {
++        std::lock_guard lock(state_->mutex);
++        state_->config = std::move(*config);
++        state_->calibration = std::move(calibration);
++        state_->available = true;
++    }
++    return true;
++}
++
++void FusionLightProcessor::setEnabled(bool enabled) {
++    std::lock_guard lifecycle_lock(lifecycle_mutex_);
++    if (enabled) {
++        initializeLocked();
++        {
++            std::lock_guard lock(state_->mutex);
++            state_->active = true;
++            state_->screen_samples.clear();
++            state_->waiting_for_sample.reset();
++            state_->delivery.clear();
++            state_->minimum_frame_start = 0ns;
++            state_->brightness = -1;
++            state_->cwb_failed = false;
++        }
++        return;
++    }
++
++    {
++        std::lock_guard lock(state_->mutex);
++        state_->active = false;
++    }
++    sampler_.stop();
++    {
++        std::lock_guard lock(state_->mutex);
++        state_->screen_samples.clear();
++        state_->waiting_for_sample.reset();
++        state_->delivery.clear();
++        state_->minimum_frame_start = 0ns;
++        state_->brightness = -1;
++        state_->cwb_failed = false;
++    }
++}
++
++void FusionLightProcessor::enqueueReady(Event event) {
++    bool should_dispatch = false;
++    {
++        std::lock_guard lock(state_->mutex);
++        if (!state_->active) {
++            return;
++        }
++        state_->finishWaitingLocked();
++        state_->enqueueDeliveryLocked(std::move(event));
++        should_dispatch = state_->startDispatchLocked();
++    }
++    if (should_dispatch) {
++        state_->dispatch();
++    }
++}
++
++void FusionLightProcessor::processScreenOff(Event event, const Channels& raw_channels,
++                                            int32_t brightness) {
++    bool should_dispatch = false;
++    {
++        std::lock_guard lifecycle_lock(lifecycle_mutex_);
++        sampler_.stop();
++        {
++            std::lock_guard lock(state_->mutex);
++            if (!state_->active) {
++                return;
++            }
++            const auto lux = CalculateLux(state_->config, raw_channels, brightness, true);
++            if (lux.has_value()) {
++                event.u.scalar = *lux;
++            }
++            state_->waiting_for_sample.reset();
++            state_->enqueueDeliveryLocked(std::move(event));
++            should_dispatch = state_->startDispatchLocked();
++            state_->screen_samples.clear();
++            state_->minimum_frame_start = 0ns;
++            state_->brightness = brightness;
++            state_->cwb_failed = false;
++        }
++    }
++    if (should_dispatch) {
++        state_->dispatch();
++    }
++}
++
++void FusionLightProcessor::process(const Event& event, int32_t fusion_light_handle) {
++    const auto event_time = std::chrono::nanoseconds(event.timestamp);
++    Event fusion_light_event = MakeFusionLightEvent(event, fusion_light_handle, event.u.data[0]);
++
++    Channels raw_channels;
++    for (int channel = 0; channel < kChannelCount; ++channel) {
++        raw_channels[channel] = event.u.data[channel + 4];
++        if (!std::isfinite(raw_channels[channel])) {
++            enqueueReady(std::move(fusion_light_event));
++            return;
++        }
++    }
++    const int32_t brightness = event.u.data[3];
++
++    bool available;
++    {
++        std::lock_guard lock(state_->mutex);
++        if (!state_->active) {
++            return;
++        }
++        available = state_->available;
++    }
++    if (!available) {
++        enqueueReady(std::move(fusion_light_event));
++        return;
++    }
++    if (brightness <= 0) {
++        processScreenOff(std::move(fusion_light_event), raw_channels, brightness);
++        return;
++    }
++
++    bool brightness_changed;
++    bool start_sampler;
++    {
++        std::lock_guard lifecycle_lock(lifecycle_mutex_);
++        {
++            std::lock_guard lock(state_->mutex);
++            if (!state_->active) {
++                return;
++            }
++            brightness_changed = brightness != state_->brightness;
++            start_sampler = state_->brightness <= 0;
++            if (start_sampler) {
++                state_->minimum_frame_start = event_time;
++                state_->cwb_failed = false;
++            }
++            state_->checkCwbStallLocked(event_time);
++            if (brightness_changed) {
++                state_->finishWaitingLocked();
++                state_->brightness = brightness;
++            }
++        }
++        if (start_sampler) {
++            sampler_.start();
++        }
++        if (brightness_changed) {
++            sampler_.requestSample();
++        }
++    }
++
++    bool should_dispatch = false;
++    {
++        std::lock_guard lock(state_->mutex);
++        if (!state_->active) {
++            return;
++        }
++        state_->finishWaitingLocked();
++        PendingEvent pending_event{std::move(fusion_light_event), raw_channels, brightness};
++        if (state_->updateCalibrationLocked(pending_event)) {
++            state_->enqueueDeliveryLocked(std::move(pending_event.event));
++        } else if (state_->cwb_failed) {
++            state_->enqueueDeliveryLocked(std::move(pending_event.event));
++        } else {
++            state_->waiting_for_sample = std::move(pending_event);
++        }
++        should_dispatch = state_->startDispatchLocked();
++    }
++    if (should_dispatch) {
++        state_->dispatch();
++    }
++}
++
++void FusionLightProcessor::completeFlush(Event event) {
++    bool should_dispatch = false;
++    {
++        std::lock_guard lock(state_->mutex);
++        state_->finishWaitingLocked();
++        state_->enqueueDeliveryLocked(std::move(event));
++        should_dispatch = state_->startDispatchLocked();
++    }
++    if (should_dispatch) {
++        state_->dispatch();
++    }
++}
++
++FusionLightProcessor::FusionLightProcessor(EmitCallback emit_callback)
++    : state_(std::make_shared<SharedState>(std::move(emit_callback))),
++      sampler_([state = std::weak_ptr<SharedState>(state_)](std::optional<CwbSample> sample) {
++          const auto shared_state = state.lock();
++          if (shared_state == nullptr) {
++              return;
++          }
++
++          bool should_dispatch = false;
++          {
++              std::lock_guard lock(shared_state->mutex);
++              if (!shared_state->active) {
++                  return;
++              }
++              if (!sample.has_value() || sample->frame_start <= 0ns ||
++                  sample->frame_end <= sample->frame_start) {
++                  shared_state->cwb_failed = true;
++                  shared_state->finishWaitingLocked();
++              } else if (sample->frame_start >= shared_state->minimum_frame_start) {
++                  shared_state->cwb_failed = false;
++                  shared_state->screen_samples.push_back(*sample);
++                  while (shared_state->screen_samples.size() > kMaxScreenSamples) {
++                      shared_state->screen_samples.pop_front();
++                  }
++                  shared_state->finishWaitingWithSampleLocked();
++              }
++              should_dispatch = shared_state->startDispatchLocked();
++          }
++          if (should_dispatch) {
++              shared_state->dispatch();
++          }
++      }) {}
++
++FusionLightProcessor::~FusionLightProcessor() {
++    setEnabled(false);
++    std::lock_guard lock(state_->mutex);
++    state_->emit = nullptr;
++}
++
++}  // namespace fusionlight
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/fusionlight/FusionLightProcessor.h b/sensors/fusionlight/FusionLightProcessor.h
+new file mode 100644
+index 0000000..2af7ba8
+--- /dev/null
++++ b/sensors/fusionlight/FusionLightProcessor.h
+@@ -0,0 +1,57 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#pragma once
++
++#include "CwbSampler.h"
++
++#include <android-base/macros.h>
++#include <android/hardware/sensors/2.1/types.h>
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++namespace fusionlight {
++
++using ::android::hardware::sensors::V2_1::Event;
++
++class FusionLightProcessor final {
++  public:
++    using EmitCallback = std::function<void(Event)>;
++
++    explicit FusionLightProcessor(EmitCallback emit_callback);
++    ~FusionLightProcessor();
++
++    DISALLOW_COPY_AND_ASSIGN(FusionLightProcessor);
++
++    bool initialize(const std::string& profile_sensor_name);
++    void setEnabled(bool enabled);
++
++    void process(const Event& event, int32_t fusion_light_handle);
++    void completeFlush(Event event);
++
++  private:
++    struct SharedState;
++
++    bool initializeLocked();
++    void enqueueReady(Event event);
++    void processScreenOff(Event event, const Channels& raw_channels, int32_t brightness);
++
++    std::shared_ptr<SharedState> state_;
++    CwbSampler sampler_;
++    std::mutex lifecycle_mutex_;
++    std::string profile_sensor_name_;
++};
++
++}  // namespace fusionlight
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/fusionlight/FusionLightUtils.cpp b/sensors/fusionlight/FusionLightUtils.cpp
+new file mode 100644
+index 0000000..ef1483b
+--- /dev/null
++++ b/sensors/fusionlight/FusionLightUtils.cpp
+@@ -0,0 +1,665 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include "FusionLightUtils.h"
++
++#include <fstream>
++
++#include <aidl/vendor/oplus/hardware/displaypanelfeature/IDisplayPanelFeature.h>
++#include <aidl/vendor/oplus/hardware/oplusSensor/ISensorFeature.h>
++#include <android-base/logging.h>
++#include <android-base/parsedouble.h>
++#include <android-base/parseint.h>
++#include <android-base/stringprintf.h>
++#include <android-base/strings.h>
++#include <json/json.h>
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++namespace fusionlight {
++namespace {
++
++using aidl::vendor::oplus::hardware::displaypanelfeature::IDisplayPanelFeature;
++using aidl::vendor::oplus::hardware::oplusSensor::ISensorFeature;
++using namespace std::chrono_literals;
++
++constexpr int32_t kHighPwmSensorType = 33171070;
++constexpr int32_t kPanelInfoFeature = 9;
++constexpr int32_t kMainPanelStageFeature = 0x22;
++constexpr int32_t kDefaultPanelStage = 4;
++constexpr auto kCwbWeightsPath = "/odm/etc/display/cwb_weightspos.json";
++
++bool ReadNumber(const Json::Value& value, double& result) {
++    if (value.isString()) {
++        if (!android::base::ParseDouble(android::base::Trim(value.asString()), &result)) {
++            return false;
++        }
++    } else if (value.isNumeric()) {
++        result = value.asDouble();
++    } else {
++        return false;
++    }
++    return std::isfinite(result);
++}
++
++bool ReadInt(const Json::Value& value, int32_t& result) {
++    if (value.isString()) {
++        return android::base::ParseInt(android::base::Trim(value.asString()), &result);
++    }
++    if (!value.isInt()) {
++        return false;
++    }
++    result = value.asInt();
++    return true;
++}
++
++bool ReadRequiredInt(const Json::Value& object, const char* name, int32_t& result) {
++    return object.isObject() && object.isMember(name) && ReadInt(object[name], result);
++}
++
++template <typename Duration>
++bool ReadRequiredDuration(const Json::Value& object, const char* name, Duration& result) {
++    int32_t value;
++    if (!ReadRequiredInt(object, name, value)) {
++        return false;
++    }
++    result = Duration(value);
++    return true;
++}
++
++bool ParseRanges(const Json::Value& array, const char* min_name, const char* max_name,
++                 std::vector<ValueRange>& ranges) {
++    if (!array.isArray() || array.empty()) {
++        return false;
++    }
++
++    int32_t max_level = -1;
++    for (const auto& item : array) {
++        int32_t level;
++        if (!ReadRequiredInt(item, "Level", level) || level < 0) {
++            return false;
++        }
++        max_level = std::max(max_level, level);
++    }
++
++    ranges.assign(max_level + 1, {});
++    std::vector<bool> seen(ranges.size());
++    for (const auto& item : array) {
++        int32_t level;
++        double min;
++        double max;
++        if (!ReadRequiredInt(item, "Level", level) || !ReadNumber(item[min_name], min) ||
++            !ReadNumber(item[max_name], max) || min > max || seen[level]) {
++            return false;
++        }
++        ranges[level] = {min, max};
++        seen[level] = true;
++    }
++    return std::all_of(seen.begin(), seen.end(), [](bool value) { return value; });
++}
++
++bool ParseLuxCoefficients(const Json::Value& array, std::vector<Channels>& coefficients) {
++    if (!array.isArray() || array.empty()) {
++        return false;
++    }
++
++    int32_t max_level = -1;
++    for (const auto& item : array) {
++        int32_t level;
++        if (!ReadRequiredInt(item, "Level", level) || level < 0) {
++            return false;
++        }
++        max_level = std::max(max_level, level);
++    }
++
++    constexpr const char* kNames[] = {"ChannelR", "ChannelG", "ChannelB", "ChannelC"};
++    coefficients.resize(max_level + 1);
++    std::vector<bool> seen(coefficients.size());
++    for (const auto& item : array) {
++        int32_t level;
++        if (!ReadRequiredInt(item, "Level", level) || seen[level]) {
++            return false;
++        }
++        for (int channel = 0; channel < kChannelCount; ++channel) {
++            if (!ReadNumber(item[kNames[channel]], coefficients[level][channel])) {
++                return false;
++            }
++        }
++        seen[level] = true;
++    }
++    return std::all_of(seen.begin(), seen.end(), [](bool value) { return value; });
++}
++
++template <typename Model>
++bool ParseChannelModels(const Json::Value& array,
++                        std::vector<std::array<Model, kChannelCount>>& models) {
++    if (!array.isArray() || array.size() != kChannelCount) {
++        return false;
++    }
++
++    int32_t max_level = -1;
++    for (const auto& channel_entry : array) {
++        if (!channel_entry["Parameter"].isArray()) {
++            return false;
++        }
++        for (const auto& item : channel_entry["Parameter"]) {
++            int32_t level;
++            if (!ReadRequiredInt(item, "level", level) || level < 0) {
++                return false;
++            }
++            max_level = std::max(max_level, level);
++        }
++    }
++    if (max_level < 0) {
++        return false;
++    }
++
++    models.resize(max_level + 1);
++    std::vector<std::array<bool, kChannelCount>> seen(models.size());
++    for (const auto& channel_entry : array) {
++        int32_t channel;
++        if (!ReadRequiredInt(channel_entry, "channel", channel) || channel < 0 ||
++            channel >= kChannelCount) {
++            return false;
++        }
++        for (const auto& item : channel_entry["Parameter"]) {
++            int32_t level;
++            if (!ReadRequiredInt(item, "level", level) || seen[level][channel]) {
++                return false;
++            }
++            for (int parameter = 0; parameter < Model::SizeAtCompileTime; ++parameter) {
++                const std::string name = "Parameter" + std::to_string(parameter);
++                if (!ReadNumber(item[name], models[level][channel][parameter])) {
++                    return false;
++                }
++            }
++            seen[level][channel] = true;
++        }
++    }
++
++    for (const auto& level : seen) {
++        if (!std::all_of(level.begin(), level.end(), [](bool value) { return value; })) {
++            return false;
++        }
++    }
++    return true;
++}
++
++bool ParseGolden(const Json::Value& array, std::vector<Channels>& golden) {
++    if (!array.isArray() || array.empty()) {
++        return false;
++    }
++    int32_t max_level = -1;
++    for (const auto& item : array) {
++        int32_t level;
++        if (!ReadRequiredInt(item, "level", level) || level < 0) {
++            return false;
++        }
++        max_level = std::max(max_level, level);
++    }
++
++    constexpr const char* kNames[] = {"RGolden", "GGolden", "BGolden", "CGolden"};
++    golden.resize(max_level + 1);
++    std::vector<bool> seen(golden.size());
++    for (const auto& item : array) {
++        int32_t level;
++        if (!ReadRequiredInt(item, "level", level) || seen[level]) {
++            return false;
++        }
++        for (int channel = 0; channel < kChannelCount; ++channel) {
++            if (!ReadNumber(item[kNames[channel]], golden[level][channel])) {
++                return false;
++            }
++        }
++        seen[level] = true;
++    }
++    return std::all_of(seen.begin(), seen.end(), [](bool value) { return value; });
++}
++
++bool ParseChannelThresholds(const Json::Value& array, std::vector<ChannelLimits>& thresholds) {
++    if (!array.isArray()) {
++        return false;
++    }
++    constexpr const char* kNames[] = {"RMax", "GMax", "BMax", "CMax"};
++    thresholds.clear();
++    thresholds.reserve(array.size());
++    for (const auto& item : array) {
++        ChannelLimits threshold;
++        for (int channel = 0; channel < kChannelCount; ++channel) {
++            if (!ReadInt(item[kNames[channel]], threshold[channel])) {
++                return false;
++            }
++        }
++        thresholds.push_back(threshold);
++    }
++    return true;
++}
++
++bool ParseCZeroThresholds(const Json::Value& array, std::vector<double>& thresholds) {
++    if (!array.isArray() || array.empty()) {
++        return false;
++    }
++    thresholds.assign(array.size(), 0.0);
++    std::vector<bool> seen(array.size());
++    for (const auto& item : array) {
++        int32_t level;
++        double min;
++        if (!ReadRequiredInt(item, "Level", level) || level < 0 || level >= array.size() ||
++            !ReadNumber(item["CZeroMin"], min) || seen[level]) {
++            return false;
++        }
++        thresholds[level] = min;
++        seen[level] = true;
++    }
++    return std::all_of(seen.begin(), seen.end(), [](bool value) { return value; });
++}
++
++bool ParseConfig(std::istream& stream, FusionConfig& config, std::string& error) {
++    Json::CharReaderBuilder builder;
++    builder["collectComments"] = false;
++    Json::Value root;
++    if (!Json::parseFromStream(builder, stream, &root, &error)) {
++        return false;
++    }
++
++    const auto& common = root["CommonConfig"];
++    const auto& crop = common["ScreenShotRect"];
++    const auto& resolution = common["ScreenResolution"];
++    if (!common.isObject() || !crop.isObject() || !resolution.isObject() ||
++        !ReadRequiredInt(crop, "LeftTopX", config.cwb.crop_left) ||
++        !ReadRequiredInt(crop, "LeftTopY", config.cwb.crop_top) ||
++        !ReadRequiredInt(crop, "RightBottomX", config.cwb.crop_right) ||
++        !ReadRequiredInt(crop, "RightBottomY", config.cwb.crop_bottom) ||
++        !ReadRequiredInt(resolution, "Width", config.cwb.reference_width) ||
++        !ReadRequiredInt(resolution, "Height", config.cwb.reference_height) ||
++        !ReadRequiredDuration(common, "CWBScreenshotPeriod", config.cwb.screenshot_period)) {
++        error = "invalid CommonConfig";
++        return false;
++    }
++
++    config.fusion_rgb_supported = common["FusionRGBSupported"].asBool();
++    config.cwb_supported = common["CWBSupported"].asBool();
++    config.cwb.screenshot_weighted = common["SupportCWBScreenshotWeighted"].asBool();
++    config.screenshot_v2_1_supported = common["SupportScreenshotAlgorithm_V2_1"].asBool();
++    config.screen_off_lux_supported = common["ScreenOffCalLuxSupported"].asBool();
++    config.channel_count_policy_supported = common["ChannelCountPolicySupported"].asBool();
++
++    if (!ParseRanges(root["LinearityBrightnessRange"], "BrightnessMin", "BrightnessMax",
++                     config.linearity_brightness) ||
++        !ParseRanges(root["IRBrightness_V2_1"], "BrightnessMin", "BrightnessMax",
++                     config.ir_brightness) ||
++        !ParseRanges(root["IRThreshold_V2_1"], "IR_Ratio_Min", "IR_Ratio_Max",
++                     config.ir_thresholds) ||
++        !ParseChannelModels(root["LinearityCompensation"], config.linearity) ||
++        !ParseChannelModels(root["LightLeakageCalculation"], config.leakage) ||
++        !ParseChannelModels(root["LightLeakageRatio"], config.leakage_ratio) ||
++        !ParseGolden(root["LightLeakageGolden"], config.leakage_golden)) {
++        error = "invalid V2.1 model";
++        return false;
++    }
++
++    constexpr std::array<const char*, kIrBandCount> kDefaultTables = {
++            "LuxCoeffLIR_V2_1", "LuxCoeffHIR_V2_1", "LuxCoeffSuperHIR_V2_1"};
++    constexpr std::array<const char*, kIrBandCount> kCountTables = {
++            "LuxCoeffLirChCountPolicy", "LuxCoeffHirChCountPolicy",
++            "LuxCoeffSuperHirChCountPolicy"};
++    constexpr std::array<const char*, kIrBandCount> kScreenOffTables = {
++            "LuxCoeffLirScreenOff", "LuxCoeffHirScreenOff", "LuxCoeffSuperHirScreenOff"};
++    for (int band = 0; band < kIrBandCount; ++band) {
++        if (!ParseLuxCoefficients(root[kDefaultTables[band]], config.lux_coefficients[band])) {
++            error = "invalid normal lux coefficient table";
++            return false;
++        }
++        if (config.channel_count_policy_supported &&
++            !ParseLuxCoefficients(root[kCountTables[band]],
++                                  config.channel_count_coefficients[band])) {
++            error = "invalid channel-count coefficient table";
++            return false;
++        }
++        if (config.screen_off_lux_supported &&
++            !ParseLuxCoefficients(root[kScreenOffTables[band]],
++                                  config.screen_off_coefficients[band])) {
++            error = "invalid screen-off coefficient table";
++            return false;
++        }
++    }
++
++    if (config.channel_count_policy_supported &&
++        !ParseChannelThresholds(root["ChannelCountThreshold"], config.channel_thresholds)) {
++        error = "invalid channel-count thresholds";
++        return false;
++    }
++    if (config.screen_off_lux_supported &&
++        !ParseCZeroThresholds(root["CZeroThreshold"], config.c_zero_thresholds)) {
++        error = "invalid C-zero thresholds";
++        return false;
++    }
++
++    const size_t levels = config.linearity_brightness.size();
++    if (levels == 0 || config.linearity.size() != levels || config.leakage.size() != levels ||
++        config.leakage_ratio.size() != levels || config.leakage_golden.size() != levels ||
++        config.ir_thresholds.size() != kIrBandCount || config.ir_brightness.empty() ||
++        config.cwb.crop_left < 0 || config.cwb.crop_top < 0 ||
++        config.cwb.crop_right <= config.cwb.crop_left ||
++        config.cwb.crop_bottom <= config.cwb.crop_top ||
++        config.cwb.crop_right > config.cwb.reference_width ||
++        config.cwb.crop_bottom > config.cwb.reference_height ||
++        config.cwb.screenshot_period <= 0ms) {
++        error = "inconsistent profile dimensions";
++        return false;
++    }
++    for (int band = 0; band < kIrBandCount; ++band) {
++        if (config.lux_coefficients[band].size() < config.ir_brightness.size() ||
++            (config.channel_count_policy_supported &&
++             config.channel_count_coefficients[band].size() < config.channel_thresholds.size()) ||
++            (config.screen_off_lux_supported &&
++             config.screen_off_coefficients[band].size() < config.c_zero_thresholds.size())) {
++            error = "coefficient table does not cover its selector";
++            return false;
++        }
++    }
++    return true;
++}
++
++void LoadCwbWeights(CwbConfig& config) {
++    if (!config.screenshot_weighted) {
++        return;
++    }
++
++    std::ifstream stream(kCwbWeightsPath);
++    Json::CharReaderBuilder builder;
++    builder["collectComments"] = false;
++    Json::Value root;
++    std::string error;
++    int32_t count;
++    if (!stream.is_open() || !Json::parseFromStream(builder, stream, &root, &error) ||
++        !ReadInt(root["count"], count) || count <= 0 || !root["Weights"].isArray() ||
++        root["Weights"].size() != count ||
++        count != (config.crop_right - config.crop_left) * (config.crop_bottom - config.crop_top)) {
++        LOG(WARNING) << "Invalid CWB weights in " << kCwbWeightsPath
++                     << "; using unweighted sampling";
++        config.screenshot_weighted = false;
++        return;
++    }
++
++    config.weights.resize(count);
++    for (int index = 0; index < count; ++index) {
++        if (!ReadInt(root["Weights"][index], config.weights[index]) || config.weights[index] < 0) {
++            LOG(WARNING) << "Invalid CWB weight " << index << " in " << kCwbWeightsPath
++                         << "; using unweighted sampling";
++            config.weights.clear();
++            config.screenshot_weighted = false;
++            return;
++        }
++    }
++    LOG(INFO) << "Loaded " << config.weights.size() << " CWB weights from " << kCwbWeightsPath;
++}
++
++std::string ToLower(std::string value) {
++    std::transform(value.begin(), value.end(), value.begin(),
++                   [](unsigned char character) { return std::tolower(character); });
++    return value;
++}
++
++int32_t GetPanelId(const std::string& panel_name) {
++    const std::string lower_name = ToLower(panel_name);
++    if (lower_name.find("samsung") != std::string::npos) {
++        return 0;
++    }
++    if (lower_name.find("boe") != std::string::npos) {
++        return 1;
++    }
++    if (panel_name.find("TM") != std::string::npos ||
++        lower_name.find("tianma") != std::string::npos) {
++        return 2;
++    }
++    if (lower_name.rfind("visionox", 0) == 0) {
++        return 3;
++    }
++    if (panel_name.find("HX") != std::string::npos) {
++        return 4;
++    }
++
++    const size_t first_separator = panel_name.find('_');
++    if (first_separator == std::string::npos || panel_name.substr(0, first_separator) != "P") {
++        return -1;
++    }
++    const size_t second_separator = panel_name.find('_', first_separator + 1);
++    const std::string manufacturer = panel_name.substr(
++            first_separator + 1, second_separator == std::string::npos
++                                         ? std::string::npos
++                                         : second_separator - first_separator - 1);
++    int32_t panel_id;
++    if (manufacturer == "1") {
++        panel_id = 0;
++    } else if (manufacturer == "3") {
++        panel_id = 1;
++    } else if (manufacturer == "7") {
++        panel_id = 2;
++    } else if (manufacturer == "B") {
++        panel_id = 3;
++    } else if (manufacturer == "D") {
++        panel_id = 4;
++    } else {
++        return -1;
++    }
++
++    if (second_separator == std::string::npos ||
++        panel_name.find('_', second_separator + 1) != std::string::npos) {
++        return panel_id;
++    }
++    int32_t version;
++    if (!android::base::ParseInt(panel_name.substr(second_separator + 1), &version, 1, 255)) {
++        return panel_id;
++    }
++    return (panel_id << 8) | version;
++}
++
++int32_t GetFusionSensorModuleId(const std::string& sensor_name) {
++    const std::string lower_name = ToLower(sensor_name);
++    constexpr std::pair<const char*, int32_t> kModuleIds[] = {
++            {"tcs3720", 3}, {"sip3625", 4},  {"sip3635", 5},  {"stk36c01", 6},
++            {"tcs3743", 8}, {"tcs3760", 10}, {"stk3bfx", 11}, {"stk32f02", 12},
++    };
++    for (const auto& [name, module_id] : kModuleIds) {
++        if (lower_name.find(name) != std::string::npos) {
++            return module_id;
++        }
++    }
++    return 3;
++}
++
++struct MainPanelConfig {
++    int32_t panel_id;
++    int32_t panel_stage;
++};
++
++std::optional<MainPanelConfig> GetMainPanelConfig() {
++    const auto service = GetService<IDisplayPanelFeature>();
++    if (service == nullptr) {
++        LOG(ERROR) << "IDisplayPanelFeature is unavailable";
++        return std::nullopt;
++    }
++
++    std::vector<std::string> panel_info;
++    int32_t return_value = -1;
++    const auto info_status =
++            service->getDisplayPanelInfo(kPanelInfoFeature, &panel_info, &return_value);
++    if (!info_status.isOk()) {
++        LOG(ERROR) << "IDisplayPanelFeature::getDisplayPanelInfo failed: "
++                   << info_status.getDescription();
++        return std::nullopt;
++    }
++    LOG(INFO) << "IDisplayPanelFeature::getDisplayPanelInfo returned " << return_value << " with "
++              << panel_info.size() << " values: [" << android::base::Join(panel_info, ", ") << "]";
++    if (return_value != 0 || panel_info.size() < 2) {
++        LOG(ERROR) << "Invalid main display panel information";
++        return std::nullopt;
++    }
++
++    const int32_t panel_id = GetPanelId(panel_info[1]);
++    if (panel_id < 0) {
++        LOG(ERROR) << "Unknown main display panel " << panel_info[1];
++        return std::nullopt;
++    }
++    LOG(INFO) << "Resolved main display panel " << panel_info[1] << " to ID " << panel_id;
++
++    int32_t panel_stage = kDefaultPanelStage;
++    std::vector<int32_t> stage_values;
++    return_value = -1;
++    const auto stage_status = service->getDisplayPanelFeatureValue(kMainPanelStageFeature,
++                                                                   &stage_values, &return_value);
++    if (!stage_status.isOk()) {
++        LOG(WARNING) << "IDisplayPanelFeature::getDisplayPanelFeatureValue failed: "
++                     << stage_status.getDescription() << "; using " << kDefaultPanelStage;
++    } else {
++        LOG(INFO) << "IDisplayPanelFeature::getDisplayPanelFeatureValue returned " << return_value
++                  << " with " << stage_values.size() << " values: ["
++                  << android::base::Join(stage_values, ", ") << "]";
++        if (return_value == 0 && !stage_values.empty()) {
++            panel_stage = stage_values.front();
++            LOG(INFO) << "Main display panel stage is " << panel_stage;
++        } else {
++            LOG(WARNING) << "Invalid main display panel stage; using " << kDefaultPanelStage;
++        }
++    }
++    return MainPanelConfig{panel_id, panel_stage};
++}
++
++std::string MakeProfilePath(int32_t panel_id, int32_t module_id,
++                            std::optional<int32_t> panel_stage) {
++    if (panel_stage.has_value()) {
++        return android::base::StringPrintf(
++                "/odm/etc/fusionlight_profile/fusionlight_Main_%X_%X_%X.json", panel_id, module_id,
++                *panel_stage);
++    }
++    return android::base::StringPrintf("/odm/etc/fusionlight_profile/fusionlight_Main_%X_%X.json",
++                                       panel_id, module_id);
++}
++
++std::optional<std::string> FindProfilePath(int32_t panel_id, int32_t module_id,
++                                           int32_t panel_stage) {
++    if (panel_stage >= 0 && panel_stage <= 4) {
++        const std::string staged_path = MakeProfilePath(panel_id, module_id, panel_stage);
++        if (access(staged_path.c_str(), F_OK) == 0) {
++            return staged_path;
++        }
++    }
++
++    const std::string path = MakeProfilePath(panel_id, module_id, std::nullopt);
++    return access(path.c_str(), F_OK) == 0 ? std::make_optional(path) : std::nullopt;
++}
++
++const Json::Value* FindMember(const Json::Value& value, const std::string& name) {
++    if (!value.isObject()) {
++        return nullptr;
++    }
++    if (value.isMember(name)) {
++        return &value[name];
++    }
++    for (const auto& member_name : value.getMemberNames()) {
++        if (const auto* result = FindMember(value[member_name], name)) {
++            return result;
++        }
++    }
++    return nullptr;
++}
++
++}  // namespace
++
++std::optional<FusionConfig> LoadConfig(const std::string& sensor_name) {
++    const auto panel = GetMainPanelConfig();
++    if (!panel.has_value()) {
++        return std::nullopt;
++    }
++
++    const int32_t module_id = GetFusionSensorModuleId(sensor_name);
++    const auto path = FindProfilePath(panel->panel_id, module_id, panel->panel_stage);
++    if (!path.has_value()) {
++        LOG(ERROR) << "FusionLight V2.1 profile was not found for panel " << panel->panel_id
++                   << ", sensor module " << module_id << ", stage " << panel->panel_stage;
++        return std::nullopt;
++    }
++
++    std::ifstream stream(*path);
++    if (!stream.is_open()) {
++        LOG(ERROR) << "Unable to open FusionLight profile " << *path;
++        return std::nullopt;
++    }
++    FusionConfig config;
++    std::string error;
++    if (!ParseConfig(stream, config, error)) {
++        LOG(ERROR) << "Invalid FusionLight profile " << *path << ": " << error;
++        return std::nullopt;
++    }
++    LoadCwbWeights(config.cwb);
++    LOG(INFO) << "Loaded FusionLight V2.1 profile from " << *path;
++    return config;
++}
++
++std::vector<Channels> LoadCalibration(const FusionConfig& config) {
++    std::vector<Channels> calibration(config.leakage_golden.size(), Channels::Ones());
++    const auto service = GetService<ISensorFeature>();
++    if (service == nullptr) {
++        LOG(WARNING) << "ISensorFeature is unavailable; using unit FusionLight calibration";
++        return calibration;
++    }
++
++    std::string response;
++    const auto status = service->getSensorCalibrationData(kHighPwmSensorType, &response);
++    if (!status.isOk()) {
++        LOG(WARNING) << "ISensorFeature::getSensorCalibrationData failed: "
++                     << status.getDescription() << "; using profile golden values";
++        return calibration;
++    }
++    LOG(INFO) << "ISensorFeature::getSensorCalibrationData returned " << response.size()
++              << " bytes: " << response;
++    if (response.empty() || response == "default") {
++        LOG(WARNING) << "No device FusionLight calibration; using profile golden values";
++        return calibration;
++    }
++
++    Json::CharReaderBuilder builder;
++    builder["collectComments"] = false;
++    std::istringstream stream(response);
++    Json::Value root;
++    std::string error;
++    if (!Json::parseFromStream(builder, stream, &root, &error)) {
++        LOG(WARNING) << "Invalid device FusionLight calibration: " << error;
++        return calibration;
++    }
++
++    constexpr const char* kChannelNames[] = {"R", "G", "B", "C"};
++    int applied_values = 0;
++    for (int level = 0; level < calibration.size(); ++level) {
++        for (int channel = 0; channel < kChannelCount; ++channel) {
++            const std::string key =
++                    "W_VIEW_" + std::string(kChannelNames[channel]) + "_" + std::to_string(level);
++            const Json::Value* value = FindMember(root, key);
++            const double golden = config.leakage_golden[level][channel];
++            double measured;
++            if (value != nullptr && ReadNumber(*value, measured) && measured != 0.0 &&
++                golden != 0.0) {
++                calibration[level][channel] = measured / golden;
++                ++applied_values;
++            }
++        }
++    }
++    LOG(INFO) << "Applied " << applied_values << " of " << calibration.size() * kChannelCount
++              << " FusionLight calibration values";
++    return calibration;
++}
++
++}  // namespace fusionlight
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/fusionlight/FusionLightUtils.h b/sensors/fusionlight/FusionLightUtils.h
+new file mode 100644
+index 0000000..f8c88a7
+--- /dev/null
++++ b/sensors/fusionlight/FusionLightUtils.h
+@@ -0,0 +1,88 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#pragma once
++
++#include <android/binder_auto_utils.h>
++#include <android/binder_manager.h>
++#include <Eigen/Core>
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++namespace fusionlight {
++
++constexpr int kChannelCount = 4;
++constexpr int kIrBandCount = 3;
++constexpr int kLeakageTermCount = 35;
++constexpr int kRatioTermCount = 20;
++
++using Channels = Eigen::Matrix<double, kChannelCount, 1>;
++using ChannelLimits = Eigen::Matrix<int, kChannelCount, 1>;
++using Polynomial = Eigen::Vector4d;
++using LeakageModel = Eigen::Matrix<double, kLeakageTermCount, 1>;
++using RatioModel = Eigen::Matrix<double, kRatioTermCount, 1>;
++
++struct ValueRange {
++    double min = 0.0;
++    double max = 0.0;
++};
++
++struct CwbConfig {
++    int32_t crop_left = 0;
++    int32_t crop_top = 0;
++    int32_t crop_right = 0;
++    int32_t crop_bottom = 0;
++    int32_t reference_width = 0;
++    int32_t reference_height = 0;
++    bool screenshot_weighted = false;
++    std::chrono::milliseconds screenshot_period{0};
++    std::vector<int32_t> weights;
++};
++
++struct FusionConfig {
++    bool fusion_rgb_supported = false;
++    bool cwb_supported = false;
++    bool screenshot_v2_1_supported = false;
++    bool screen_off_lux_supported = false;
++    bool channel_count_policy_supported = false;
++
++    CwbConfig cwb;
++
++    std::vector<ValueRange> linearity_brightness;
++    std::vector<ValueRange> ir_brightness;
++    std::vector<ValueRange> ir_thresholds;
++    std::vector<std::array<Polynomial, kChannelCount>> linearity;
++    std::vector<std::array<LeakageModel, kChannelCount>> leakage;
++    std::vector<std::array<RatioModel, kChannelCount>> leakage_ratio;
++    std::vector<Channels> leakage_golden;
++
++    std::array<std::vector<Channels>, kIrBandCount> lux_coefficients;
++    std::array<std::vector<Channels>, kIrBandCount> channel_count_coefficients;
++    std::array<std::vector<Channels>, kIrBandCount> screen_off_coefficients;
++    std::vector<ChannelLimits> channel_thresholds;
++    std::vector<double> c_zero_thresholds;
++};
++
++std::optional<FusionConfig> LoadConfig(const std::string& sensor_name);
++std::vector<Channels> LoadCalibration(const FusionConfig& config);
++
++template <typename Interface>
++std::shared_ptr<Interface> GetService() {
++    const std::string instance = std::string(Interface::descriptor) + "/default";
++    ndk::SpAIBinder binder(AServiceManager_checkService(instance.c_str()));
++    return binder.get() == nullptr ? nullptr : Interface::fromBinder(binder);
++}
++
++}  // namespace fusionlight
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/fusionlight/SensorsSubHal.cpp b/sensors/fusionlight/SensorsSubHal.cpp
+index 3f1e454..7e86316 100644
+--- a/sensors/fusionlight/SensorsSubHal.cpp
++++ b/sensors/fusionlight/SensorsSubHal.cpp
+@@ -7,8 +7,13 @@
+ 
+ #include <dlfcn.h>
+ 
+-#include <android-base/logging.h>
++#include <algorithm>
++#include <utility>
+ 
++#include <android-base/logging.h>
++#include <hardware/sensors.h>
++
++using ::android::hardware::sensors::V1_0::MetaDataEventType;
+ using ::android::hardware::sensors::V2_0::implementation::ScopedWakelock;
+ using ::android::hardware::sensors::V2_1::implementation::ISensorsSubHal;
+ 
+@@ -26,14 +31,30 @@
+ #else
+ constexpr auto kLibName = "sensors.qsh.so";
+ #endif
++
++constexpr auto kTypeUnderScreenRgbSensor = static_cast<SensorType>(33171070);
++constexpr auto kTypeMainFusionConfigSensor = static_cast<SensorType>(33171042);
++constexpr int32_t kVirtualSensorHandleBase = 0x10000;
++
++bool IsVirtualHandle(int32_t sensor_handle) {
++    return sensor_handle >= kVirtualSensorHandleBase;
++}
++
++int32_t ToVirtualHandle(int32_t sensor_handle) {
++    return IsVirtualHandle(sensor_handle) ? sensor_handle
++                                          : sensor_handle + kVirtualSensorHandleBase;
++}
++
+ };  // anonymous namespace
+ 
+ SensorsSubHal::SensorsSubHal()
+-    : lib_handle_(dlopen(kLibName, RTLD_NOW), [](void* handle) {
+-          if (handle != nullptr) {
+-              dlclose(handle);
+-          }
+-      }) {
++    : lib_handle_(dlopen(kLibName, RTLD_NOW),
++                  [](void* handle) {
++                      if (handle != nullptr) {
++                          dlclose(handle);
++                      }
++                  }),
++      fusion_light_([this](Event event) { emitFusionEvent(std::move(event)); }) {
+     if (!lib_handle_) {
+         LOG(FATAL) << "dlopen " << kLibName << " failed: " << dlerror();
+     }
+@@ -55,16 +76,82 @@
+ }
+ 
+ Return<Result> SensorsSubHal::activate(int32_t sensor_handle, bool enabled) {
+-    return impl_->activate(sensor_handle, enabled);
++    const int32_t fusion_light_handle = fusion_light_handle_;
++    const int32_t physical_handle = high_pwm_handle_;
++    const bool fusion_light_request = sensor_handle == fusion_light_handle;
++
++    if (sensor_handle != physical_handle && !fusion_light_request) {
++        return impl_->activate(sensor_handle, enabled);
++    }
++
++    {
++        std::lock_guard lock(control_mutex_);
++
++        const bool fusion_light_enabled = fusion_light_enabled_.load();
++        const bool currently_enabled = fusion_light_request ? fusion_light_enabled : raw_enabled_;
++        if (currently_enabled == enabled) {
++            return Result::OK;
++        }
++
++        const bool was_physically_enabled = raw_enabled_ || fusion_light_enabled;
++        const bool should_be_physically_enabled =
++                fusion_light_request ? raw_enabled_ || enabled : enabled || fusion_light_enabled;
++        if (was_physically_enabled != should_be_physically_enabled) {
++            auto result = impl_->activate(physical_handle, should_be_physically_enabled);
++            if (result != Result::OK) {
++                return result;
++            }
++        }
++
++        if (fusion_light_request) {
++            fusion_light_enabled_.store(enabled);
++            fusion_light_.setEnabled(enabled);
++        } else {
++            raw_enabled_ = enabled;
++        }
++    }
++    return Result::OK;
+ }
+ 
+ Return<Result> SensorsSubHal::batch(int32_t sensor_handle, int64_t sampling_period_ns,
+                                     int64_t max_report_latency_ns) {
+-    return impl_->batch(sensor_handle, sampling_period_ns, max_report_latency_ns);
++    const int32_t physical_handle =
++            sensor_handle == fusion_light_handle_ ? high_pwm_handle_ : sensor_handle;
++    return impl_->batch(physical_handle, sampling_period_ns, max_report_latency_ns);
+ }
+ 
+ Return<Result> SensorsSubHal::flush(int32_t sensor_handle) {
+-    return impl_->flush(sensor_handle);
++    const int32_t fusion_light_handle = fusion_light_handle_;
++    const int32_t high_pwm_handle = high_pwm_handle_;
++    const bool fusion_light_request = sensor_handle == fusion_light_handle;
++
++    if (sensor_handle != high_pwm_handle && !fusion_light_request) {
++        return impl_->flush(sensor_handle);
++    }
++
++    std::lock_guard flush_call_lock(flush_call_mutex_);
++    {
++        std::lock_guard lock(control_mutex_);
++        const bool enabled = fusion_light_request ? fusion_light_enabled_.load() : raw_enabled_;
++        if (!enabled) {
++            return Result::BAD_VALUE;
++        }
++    }
++
++    const FlushTarget target = fusion_light_request ? FlushTarget::kFusionLight : FlushTarget::kRaw;
++    {
++        std::lock_guard lock(flush_mutex_);
++        pending_flushes_.push_back(target);
++    }
++
++    auto result = impl_->flush(high_pwm_handle);
++    if (result != Result::OK) {
++        std::lock_guard lock(flush_mutex_);
++        if (!pending_flushes_.empty()) {
++            pending_flushes_.pop_back();
++        }
++    }
++    return result;
+ }
+ 
+ Return<void> SensorsSubHal::registerDirectChannel(const SharedMemInfo& mem,
+@@ -79,14 +166,63 @@
+ Return<void> SensorsSubHal::configDirectReport(int32_t sensor_handle, int32_t channel_handle,
+                                                RateLevel rate,
+                                                ISensors::configDirectReport_cb callback) {
++    if (sensor_handle == fusion_light_handle_) {
++        callback(Result::BAD_VALUE, 0);
++        return Void();
++    }
+     return impl_->configDirectReport(sensor_handle, channel_handle, rate, callback);
+ }
+ 
+ Return<void> SensorsSubHal::getSensorsList_2_1(ISensors::getSensorsList_2_1_cb callback) {
+-    return impl_->getSensorsList_2_1(callback);
++    return impl_->getSensorsList_2_1([&](const auto& source) {
++        const auto high_pwm = std::find_if(source.begin(), source.end(), [](const auto& sensor) {
++            return sensor.type == kTypeUnderScreenRgbSensor;
++        });
++
++        if (high_pwm == source.end()) {
++            callback(source);
++            return;
++        }
++
++        auto sensors = hidl_vec<SensorInfo>(source.size() + 1);
++        std::copy(source.begin(), source.end(), sensors.begin());
++        sensors[source.size()] = *high_pwm;
++        const int32_t high_pwm_handle = high_pwm->sensorHandle;
++        const int32_t fusion_light_handle = ToVirtualHandle(high_pwm_handle);
++        sensors[source.size()].sensorHandle = fusion_light_handle;
++        sensors[source.size()].name = "Oplus FusionLight Sensor";
++        sensors[source.size()].type = SensorType::LIGHT;
++        sensors[source.size()].typeAsString = "";
++
++        bool initialize_fusion_light = false;
++        if (high_pwm_handle_ < 0 && fusion_light_handle_ < 0) {
++            high_pwm_handle_ = high_pwm_handle;
++            fusion_light_handle_ = fusion_light_handle;
++            initialize_fusion_light = true;
++        } else if (high_pwm_handle_ != high_pwm_handle ||
++                   fusion_light_handle_ != fusion_light_handle) {
++            LOG(ERROR) << "FusionLight sensor handles changed after initial enumeration: "
++                       << high_pwm_handle_ << "/" << fusion_light_handle_ << " -> "
++                       << high_pwm_handle << "/" << fusion_light_handle;
++        }
++        if (initialize_fusion_light) {
++            const auto main_profile_sensor = std::find_if(
++                    source.begin(), source.end(),
++                    [](const auto& sensor) { return sensor.type == kTypeMainFusionConfigSensor; });
++            const auto profile_sensor =
++                    main_profile_sensor == source.end() ? high_pwm : main_profile_sensor;
++            fusion_light_.initialize(profile_sensor->name.c_str());
++            LOG(INFO) << "Added FusionLight sensor " << fusion_light_handle
++                      << " backed by high-PWM RGB sensor " << high_pwm_handle;
++        }
++        callback(sensors);
++    });
+ }
+ 
+ Return<Result> SensorsSubHal::injectSensorData_2_1(const Event& event) {
++    if (event.sensorHandle == fusion_light_handle_) {
++        return Result::BAD_VALUE;
++    }
+     return impl_->injectSensorData_2_1(event);
+ }
+ 
+@@ -118,7 +254,58 @@
+ }
+ 
+ void SensorsSubHal::postEvents(const std::vector<Event>& events, ScopedWakelock wakelock) {
+-    hal_proxy_callback_->postEvents(events, std::move(wakelock));
++    std::vector<Event> output;
++    output.reserve(events.size());
++    const int32_t physical_handle = high_pwm_handle_;
++    const int32_t fusion_light_handle = fusion_light_handle_;
++
++    for (const auto& event : events) {
++        if (event.sensorType == SensorType::META_DATA &&
++            event.u.meta.what == MetaDataEventType::META_DATA_FLUSH_COMPLETE &&
++            event.sensorHandle == physical_handle) {
++            FlushTarget flush_target = FlushTarget::kRaw;
++            bool requested = false;
++            {
++                std::lock_guard lock(flush_mutex_);
++                if (!pending_flushes_.empty()) {
++                    flush_target = pending_flushes_.front();
++                    pending_flushes_.pop_front();
++                    requested = true;
++                }
++            }
++            Event flush_event = event;
++            if (requested && flush_target == FlushTarget::kFusionLight) {
++                flush_event.sensorHandle = fusion_light_handle;
++                fusion_light_.completeFlush(std::move(flush_event));
++                continue;
++            }
++            output.push_back(std::move(flush_event));
++            continue;
++        }
++
++        // Forward every non-flush event unchanged.
++        output.push_back(event);
++        if (event.sensorType != kTypeUnderScreenRgbSensor) {
++            continue;
++        }
++
++        if (fusion_light_enabled_.load() && fusion_light_handle >= 0) {
++            fusion_light_.process(event, fusion_light_handle);
++        }
++    }
++
++    if (!output.empty()) {
++        hal_proxy_callback_->postEvents(output, std::move(wakelock));
++    }
++}
++
++void SensorsSubHal::emitFusionEvent(Event event) {
++    if (!fusion_light_enabled_.load() || hal_proxy_callback_ == nullptr) {
++        return;
++    }
++    std::vector<Event> events;
++    events.push_back(std::move(event));
++    hal_proxy_callback_->postEvents(events, hal_proxy_callback_->createScopedWakelock(false));
+ }
+ 
+ ScopedWakelock SensorsSubHal::createScopedWakelock(bool lock) {
+diff --git a/sensors/fusionlight/SensorsSubHal.h b/sensors/fusionlight/SensorsSubHal.h
+index 2743f02..2290305 100644
+--- a/sensors/fusionlight/SensorsSubHal.h
++++ b/sensors/fusionlight/SensorsSubHal.h
+@@ -5,8 +5,14 @@
+ 
+ #pragma once
+ 
++#include <atomic>
++#include <deque>
++#include <mutex>
++
+ #include <V2_1/SubHal.h>
+ 
++#include "FusionLightProcessor.h"
++
+ namespace android {
+ namespace hardware {
+ namespace sensors {
+@@ -57,9 +63,26 @@
+     ScopedWakelock createScopedWakelock(bool lock) override;
+ 
+   private:
++    enum class FlushTarget {
++        kRaw,
++        kFusionLight,
++    };
++
++    void emitFusionEvent(Event event);
++
+     std::unique_ptr<void, std::function<void(void*)>> lib_handle_;
+     V2_1::implementation::ISensorsSubHal* impl_;
+     sp<IHalProxyCallback> hal_proxy_callback_;
++
++    FusionLightProcessor fusion_light_;
++    std::mutex control_mutex_;
++    std::mutex flush_call_mutex_;
++    std::mutex flush_mutex_;
++    std::deque<FlushTarget> pending_flushes_;
++    int32_t high_pwm_handle_ = -1;
++    int32_t fusion_light_handle_ = -1;
++    bool raw_enabled_ = false;
++    std::atomic_bool fusion_light_enabled_ = false;
+ };
+ 
+ }  // namespace fusionlight
+diff --git a/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te b/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te
+index 33a9c5f..bcfda16 100644
+--- a/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te
++++ b/sepolicy/qti/vendor/hal_oplus_displaypanelfeature_aidl.te
+@@ -7,6 +7,8 @@
+ 
+ hal_server_domain(hal_oplus_displaypanelfeature_aidl, vendor_hal_oplus_displaypanelfeature)
+ 
++binder_call(vendor_hal_oplus_displaypanelfeature_client, vendor_hal_oplus_displaypanelfeature_server)
++
+ hal_attribute_service(vendor_hal_oplus_displaypanelfeature, hal_oplus_displaypanel_aidl_service)
+ 
+ add_service(hal_oplus_displaypanelfeature_aidl, dpa_service)
+diff --git a/sepolicy/qti/vendor/hal_sensors_default.te b/sepolicy/qti/vendor/hal_sensors_default.te
+index 5f482bd..0469421 100644
+--- a/sepolicy/qti/vendor/hal_sensors_default.te
++++ b/sepolicy/qti/vendor/hal_sensors_default.te
+@@ -1,3 +1,10 @@
++hal_client_domain(hal_sensors_default, vendor_hal_oplus_sensor)
++hal_client_domain(hal_sensors_default, vendor_hal_oplus_displaypanelfeature)
++
++hal_client_domain(hal_sensors_default, hal_graphics_composer)
++binder_call(hal_sensors_default, hal_graphics_composer_default)
++binder_call(hal_graphics_composer_default, hal_sensors_default)
++
+ allow hal_sensors_default ssc_interactive_device:chr_file rw_file_perms;
+ allow hal_sensors_default ultrasound_device:chr_file rw_file_perms;
+ 

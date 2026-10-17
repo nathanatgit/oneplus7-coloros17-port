@@ -1,0 +1,21 @@
+From d242795981cfe2f2ac50ea65daa4816516f3e44d Mon Sep 17 00:00:00 2001
+From: NullCode1337 <contact.nullcode@proton.me>
+Date: Fri, 25 Sep 2026 08:44:50 +0600
+Subject: [PATCH] sepolicy: qti: Allow tee to create directories under /data/vendor
+
+qseecomd creates /data/vendor/fingerprint, which needs write on the parent directory.
+
+Change-Id: Id6aec0fa3d98e1d6b3e9ec40aa55a1e67761c393
+---
+
+diff --git a/sepolicy/qti/vendor/tee.te b/sepolicy/qti/vendor/tee.te
+index 70c31ff..d01bbea 100644
+--- a/sepolicy/qti/vendor/tee.te
++++ b/sepolicy/qti/vendor/tee.te
+@@ -6,5 +6,5 @@
+ allow tee fingerprint_vendor_data_file:dir create_dir_perms;
+ allow tee fingerprint_vendor_data_file:file create_file_perms;
+ 
+-allow tee vendor_data_file:dir r_dir_perms;
++allow tee vendor_data_file:dir rw_dir_perms;
+ allow tee vendor_data_file:file r_file_perms;

@@ -1,0 +1,78 @@
+From a886ea52ddd7ebe77ddce9cbf38e9d65c1a81ea2 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Mon, 05 Oct 2026 21:15:01 +0100
+Subject: [PATCH] SystemUI: Rotate keyguard UDFPS icon with the display
+
+Transform the natural-orientation fingerprint sensor coordinates
+before positioning the device entry icon. Recover natural display
+dimensions from the rotated window bounds so the icon stays over
+the sensor in landscape and reverse portrait.
+
+Assisted-by: Codex:GPT-6
+Change-Id: I5dc859bcd8bb3a9bb08a2ab8c0220f8ca62affce
+---
+
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsControllerOverlay.kt b/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsControllerOverlay.kt
+index 9071987..5def052 100644
+--- a/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsControllerOverlay.kt
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsControllerOverlay.kt
+@@ -315,8 +315,8 @@
+ 
+     fun updateOverlayParams(updatedOverlayParams: UdfpsOverlayParams) {
+         overlayParams = updatedOverlayParams
+-        sensorBounds = updatedOverlayParams.sensorBounds
+-        overlayTouchView?.sensorRect = updatedOverlayParams.sensorBounds
++        sensorBounds = Rect(updatedOverlayParams.sensorBounds)
++        overlayTouchView?.sensorRect = sensorBounds
+         getTouchOverlay()?.let {
+             if (addViewRunnable == null) {
+                 // Only updateViewLayout if there's no pending view to add to WM.
+@@ -441,8 +441,9 @@
+             return true
+         }
+ 
+-        // on the keyguard, make sure we don't rotate if we're going to sleep or not occluded
+-        return !(keyguardUpdateMonitor.isGoingToSleep || !keyguardStateController.isOccluded)
++        // The keyguard can rotate too; keep its touch overlay aligned with the display.
++        // Avoid changing orientation during the transition to sleep.
++        return !keyguardUpdateMonitor.isGoingToSleep
+     }
+ }
+ 
+diff --git a/packages/SystemUI/src/com/android/systemui/keyguard/ui/view/layout/sections/DefaultDeviceEntrySection.kt b/packages/SystemUI/src/com/android/systemui/keyguard/ui/view/layout/sections/DefaultDeviceEntrySection.kt
+index ec03b45..11eff6c 100644
+--- a/packages/SystemUI/src/com/android/systemui/keyguard/ui/view/layout/sections/DefaultDeviceEntrySection.kt
++++ b/packages/SystemUI/src/com/android/systemui/keyguard/ui/view/layout/sections/DefaultDeviceEntrySection.kt
+@@ -21,6 +21,8 @@
+ import android.graphics.Point
+ import android.graphics.Rect
+ import android.util.DisplayMetrics
++import android.util.RotationUtils
++import android.view.Surface
+ import android.view.WindowManager
+ import androidx.annotation.VisibleForTesting
+ import androidx.constraintlayout.widget.ConstraintLayout
+@@ -141,11 +143,18 @@
+                     str2 = "(${udfpsLocation.centerX}, ${udfpsLocation.centerY})"
+                     str3 = "${authController.udfpsLocation}"
+                 }
+-                centerIcon(
+-                    Point(udfpsLocation.centerX.toInt(), udfpsLocation.centerY.toInt()),
+-                    udfpsLocation.radius,
+-                    constraintSet,
+-                )
++                val rotation = context.display.rotation
++                val isLandscape =
++                    rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270
++
++                // Window bounds already reflect rotation; recover the natural dimensions.
++                val naturalWidth = if (isLandscape) bounds.height() else bounds.width()
++                val naturalHeight = if (isLandscape) bounds.width() else bounds.height()
++                val center =
++                    Point(udfpsLocation.centerX.toInt(), udfpsLocation.centerY.toInt())
++                RotationUtils.rotatePoint(center, rotation, naturalWidth, naturalHeight)
++
++                centerIcon(center, udfpsLocation.radius, constraintSet)
+             }
+         } else {
+             centerIcon(

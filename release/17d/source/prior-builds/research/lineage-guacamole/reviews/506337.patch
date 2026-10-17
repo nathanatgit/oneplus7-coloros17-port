@@ -1,0 +1,29 @@
+From b995830e0acd1683687698178e96fc31cf9ce899 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Mon, 05 Oct 2026 10:44:34 +0530
+Subject: [PATCH] SUW: Filter-out PseudoLocales
+
+Change-Id: I12793f581b8ee8a1f2703e862042df9ca26b50ad
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+index 65f8f20..1b72197 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+@@ -12,6 +12,7 @@
+ import android.content.IntentFilter
+ import android.os.Bundle
+ import android.os.Handler
++import android.os.LocaleList
+ import android.os.Looper
+ import android.telephony.SubscriptionManager
+ import android.telephony.TelephonyManager
+@@ -151,6 +152,7 @@
+     private fun levelLocales(parent: LocaleStore.LocaleInfo?): List<LocaleStore.LocaleInfo> =
+         levelLocales.getOrPut(parent?.id.orEmpty()) {
+             LocaleStore.getLevelLocales(this, emptySet(), parent, /* translatedOnly= */ true)
++                .filterNot { LocaleList.isPseudoLocale(it.locale) }
+                 .sortedWith(LocaleHelper.LocaleInfoComparator(Locale.getDefault(), parent != null))
+         }
+ 

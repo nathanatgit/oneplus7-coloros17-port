@@ -1,0 +1,243 @@
+From de684e4e1947035211863c646df4cd08fbeb96ac Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Wed, 30 Sep 2026 23:18:50 +0200
+Subject: [PATCH] Launcher3: Support recents blur in RecentsActivity
+
+With a third-party default launcher, recents are hosted by
+RecentsActivity, which always used the non-blur overview style and
+had no DepthController. Create one based on WindowBlurState and wire
+it up the same way as QuickstepLauncher and RecentsWindowManager.
+
+Assisted-by: LLM
+Change-Id: I9d1a8abe641be177854d9021100feca5cbdaaeb5
+---
+
+diff --git a/quickstep/src/com/android/quickstep/FallbackActivityInterface.java b/quickstep/src/com/android/quickstep/FallbackActivityInterface.java
+index d9f14ac..19909e5 100644
+--- a/quickstep/src/com/android/quickstep/FallbackActivityInterface.java
++++ b/quickstep/src/com/android/quickstep/FallbackActivityInterface.java
+@@ -17,6 +17,8 @@
+ 
+ import static android.view.Display.DEFAULT_DISPLAY;
+ 
++import static com.android.app.animation.Interpolators.LINEAR;
++import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
+ import static com.android.launcher3.util.NavigationMode.NO_BUTTON;
+ import static com.android.quickstep.fallback.RecentsState.BACKGROUND_APP;
+ import static com.android.quickstep.fallback.RecentsState.DEFAULT;
+@@ -33,8 +35,11 @@
+ 
+ import com.android.app.displaylib.PerDisplayRepository;
+ import com.android.launcher3.DeviceProfile;
++import com.android.launcher3.LauncherAnimUtils;
++import com.android.launcher3.anim.PendingAnimation;
+ import com.android.launcher3.dagger.LauncherAppSingleton;
+ import com.android.launcher3.display.DisplayController;
++import com.android.launcher3.statehandlers.DepthController;
+ import com.android.launcher3.statemanager.StateManager;
+ import com.android.launcher3.taskbar.TaskbarInteractor;
+ import com.android.launcher3.util.DaggerSingletonObject;
+@@ -97,7 +102,22 @@
+     public AnimationFactory prepareRecentsUI(
+             boolean activityVisible, Consumer<AnimatorControllerWithResistance> callback) {
+         notifyRecentsOfOrientation();
+-        DefaultAnimationFactory factory = new DefaultAnimationFactory(callback);
++        DefaultAnimationFactory factory =
++                new DefaultAnimationFactory(callback) {
++                    @Override
++                    protected void createBackgroundToOverviewAnim(RecentsActivity container,
++                            PendingAnimation pa) {
++                        super.createBackgroundToOverviewAnim(container, pa);
++
++                        // Animate the blur and wallpaper zoom
++                        float fromDepthRatio = BACKGROUND_APP.getDepth(container);
++                        float toDepthRatio = DEFAULT.getDepth(container);
++                        pa.addFloat(container.getDepthController().stateDepth,
++                                new LauncherAnimUtils.ClampedProperty<>(
++                                        MULTI_PROPERTY_VALUE, fromDepthRatio, toDepthRatio),
++                                fromDepthRatio, toDepthRatio, LINEAR);
++                    }
++                };
+         factory.initBackgroundStateUI();
+         return factory;
+     }
+@@ -115,6 +135,16 @@
+         return RecentsActivity.ACTIVITY_TRACKER.getCreatedContext();
+     }
+ 
++    @Nullable
++    @Override
++    public DepthController<RecentsState, RecentsActivity> getDepthController() {
++        RecentsActivity activity = getCreatedContainer();
++        if (activity == null) {
++            return null;
++        }
++        return activity.getDepthController();
++    }
++
+     @Override
+     public TaskbarInteractor getTaskbarInteractor() {
+         RecentsActivity activity = getCreatedContainer();
+diff --git a/quickstep/src/com/android/quickstep/RecentsActivity.java b/quickstep/src/com/android/quickstep/RecentsActivity.java
+index 34a3adb..8c658c9 100644
+--- a/quickstep/src/com/android/quickstep/RecentsActivity.java
++++ b/quickstep/src/com/android/quickstep/RecentsActivity.java
+@@ -21,6 +21,7 @@
+ import static android.view.RemoteAnimationTarget.MODE_OPENING;
+ 
+ import static com.android.app.animation.Interpolators.FINAL_FRAME;
++import static com.android.launcher3.Flags.blurOnMoreSurfaces;
+ import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE;
+ import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_RECREATE_TO_UPDATE_THEME;
+ import static com.android.launcher3.QuickstepTransitionManager.RECENTS_LAUNCH_DURATION;
+@@ -75,6 +76,7 @@
+ import com.android.launcher3.compat.AccessibilityManagerCompat;
+ import com.android.launcher3.desktop.DesktopRecentsTransitionController;
+ import com.android.launcher3.model.data.ItemInfo;
++import com.android.launcher3.statehandlers.DepthController;
+ import com.android.launcher3.statemanager.StateManager;
+ import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
+ import com.android.launcher3.statemanager.StateManager.StateHandler;
+@@ -83,9 +85,11 @@
+ import com.android.launcher3.taskbar.TaskbarInteractor;
+ import com.android.launcher3.util.ActivityOptionsWrapper;
+ import com.android.launcher3.util.ContextTracker;
++import com.android.launcher3.util.ListenableRef;
+ import com.android.launcher3.util.RunnableList;
+ import com.android.launcher3.util.SystemUiController;
+ import com.android.launcher3.util.Themes;
++import com.android.launcher3.util.WindowBlurState;
+ import com.android.launcher3.views.BaseDragLayer;
+ import com.android.launcher3.views.ScrimView;
+ import com.android.quickstep.fallback.FallbackActivityRecentsView;
+@@ -132,6 +136,7 @@
+     private @Nullable volatile TaskbarInteractor mTaskbarInteractor;
+ 
+     private StateManager<RecentsState, RecentsActivity> mStateManager;
++    private DepthController<RecentsState, RecentsActivity> mDepthController;
+ 
+     // Strong refs to runners which are cleared when the activity is destroyed
+     private RemoteAnimationFactory mActivityLaunchAnimationRunner;
+@@ -149,12 +154,12 @@
+      * Init drag layer and overview panel views.
+      */
+     private void setupViews() {
+-        getTheme().applyStyle(R.style.OverviewBlurFallbackStyle, true);
++        setupBlurState();
+         SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
+         // SplitSelectStateController needs to be created before setContentView()
+         mSplitSelectStateController =
+                 new SplitSelectStateController(this, getStateManager(),
+-                        null /* depthController */, getStatsLogManager(),
++                        mDepthController, getStatsLogManager(),
+                         systemUiProxy, RecentsModel.INSTANCE.get(this),
+                         null /*activityBackCallback*/, new SplitScreenUiState(),
+                         new SplitScreenAppResolver(this));
+@@ -172,11 +177,14 @@
+         if (DesktopModeStatus.canEnterDesktopMode(this)) {
+             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
+                     getStateManager(), systemUiProxy, getIApplicationThread(),
+-                    null /* depthController */
++                    mDepthController
+             );
+         }
++        SurfaceTransactionApplier surfaceTransactionApplier =
++                new SurfaceTransactionApplier(getRootView());
++        mDepthController.setSurfaceTransactionApplier(surfaceTransactionApplier);
+         mFallbackRecentsView.init(mActionsView, mSplitSelectStateController,
+-                mDesktopRecentsTransitionController, new SurfaceTransactionApplier(getRootView()),
++                mDesktopRecentsTransitionController, surfaceTransactionApplier,
+                 emptyRecentsMessageView);
+ 
+         setContentView(rootView);
+@@ -187,6 +195,28 @@
+         mSysUIConnectionTracker.onConnected(this, c -> c.getTaskbarManager().setActivity(this));
+     }
+ 
++    private void setupBlurState() {
++        ListenableRef<Boolean> blurState = WindowBlurState.getInstance(this);
++        boolean blurEnabled = blurState.getValue();
++
++        // Recreate recents activity if the blur enabled state changes
++        closeOnDestroy(blurState.forEach(getUiExecutor(), v -> {
++            if (v != blurEnabled) recreate();
++            return null;
++        }));
++        mDepthController = new DepthController<>(this, blurState);
++        getTheme().applyStyle(blurEnabled ? R.style.OverviewBlurStyle
++                : R.style.OverviewBlurFallbackStyle, true);
++        if (blurOnMoreSurfaces()) {
++            getTheme().applyStyle(blurEnabled ? R.style.FolderBlurStyle
++                    : R.style.FolderBlurFallbackStyle, true);
++        }
++    }
++
++    public DepthController<RecentsState, RecentsActivity> getDepthController() {
++        return mDepthController;
++    }
++
+     @AnyThread
+     @Override
+     public void setTaskbarInteractor(@Nullable TaskbarInteractor taskbarInteractor) {
+@@ -353,7 +383,7 @@
+         boolean activityClosing = taskIsATargetWithMode(appTargets, getTaskId(), MODE_CLOSING);
+         PendingAnimation pa = new PendingAnimation(RECENTS_LAUNCH_DURATION);
+         createRecentsWindowAnimator(recentsView, taskView, !activityClosing, appTargets,
+-                wallpaperTargets, nonAppTargets, /* depthController= */ null,
++                wallpaperTargets, nonAppTargets, mDepthController,
+                 /* transitionInfo= */ null, /* appearedTaskId= */ INVALID_TASK_ID, pa);
+         target.play(pa.buildAnim());
+ 
+@@ -389,6 +419,14 @@
+     }
+ 
+     @Override
++    protected void onActivityFlagsChanged(int changeBits) {
++        if ((changeBits & ACTIVITY_STATE_STARTED) != 0) {
++            mDepthController.setActivityStarted(isStarted());
++        }
++        super.onActivityFlagsChanged(changeBits);
++    }
++
++    @Override
+     protected void onResume() {
+         super.onResume();
+         AccessibilityManagerCompat.sendStateEventToTest(getBaseContext(), OVERVIEW_STATE_ORDINAL);
+@@ -562,6 +600,7 @@
+     @Override
+     public void collectStateHandlers(List<StateHandler<RecentsState>> out) {
+         out.add(new FallbackRecentsStateController(this));
++        out.add(getDepthController());
+     }
+ 
+     @Override
+@@ -572,6 +611,9 @@
+     @Override
+     public void dump(String prefix, FileDescriptor fd, PrintWriter writer, String[] args) {
+         super.dump(prefix, fd, writer, args);
++        if (mDepthController != null) {
++            mDepthController.dump(prefix, writer);
++        }
+         writer.println(prefix + "Misc:");
+         dumpMisc(prefix + "\t", writer);
+     }
+diff --git a/quickstep/src/com/android/quickstep/fallback/FallbackActivityRecentsView.kt b/quickstep/src/com/android/quickstep/fallback/FallbackActivityRecentsView.kt
+index befe20b..df5d71a 100644
+--- a/quickstep/src/com/android/quickstep/fallback/FallbackActivityRecentsView.kt
++++ b/quickstep/src/com/android/quickstep/fallback/FallbackActivityRecentsView.kt
+@@ -18,6 +18,7 @@
+ 
+ import android.content.Context
+ import android.util.AttributeSet
++import com.android.launcher3.statehandlers.DepthController
+ import com.android.quickstep.RecentsActivity
+ 
+ class FallbackActivityRecentsView
+@@ -28,4 +29,7 @@
+     override fun initialiseInjectables() {
+         mContainer.activityComponent.inject(this)
+     }
++
++    override fun getDepthController(): DepthController<RecentsState, RecentsActivity> =
++        mContainer.depthController
+ }

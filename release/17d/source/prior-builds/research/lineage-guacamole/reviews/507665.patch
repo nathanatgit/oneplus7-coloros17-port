@@ -1,0 +1,175 @@
+From 2ccd6fad82503472c7318b2d0aac7d0fa01ca76b Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Mon, 12 Oct 2026 19:05:45 +0100
+Subject: [PATCH] oplus: Add Dolby Vision Codec2 service wrapper
+
+Construct the HIDL ComponentStore against the current platform ABI
+while loading the proprietary Dolby store.
+
+Assisted-by: LLM
+Change-Id: Iea4f81072e995985311b4fbbd68acd0a4421811d
+---
+
+diff --git a/hidl/dolby/codec2/Android.bp b/hidl/dolby/codec2/Android.bp
+new file mode 100644
+index 0000000..0ea571f
+--- /dev/null
++++ b/hidl/dolby/codec2/Android.bp
+@@ -0,0 +1,28 @@
++//
++// SPDX-FileCopyrightText: The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++cc_binary {
++    name: "dolbycodec2",
++    device_specific: true,
++    relative_install_path: "hw",
++    compile_multilib: "64",
++    init_rc: ["vendor.dolby.media.c2@1.0-service.rc"],
++    vintf_fragments: ["vendor.dolby.media.c2@1.0-service.xml"],
++    srcs: ["service.cpp"],
++    shared_libs: [
++        "android.hardware.media.c2@1.0",
++        "libbase",
++        "libbinder",
++        "libcodec2_hidl@1.0",
++        "libdl",
++        "libhidlbase",
++        "libutils",
++    ],
++    cflags: [
++        "-Wall",
++        "-Wextra",
++        "-Werror",
++    ],
++}
+diff --git a/hidl/dolby/codec2/service.cpp b/hidl/dolby/codec2/service.cpp
+new file mode 100644
+index 0000000..a87892e
+--- /dev/null
++++ b/hidl/dolby/codec2/service.cpp
+@@ -0,0 +1,52 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#include <dlfcn.h>
++#include <cstdlib>
++#include <memory>
++
++#include <android-base/logging.h>
++#include <binder/ProcessState.h>
++#include <codec2/hidl/1.0/ComponentStore.h>
++#include <hidl/HidlTransportSupport.h>
++
++int main() {
++    using android::hardware::media::c2::V1_0::utils::ComponentStore;
++
++    android::ProcessState::initWithDriver("/dev/vndbinder");
++    android::ProcessState::self()->startThreadPool();
++    android::hardware::configureRpcThreadpool(8, true);
++
++    // Keep the library loaded for the lifetime of the store and its components.
++    void* library = dlopen("c2.dolby.store.so", RTLD_NOW | RTLD_LOCAL);
++    if (library == nullptr) {
++        LOG(ERROR) << "Cannot load Dolby component store: " << dlerror();
++        return EXIT_FAILURE;
++    }
++
++    using GetStore = std::shared_ptr<C2ComponentStore> (*)();
++    auto getStore = reinterpret_cast<GetStore>(
++            dlsym(library, "_ZN7android28GetCodec2DolbyComponentStoreEv"));
++    if (getStore == nullptr) {
++        LOG(ERROR) << "Cannot find Dolby component store factory: " << dlerror();
++        return EXIT_FAILURE;
++    }
++
++    auto implementation = getStore();
++    if (implementation == nullptr) {
++        LOG(ERROR) << "Dolby component store factory returned null";
++        return EXIT_FAILURE;
++    }
++
++    auto service = android::sp<ComponentStore>::make(implementation);
++    android::status_t status = service->registerAsService("dolby");
++    if (status != android::OK) {
++        LOG(ERROR) << "Cannot register Dolby Codec2 service: " << status;
++        return EXIT_FAILURE;
++    }
++
++    android::hardware::joinRpcThreadpool();
++    return EXIT_FAILURE;
++}
+diff --git a/hidl/dolby/codec2/vendor.dolby.media.c2@1.0-service.rc b/hidl/dolby/codec2/vendor.dolby.media.c2@1.0-service.rc
+new file mode 100644
+index 0000000..1fda498
+--- /dev/null
++++ b/hidl/dolby/codec2/vendor.dolby.media.c2@1.0-service.rc
+@@ -0,0 +1,6 @@
++service dolbycodec2 /odm/bin/hw/dolbycodec2
++    class hal
++    user mediacodec
++    group camera mediadrm drmrpc
++    ioprio rt 4
++    writepid /dev/cpuset/foreground/tasks
+diff --git a/hidl/dolby/codec2/vendor.dolby.media.c2@1.0-service.xml b/hidl/dolby/codec2/vendor.dolby.media.c2@1.0-service.xml
+new file mode 100644
+index 0000000..630c95f
+--- /dev/null
++++ b/hidl/dolby/codec2/vendor.dolby.media.c2@1.0-service.xml
+@@ -0,0 +1,15 @@
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<manifest version="1.0" type="device">
++    <hal format="hidl">
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>dolby</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/sepolicy/qti/vendor/file_contexts b/sepolicy/qti/vendor/file_contexts
+index 0536272..fd00721 100644
+--- a/sepolicy/qti/vendor/file_contexts
++++ b/sepolicy/qti/vendor/file_contexts
+@@ -39,6 +39,7 @@
+ /(odm|vendor/odm)/bin/hw/vendor\.pixelworks\.hardware\.feature-service                 u:object_r:hal_feature_irisfeature_default_exec:s0
+ 
+ # Dolby Vision
++/(odm|vendor/odm)/bin/hw/dolbycodec2         u:object_r:mediacodec_exec:s0
+ /(odm|vendor/odm)/bin/hw/dvs-hal-service     u:object_r:hal_dvs_default_exec:s0
+ /(odm|vendor/odm)/bin/hw/dvs-aidl-service    u:object_r:hal_dolby_dvs_aidl_exec:s0
+ 
+diff --git a/sepolicy/qti/vendor/mediacodec.te b/sepolicy/qti/vendor/mediacodec.te
+index 50be793..4ab6520 100644
+--- a/sepolicy/qti/vendor/mediacodec.te
++++ b/sepolicy/qti/vendor/mediacodec.te
+@@ -1,3 +1,4 @@
+ hal_client_domain(mediacodec, vendor_hal_dolby_dvs)
+ 
++set_prop(mediacodec, vendor_dolby_vision_prop)
+ set_prop(mediacodec, vendor_video_prop)
+diff --git a/vintf/device_framework_matrix.xml b/vintf/device_framework_matrix.xml
+index 29529df..f9bc437 100644
+--- a/vintf/device_framework_matrix.xml
++++ b/vintf/device_framework_matrix.xml
+@@ -1,4 +1,12 @@
+ <compatibility-matrix version="4.0" type="framework">
++    <hal format="hidl" optional="true">
++        <name>android.hardware.media.c2</name>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>dolby</instance>
++        </interface>
++    </hal>
+     <hal format="aidl" optional="true">
+         <name>vendor.dolby.dvs</name>
+         <version>1</version>

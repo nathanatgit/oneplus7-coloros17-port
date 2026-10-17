@@ -1,0 +1,135 @@
+From 7d15d25e18d1a6c404b42a2c7a9e9e6f4b7908f5 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Mon, 28 Sep 2026 08:35:09 +0300
+Subject: [PATCH] SettingsIntelligence: Implement edge-to-edge
+
+Theme.DeviceDefault.Settings hard-codes a solid navigation bar color,
+so override it as well.
+
+Change-Id: I2f38a828c9908dfd3277f3d9266224a8d5e0eabe
+---
+
+diff --git a/res/layout/search_panel.xml b/res/layout/search_panel.xml
+index 990d11a..812f011 100644
+--- a/res/layout/search_panel.xml
++++ b/res/layout/search_panel.xml
+@@ -1,5 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <!-- Copyright (C) 2016 The Android Open Source Project
++     Copyright (C) The LineageOS Project
+ 
+      Licensed under the Apache License, Version 2.0 (the "License");
+      you may not use this file except in compliance with the License.
+@@ -64,6 +65,7 @@
+             android:id="@+id/list_results"
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
++            android:clipToPadding="false"
+             android:paddingStart="@dimen/dashboard_padding_start"
+             android:paddingEnd="@dimen/dashboard_padding_end"
+             android:paddingTop="@dimen/dashboard_padding_top"
+diff --git a/res/values/themes.xml b/res/values/themes.xml
+index 66868de..1bd33d1 100644
+--- a/res/values/themes.xml
++++ b/res/values/themes.xml
+@@ -1,6 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <!--
+   ~ Copyright (C) 2017 The Android Open Source Project
++  ~ Copyright (C) The LineageOS Project
+   ~
+   ~ Licensed under the Apache License, Version 2.0 (the "License");
+   ~ you may not use this file except in compliance with the License.
+@@ -16,7 +17,11 @@
+   -->
+ 
+ <resources>
+-    <style name="Theme.Settings" parent="@android:style/Theme.DeviceDefault.Settings"/>
++    <style name="Theme.Settings" parent="@android:style/Theme.DeviceDefault.Settings">
++        <item name="android:statusBarColor">@android:color/transparent</item>
++        <item name="android:navigationBarColor">@android:color/transparent</item>
++        <item name="android:navigationBarDividerColor">@android:color/transparent</item>
++    </style>
+ 
+     <style name="Theme.Settings.NoActionBar">
+         <item name="android:windowActionBar">false</item>
+diff --git a/src/com/android/settings/intelligence/search/SearchActivity.java b/src/com/android/settings/intelligence/search/SearchActivity.java
+index 28e1783..5dec0e9 100644
+--- a/src/com/android/settings/intelligence/search/SearchActivity.java
++++ b/src/com/android/settings/intelligence/search/SearchActivity.java
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2017 The Android Open Source Project
++ * Copyright (C) The LineageOS Project
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+@@ -18,7 +19,12 @@
+ package com.android.settings.intelligence.search;
+ 
+ import android.os.Bundle;
++import android.view.View;
+ 
++import androidx.core.graphics.Insets;
++import androidx.core.view.ViewCompat;
++import androidx.core.view.WindowCompat;
++import androidx.core.view.WindowInsetsCompat;
+ import androidx.fragment.app.Fragment;
+ import androidx.fragment.app.FragmentActivity;
+ import androidx.fragment.app.FragmentManager;
+@@ -30,8 +36,19 @@
+     @Override
+     public void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
++
++        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+         setContentView(R.layout.search_main);
+ 
++        final View root = findViewById(R.id.main_content);
++        ViewCompat.setOnApplyWindowInsetsListener(root, (view, windowInsets) -> {
++            final Insets insets = windowInsets.getInsets(
++                    WindowInsetsCompat.Type.systemBars()
++                            | WindowInsetsCompat.Type.displayCutout());
++            view.setPadding(insets.left, insets.top, insets.right, 0);
++            return windowInsets;
++        });
++
+         FragmentManager fragmentManager = getSupportFragmentManager();
+         Fragment fragment = fragmentManager.findFragmentById(R.id.main_content);
+         if (fragment == null) {
+diff --git a/src/com/android/settings/intelligence/search/SearchFragment.java b/src/com/android/settings/intelligence/search/SearchFragment.java
+index 86b5b37..94e7800 100644
+--- a/src/com/android/settings/intelligence/search/SearchFragment.java
++++ b/src/com/android/settings/intelligence/search/SearchFragment.java
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2017 The Android Open Source Project
++ * Copyright (C) The LineageOS Project
+  *
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+@@ -24,6 +25,9 @@
+ import android.os.Bundle;
+ import androidx.annotation.VisibleForTesting;
+ import androidx.cardview.widget.CardView;
++import androidx.core.graphics.Insets;
++import androidx.core.view.ViewCompat;
++import androidx.core.view.WindowInsetsCompat;
+ import androidx.loader.content.Loader;
+ import androidx.loader.app.LoaderManager;
+ import androidx.recyclerview.widget.LinearLayoutManager;
+@@ -147,6 +151,14 @@
+         mResultsRecyclerView.setAdapter(mSearchAdapter);
+         mResultsRecyclerView.setLayoutManager(new LinearLayoutManager(activity));
+         mResultsRecyclerView.addOnScrollListener(mScrollListener);
++        ViewCompat.setOnApplyWindowInsetsListener(mResultsRecyclerView, (v, windowInsets) -> {
++            final Insets insets = windowInsets.getInsets(
++                    WindowInsetsCompat.Type.systemBars()
++                            | WindowInsetsCompat.Type.displayCutout());
++            v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(),
++                    insets.bottom);
++            return windowInsets;
++        });
+ 
+         mNoResultsView = view.findViewById(R.id.no_results_layout);
+ 

@@ -1,0 +1,39 @@
+From c47804f035a062079020c40720fdbed2b47e7520 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Wed, 14 Oct 2026 10:28:41 +0200
+Subject: [PATCH] config: Move freeform_window_management feature to common_mobile
+
+Matches stock Pixel 8.
+
+Fixes: https://github.com/LineageOS/issues/issues/783
+Change-Id: I3d80f2d032805a812d99a3346a692fe06c4ab359
+---
+
+diff --git a/config/common_mobile.mk b/config/common_mobile.mk
+index f8e991e..83ad397 100644
+--- a/config/common_mobile.mk
++++ b/config/common_mobile.mk
+@@ -52,6 +52,10 @@
+ PRODUCT_PACKAGES += \
+     android.software.credentials.prebuilt.xml
+ 
++# Freeform window management
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.software.freeform_window_management.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/android.software.freeform_window_management.xml
++
+ # Legal
+ PRODUCT_PRODUCT_PROPERTIES += \
+     ro.lineagelegal.url=https://lineageos.org/legal
+diff --git a/config/tablet.mk b/config/tablet.mk
+index dff7e7b..7f8debe 100644
+--- a/config/tablet.mk
++++ b/config/tablet.mk
+@@ -1,8 +1,4 @@
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/large_screen_common.mk)
+ 
+-# Freeform window management
+-PRODUCT_COPY_FILES += \
+-    frameworks/native/data/etc/android.software.freeform_window_management.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/android.software.freeform_window_management.xml
+-
+ # Tablet-specific overlay
+ PRODUCT_PACKAGE_OVERLAYS += vendor/lineage/overlay/tablet

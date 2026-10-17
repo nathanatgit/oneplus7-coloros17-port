@@ -1,0 +1,32 @@
+From 15f79d6014e9cc3c70819d81ccb70687ed2dab28 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 13 Oct 2026 12:44:57 +0530
+Subject: [PATCH] partnerconfig: Better report partner configs that are not resolved
+
+Change-Id: Id63def667fc5b0044cfb60f0292660dfa78a40d7
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java b/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
+index ccfb1a6..1e229f6 100644
+--- a/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
++++ b/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
+@@ -304,7 +304,17 @@
+ 
+       int resId = mContext.getResources().getIdentifier(resourceConfig.getResourceName(), resType,
+           mContext.getPackageName());
+-      return (resId != 0);
++      if (resId == 0) {
++        return false;
++      }
++      try {
++        mContext.getResources().getValue(resId, new TypedValue(), /* resolveRefs= */ true);
++        return true;
++      } catch (NotFoundException e) {
++        Log.w(TAG, "Partner resource " + resourceConfig.getResourceName()
++            + " has no value for the current configuration");
++        return false;
++      }
+     }
+   }
+ 

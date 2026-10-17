@@ -1,0 +1,44 @@
+From 937eb9047ec2f88620f1f6a4d9e407f6c869d91a Mon Sep 17 00:00:00 2001
+From: Mathias Gluszczynski <admin@krazey.de>
+Date: Sun, 04 Oct 2026 21:05:23 +0200
+Subject: [PATCH] audiopolicy: Preserve HIDL routability for dynamic devices
+
+The Android 16 to 17 release configuration change enables:
+  com.android.media.audioserver.enable_strict_port_routing_checks
+  com.android.media.audio.check_route_in_get_audio_mix_port
+
+This exposes a missing HIDL fallback: the connection-time
+getAudioMixPort() query requires an existing stream handle on HIDL.
+It therefore fails for dynamic profiles before their streams open,
+leaving supported USB devices absent from the routable set and
+potentially breaking playback.
+
+Skip the query for AUDIO_PORT_HANDLE_NONE in
+addRoutableDeviceToProfiles(), matching IOProfile::routesToDevice().
+HIDL profiles lack HAL port IDs; support checks and routing
+validation for valid HAL port IDs remain unchanged.
+
+Test: Dynamic HIDL USB playback restored.
+Test: A/B playback retains the existing deep_buffer route, format
+      and buffer size on another HIDL device.
+      Both tests use the enabled flags listed above.
+Change-Id: I0a6aeafc3e8d665f963540604ef66748f8f5f20a
+---
+
+diff --git a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
+index e96584d..2b588ec 100644
+--- a/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
++++ b/services/audiopolicy/managerdefault/AudioPolicyManager.cpp
+@@ -196,9 +196,10 @@
+ 
+             bool isSupported = profile->supportsDevice(device);
+ 
+-            // When flag is disabled or there is not dynamic profiles,
+-            // routable should be equivalent to supported.
++            // For HIDL, static profiles or disabled routing checks,
++            // routable devices are equivalent to supported devices.
+             bool isRoutable =
++                profile->getHalId() == AUDIO_PORT_HANDLE_NONE ||
+                 !profile->hasDynamicAudioProfile() ||
+                 !com::android::media::audioserver::enable_strict_port_routing_checks() ||
+                 !com::android::media::audio::check_route_in_get_audio_mix_port() ||

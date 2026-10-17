@@ -1,0 +1,399 @@
+From 930a82c8624e7876ea8d55ba49786c21aedfb324 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Tue, 06 Oct 2026 08:19:30 +0530
+Subject: [PATCH] Pen: Cap refresh rate only while the pen is in use
+
+Cap the refresh rate while the pen reports itself active and ack its
+status once the panel runs at a supported rate. Fall back to capping
+on connection only until a GATT session is up; the pen notifies status
+changes only, so treat it as idle until it reports otherwise.
+
+Pens without the BLE pressure service still get a status-only session
+that leaves the touch HAL alone.
+
+Assisted-by: LLM
+Change-Id: Iac1fab92543e68f5559213bd125edcab23b78420
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/packages/Pen/src/org/lineageos/pen/PenGattSession.kt b/packages/Pen/src/org/lineageos/pen/PenGattSession.kt
+index fe1916c..27def05 100644
+--- a/packages/Pen/src/org/lineageos/pen/PenGattSession.kt
++++ b/packages/Pen/src/org/lineageos/pen/PenGattSession.kt
+@@ -22,10 +22,17 @@
+     private val handler: Handler,
+     private val onReady: (PenGattSession) -> Unit,
+     private val onClosed: (PenGattSession) -> Unit,
++    private val onPencilStatus: (PenGattSession, Boolean) -> Unit,
+ ) {
+     private var gatt: BluetoothGatt? = null
+     private var pressChar: BluetoothGattCharacteristic? = null
+     private var speedChar: BluetoothGattCharacteristic? = null
++    private var interfaceChar: BluetoothGattCharacteristic? = null
++
++    private val pendingCccs = ArrayDeque<BluetoothGattDescriptor>()
++
++    var isPencilActive: Boolean? = null
++        private set
+ 
+     private var isReady = false
+     private var isClosed = false
+@@ -57,19 +64,30 @@
+                 val service = gatt.getService(PenProtocol.SERVICE_UUID)
+                 val press = service?.getCharacteristic(PenProtocol.PRESS_CHAR_UUID)
+                 val ccc = press?.getDescriptor(PenProtocol.CCC_DESCRIPTOR_UUID)
+-                if (press == null || ccc == null) {
+-                    Log.d(TAG, "${device.address} has no pen press service")
++                if (press != null && ccc != null) {
++                    pressChar = press
++                    speedChar = service.getCharacteristic(PenProtocol.SPEED_CHAR_UUID)
++                    gatt.setCharacteristicNotification(press, true)
++                    pendingCccs.addLast(ccc)
++                }
++
++                val iface =
++                    gatt
++                        .getService(PenProtocol.INTERFACE_SERVICE_UUID)
++                        ?.getCharacteristic(PenProtocol.INTERFACE_CHAR_UUID)
++                val ifaceCcc = iface?.getDescriptor(PenProtocol.CCC_DESCRIPTOR_UUID)
++                if (iface != null && ifaceCcc != null) {
++                    interfaceChar = iface
++                    gatt.setCharacteristicNotification(iface, true)
++                    pendingCccs.addLast(ifaceCcc)
++                }
++
++                if (pendingCccs.isEmpty()) {
++                    Log.d(TAG, "${device.address} has no pen services")
+                     close()
+                     return
+                 }
+-                pressChar = press
+-                speedChar = service.getCharacteristic(PenProtocol.SPEED_CHAR_UUID)
+-
+-                gatt.setCharacteristicNotification(press, true)
+-                val ret =
+-                    gatt.writeDescriptor(ccc, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+-                if (ret != BluetoothStatusCodes.SUCCESS) {
+-                    Log.e(TAG, "Failed to enable pen press notifications: $ret")
++                if (!writeNextCcc(gatt)) {
+                     close()
+                 }
+             }
+@@ -80,8 +98,21 @@
+                 status: Int,
+             ) {
+                 if (status != BluetoothGatt.GATT_SUCCESS) {
+-                    Log.e(TAG, "CCC write failed: $status")
+-                    close()
++                    if (
++                        descriptor.characteristic.uuid != PenProtocol.INTERFACE_CHAR_UUID ||
++                            pressChar == null
++                    ) {
++                        Log.e(TAG, "CCC write failed: $status")
++                        close()
++                        return
++                    }
++                    Log.w(TAG, "Pencil status notifications unavailable: $status")
++                    interfaceChar = null
++                }
++                if (pendingCccs.isNotEmpty()) {
++                    if (!writeNextCcc(gatt)) {
++                        close()
++                    }
+                     return
+                 }
+                 if (!gatt.requestMtu(PenProtocol.MTU)) {
+@@ -100,6 +131,14 @@
+                 characteristic: BluetoothGattCharacteristic,
+                 value: ByteArray,
+             ) {
++                if (characteristic.uuid == PenProtocol.INTERFACE_CHAR_UUID) {
++                    PenProtocol.parsePencilStatus(value)?.let {
++                        Log.d(TAG, "Pencil ${if (it) "active" else "idle"}")
++                        isPencilActive = it
++                        onPencilStatus(this@PenGattSession, it)
++                    }
++                    return
++                }
+                 if (characteristic.uuid != PenProtocol.PRESS_CHAR_UUID) {
+                     return
+                 }
+@@ -159,6 +198,15 @@
+         }
+     }
+ 
++    fun sendPencilStatusAck(isActive: Boolean) {
++        handler.post {
++            if (!isReady) {
++                return@post
++            }
++            interfaceChar?.let { enqueueWrite(it, PenProtocol.pencilStatusAck(isActive)) }
++        }
++    }
++
+     fun close() {
+         if (isClosed) {
+             return
+@@ -166,12 +214,15 @@
+         isClosed = true
+         if (isReady) {
+             isReady = false
+-            touchHal.writeBtInfo(PenProtocol.PRESSURE_CLEAR)
+-            touchHal.writeNode(PenProtocol.NODE_PENCIL_CONNECTED, "0")
+-            touchHal.unregisterCallback()
++            if (pressChar != null) {
++                touchHal.writeBtInfo(PenProtocol.PRESSURE_CLEAR)
++                touchHal.writeNode(PenProtocol.NODE_PENCIL_CONNECTED, "0")
++                touchHal.unregisterCallback()
++            }
+             Log.i(TAG, "Pen ${device.address} disconnected")
+         }
+         pendingWrites.clear()
++        pendingCccs.clear()
+         gatt?.close()
+         gatt = null
+         onClosed(this)
+@@ -183,13 +234,25 @@
+         }
+         isReady = true
+         pressPacketCount = 0
+-        touchHal.registerCallback()
+-        touchHal.writeNode(PenProtocol.NODE_PENCIL_CONNECTED, "0")
+-        touchHal.writeNode(PenProtocol.NODE_PENCIL_CONNECTED, "1")
++        if (pressChar != null) {
++            touchHal.registerCallback()
++            touchHal.writeNode(PenProtocol.NODE_PENCIL_CONNECTED, "0")
++            touchHal.writeNode(PenProtocol.NODE_PENCIL_CONNECTED, "1")
++        }
+         Log.i(TAG, "Pen ${device.address} ready")
+         onReady(this)
+     }
+ 
++    private fun writeNextCcc(gatt: BluetoothGatt): Boolean {
++        val ccc = pendingCccs.removeFirst()
++        val ret = gatt.writeDescriptor(ccc, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
++        if (ret != BluetoothStatusCodes.SUCCESS) {
++            Log.e(TAG, "Failed to enable notifications on ${ccc.characteristic.uuid}: $ret")
++            return false
++        }
++        return true
++    }
++
+     private fun enqueueWrite(characteristic: BluetoothGattCharacteristic, value: ByteArray) {
+         pendingWrites.addLast(characteristic to value)
+         drainWrites()
+diff --git a/packages/Pen/src/org/lineageos/pen/PenProtocol.kt b/packages/Pen/src/org/lineageos/pen/PenProtocol.kt
+index 39897b7..e660b9a 100644
+--- a/packages/Pen/src/org/lineageos/pen/PenProtocol.kt
++++ b/packages/Pen/src/org/lineageos/pen/PenProtocol.kt
+@@ -13,6 +13,9 @@
+     val SPEED_CHAR_UUID = UUID.fromString("0783b03e-8535-b5a0-7140-a304d2495cbc")
+     val CCC_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+ 
++    val INTERFACE_SERVICE_UUID = UUID.fromString("18092dbc-2a69-11ec-8d3d-0242ac130003")
++    val INTERFACE_CHAR_UUID = UUID.fromString("18093046-2a69-11ec-8d3d-0242ac130003")
++
+     const val MTU = 100
+ 
+     const val NODE_PENCIL_CONNECTED = 32
+@@ -24,6 +27,24 @@
+     const val KEEP_ALIVE_INTERVAL = 5
+     val KEEP_ALIVE = "aa020000".hexToByteArray()
+ 
++    private val PENCIL_STATUS = byteArrayOf(0x2C, 0x90.toByte(), 0x01, 0x01)
++
++    fun parsePencilStatus(value: ByteArray): Boolean? {
++        if (
++            value.size <= PENCIL_STATUS.size ||
++                !value.copyOf(PENCIL_STATUS.size).contentEquals(PENCIL_STATUS)
++        ) {
++            return null
++        }
++        return when (value[PENCIL_STATUS.size]) {
++            0x00.toByte() -> false
++            0x01.toByte() -> true
++            else -> null
++        }
++    }
++
++    fun pencilStatusAck(isActive: Boolean) = PENCIL_STATUS + (if (isActive) 0x01 else 0x00).toByte()
++
+     fun isPressurePacket(value: ByteArray) =
+         value.size >= 4 && value[2] == 0x01.toByte() && value[3] == 0x02.toByte()
+ 
+diff --git a/packages/Pen/src/org/lineageos/pen/PenRelay.kt b/packages/Pen/src/org/lineageos/pen/PenRelay.kt
+index 960fd66..25a3e53 100644
+--- a/packages/Pen/src/org/lineageos/pen/PenRelay.kt
++++ b/packages/Pen/src/org/lineageos/pen/PenRelay.kt
+@@ -18,7 +18,10 @@
+ import android.os.HandlerThread
+ import android.os.Process
+ 
+-class PenRelay(private val context: Context) {
++class PenRelay(
++    private val context: Context,
++    private val onPencilStatusChanged: (Boolean?) -> Unit,
++) {
+     private val bluetoothManager by lazy { context.getSystemService(BluetoothManager::class.java) }
+ 
+     private val thread = HandlerThread(TAG, Process.THREAD_PRIORITY_URGENT_DISPLAY)
+@@ -81,6 +84,10 @@
+         thread.quitSafely()
+     }
+ 
++    fun sendPencilStatusAck(isActive: Boolean) {
++        session?.sendPencilStatusAck(isActive)
++    }
++
+     // GATT callbacks stop once Bluetooth goes down, so sessions must be dropped explicitly
+     private fun closeAll() {
+         probing.values.toList().forEach { it.close() }
+@@ -95,7 +102,14 @@
+             return
+         }
+         val newSession =
+-            PenGattSession(device, touchHal, handler, ::onSessionReady, ::onSessionClosed)
++            PenGattSession(
++                device,
++                touchHal,
++                handler,
++                ::onSessionReady,
++                ::onSessionClosed,
++                ::onPencilStatus,
++            )
+         probing[device.address] = newSession
+         newSession.open()
+     }
+@@ -104,12 +118,20 @@
+         probing.remove(ready.device.address)
+         session?.takeIf { it !== ready }?.close()
+         session = ready
++        onPencilStatusChanged(ready.isPencilActive ?: false)
+     }
+ 
+     private fun onSessionClosed(closed: PenGattSession) {
+         probing.remove(closed.device.address)
+         if (session === closed) {
+             session = null
++            onPencilStatusChanged(null)
++        }
++    }
++
++    private fun onPencilStatus(from: PenGattSession, isActive: Boolean) {
++        if (session === from) {
++            onPencilStatusChanged(isActive)
+         }
+     }
+ 
+diff --git a/packages/Pen/src/org/lineageos/pen/PenService.kt b/packages/Pen/src/org/lineageos/pen/PenService.kt
+index c41c96e..2a9120b 100644
+--- a/packages/Pen/src/org/lineageos/pen/PenService.kt
++++ b/packages/Pen/src/org/lineageos/pen/PenService.kt
+@@ -35,11 +35,35 @@
+     }
+ 
+     private val penRelay by lazy {
+-        if (resources.getBoolean(R.bool.config_penPressureRelay)) PenRelay(this) else null
++        if (resources.getBoolean(R.bool.config_penPressureRelay)) {
++            PenRelay(this) { isActive -> handler.post { onPencilStatusChanged(isActive) } }
++        } else {
++            null
++        }
+     }
+ 
+     private val handler by lazy { Handler(mainLooper) }
+ 
++    private var pencilStatus: Boolean? = null
++    private var isActiveAckSent = false
++
++    private val displayListener =
++        object : DisplayManager.DisplayListener {
++            override fun onDisplayAdded(displayId: Int) {
++                // Do nothing
++            }
++
++            override fun onDisplayRemoved(displayId: Int) {
++                // Do nothing
++            }
++
++            override fun onDisplayChanged(displayId: Int) {
++                if (displayId == Display.DEFAULT_DISPLAY) {
++                    ackActivePencilIfNeeded()
++                }
++            }
++        }
++
+     private val observer =
+         object : UEventObserver() {
+             private val lock = Any()
+@@ -92,7 +116,14 @@
+ 
+         observer.startObserving("DEVPATH=/devices/virtual/oplus_wireless/pencil")
+ 
+-        penRelay?.start()
++        penRelay?.let {
++            displayManager.registerDisplayListener(
++                displayListener,
++                handler,
++                DisplayManager.EVENT_TYPE_DISPLAY_REFRESH_RATE,
++            )
++            it.start()
++        }
+     }
+ 
+     override fun onDestroy() {
+@@ -105,7 +136,36 @@
+ 
+         observer.stopObserving()
+ 
+-        penRelay?.stop()
++        penRelay?.let {
++            displayManager.unregisterDisplayListener(displayListener)
++            it.stop()
++        }
++    }
++
++    private fun onPencilStatusChanged(isActive: Boolean?) {
++        if (pencilStatus != isActive) {
++            pencilStatus = isActive
++            updateRefreshRateCap()
++        }
++        isActiveAckSent = false
++        when (isActive) {
++            true -> ackActivePencilIfNeeded()
++            false -> penRelay?.sendPencilStatusAck(false)
++            null -> {}
++        }
++    }
++
++    private fun ackActivePencilIfNeeded() {
++        if (pencilStatus != true || isActiveAckSent) {
++            return
++        }
++        val rate = displayManager.getDisplay(Display.DEFAULT_DISPLAY)?.refreshRate ?: return
++        val maxRate = penSupportedRefreshRate ?: Float.POSITIVE_INFINITY
++        if (rate > maxRate + REFRESH_RATE_TOLERANCE) {
++            return
++        }
++        isActiveAckSent = true
++        penRelay?.sendPencilStatusAck(true)
+     }
+ 
+     private fun bondBtDevice(pencilAddr: String) {
+@@ -170,7 +230,7 @@
+ 
+         displayManager.requestMaxRefreshRate(
+             Display.DEFAULT_DISPLAY,
+-            if (isPenConnected) maxRefreshRate else 0f,
++            if (pencilStatus ?: isPenConnected) maxRefreshRate else 0f,
+         )
+     }
+ 
+@@ -220,5 +280,7 @@
+ 
+         private const val NOTIFICATION_CHANNEL_ID = "OplusPen"
+         private const val NOTIFICATION_ID = 1000
++
++        private const val REFRESH_RATE_TOLERANCE = 0.5f
+     }
+ }

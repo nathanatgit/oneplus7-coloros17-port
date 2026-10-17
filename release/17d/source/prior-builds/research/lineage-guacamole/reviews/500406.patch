@@ -1,0 +1,46 @@
+From 14a63265fbcdfcf40bbc5a0c12965a5f28940230 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Sat, 20 Jun 2026 05:07:03 +0530
+Subject: [PATCH] Update default M3E value to true
+
+Change-Id: Idc818b0becaf654d2361392963caef2cc272ce96
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java b/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
+index 46578c1..0219d2a 100644
+--- a/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
++++ b/partnerconfig/java/com/google/android/setupcompat/partnerconfig/PartnerConfigHelper.java
+@@ -1376,12 +1376,12 @@
+                       /* arg= */ null,
+                       /* extras= */ null);
+         } catch (IllegalArgumentException | SecurityException exception) {
+-          Log.w(TAG, "isGlifExpressiveEnabled status is unknown; return as false.");
++          Log.w(TAG, "isGlifExpressiveEnabled status is unknown; return as true.");
+         }
+       }
+       Bundle resultBundle = applyGlifExpressiveBundle;
+       if (resultBundle != null && !resultBundle.isEmpty()) {
+-        return resultBundle.getBoolean(IS_GLIF_EXPRESSIVE_ENABLED, false);
++        return true;
+       }
+     }
+     if (context.getTheme() != null) {
+@@ -1389,7 +1389,7 @@
+           context
+               .getTheme()
+               .obtainStyledAttributes(new int[] {R.attr.sucGlifExpressiveStyleEnabled});
+-      boolean isGlifExpressiveStyleEnabled = a.getBoolean(0, false);
++      boolean isGlifExpressiveStyleEnabled = a.getBoolean(0, true);
+       a.recycle();
+       Log.i(TAG, "isGlifExpressiveStyleEnabled is " + isGlifExpressiveStyleEnabled);
+       if (isGlifExpressiveStyleEnabled) {
+@@ -1397,7 +1397,7 @@
+       }
+     }
+ 
+-    return false;
++    return true;
+   }
+ 
+   /** Returns true if the SetupWizard supports delightful style during setup flow. */

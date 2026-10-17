@@ -1,0 +1,43 @@
+From 183e59578606687d66096cbce86cb50c27f4e9d7 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sat, 10 Oct 2026 17:24:22 +0300
+Subject: [PATCH] gen_build_prop: Allow overriding system build description
+
+As seen on Pixel CP3A.260905.009, system partition can have a different
+build description than the other partitions.
+
+Change-Id: Iebef0bc8bf55ddc3b93c321541624ed1fe258a75
+---
+
+diff --git a/scripts/gen_build_prop.py b/scripts/gen_build_prop.py
+index e7ef590..639967e 100644
+--- a/scripts/gen_build_prop.py
++++ b/scripts/gen_build_prop.py
+@@ -118,6 +118,7 @@
+   config["BuildDesc"] = f"{config['DeviceProduct']}-{config['BuildVariant']} " \
+                         f"{config['Platform_version_name']} {config['BuildId']} " \
+                         f"{config['BuildNumber']} {config['BuildVersionTags']}"
++  config["BuildSystemDesc"] = config["BuildDesc"]
+ 
+   config["PlatformPreviewSdkFingerprint"] = args.platform_preview_sdk_fingerprint_file.read().strip()
+ 
+@@ -211,6 +212,7 @@
+ 
+   config = args.config
+   build_flags = config["BuildFlags"]
++  partition = args.partition
+ 
+   print(f"ro.build.fingerprint?={config['BuildFingerprint']}")
+ 
+@@ -272,7 +274,10 @@
+   print(f"ro.wifi.channels={' '.join(config['ProductDefaultWifiChannels'])}")
+ 
+   print(f"# Do not try to parse description or thumbprint")
+-  print(f"ro.build.description?={config['BuildDesc']}")
++  if partition == "system":
++    print(f"ro.build.description?={config['BuildSystemDesc']}")
++  else:
++    print(f"ro.build.description?={config['BuildDesc']}")
+   if "BuildThumbprint" in config:
+     print(f"ro.build.thumbprint={config['BuildThumbprint']}")
+ 

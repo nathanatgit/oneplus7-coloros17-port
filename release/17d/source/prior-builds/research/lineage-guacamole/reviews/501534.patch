@@ -1,0 +1,222 @@
+From c138d405ef0fcb86c25ee582098a9f21ad86358e Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Wed, 16 Sep 2026 23:28:35 +0530
+Subject: [PATCH] SUW: Convert LocationSettings to GlifRecyclerLayout
+
+Based on the design provided by Asher Simonds.
+
+Co-authored-by: Asher S <dayanhammer@gmail.com>
+Change-Id: Ib815db46c3400f13a4a9e6a57bddd21861ac4ee9
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt b/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
+index 1a6b70d..4453ca2 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/privacy/LocationSettingsActivity.kt
+@@ -11,40 +11,39 @@
+ import android.os.Process
+ import android.os.UserManager
+ import android.provider.Settings
+-import android.view.View
+-import android.widget.CheckBox
++import com.google.android.setupdesign.GlifRecyclerLayout
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++import com.google.android.setupdesign.items.SwitchItem
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.base.BaseSetupWizardActivity
+ 
+ class LocationSettingsActivity : BaseSetupWizardActivity() {
+ 
+-    private lateinit var locationAccess: CheckBox
+-    private lateinit var locationAgpsAccess: CheckBox
++    private val itemAdapter by lazy {
++        (glifLayout as GlifRecyclerLayout).adapter as RecyclerItemAdapter
++    }
+ 
+-    private lateinit var locationManager: LocationManager
+-    private lateinit var userManager: UserManager
++    private val locationAccess by lazy {
++        itemAdapter.findItemById(R.id.location_item) as SwitchItem
++    }
++    private val locationAgpsAccess by lazy {
++        itemAdapter.findItemById(R.id.location_agps_item) as SwitchItem
++    }
++
++    private val locationManager by lazy { getSystemService(LocationManager::class.java) }
++    private val userManager by lazy { getSystemService(UserManager::class.java) }
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+         setNextText(R.string.next)
++        glifLayout.setDescriptionText(getString(R.string.location_summary))
+ 
+-        locationAccess = findViewById(R.id.location_checkbox)
+-        locationAgpsAccess = findViewById(R.id.location_agps_checkbox)
+-        locationManager = getSystemService(LocationManager::class.java)
+-        userManager = getSystemService(UserManager::class.java)
++        locationAgpsAccess.isVisible = userManager.isMainUser
+ 
+-        val locationAccessView = findViewById<View>(R.id.location)
+-        locationAccessView.setOnClickListener {
+-            locationAccess.isChecked = !locationAccess.isChecked
+-        }
+-
+-        val locationAgpsAccessView = findViewById<View>(R.id.location_agps)
+-        if (userManager.isMainUser) {
+-            locationAgpsAccessView.setOnClickListener {
+-                locationAgpsAccess.isChecked = !locationAgpsAccess.isChecked
++        itemAdapter.setOnItemSelectedListener { item ->
++            if (item is SwitchItem) {
++                item.isChecked = !item.isChecked
+             }
+-        } else {
+-            locationAgpsAccessView.visibility = View.GONE
+         }
+     }
+ 
+diff --git a/app/src/main/res/layout/location_settings.xml b/app/src/main/res/layout/location_settings.xml
+index a9a8144..6d550e6 100644
+--- a/app/src/main/res/layout/location_settings.xml
++++ b/app/src/main/res/layout/location_settings.xml
+@@ -4,92 +4,9 @@
+      SPDX-FileCopyrightText: The LineageOS Project
+      SPDX-License-Identifier: Apache-2.0
+ -->
+-<com.google.android.setupdesign.GlifLayout
++<com.google.android.setupdesign.GlifRecyclerLayout
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:id="@+id/setup_wizard_layout"
+     android:layout_width="match_parent"
+-    android:layout_height="match_parent">
+-
+-    <LinearLayout
+-        android:orientation="vertical"
+-        android:layout_width="match_parent"
+-        android:layout_height="match_parent"
+-        style="@style/SudContentFrame">
+-
+-        <FrameLayout
+-            android:id="@+id/page"
+-            android:layout_width="match_parent"
+-            android:layout_height="0dp"
+-            android:layout_weight="1">
+-
+-            <ScrollView
+-                android:layout_width="match_parent"
+-                android:layout_height="match_parent"
+-                android:fillViewport="true">
+-
+-                <LinearLayout
+-                    android:orientation="vertical"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="match_parent">
+-
+-                    <LinearLayout
+-                        android:id="@+id/location"
+-                        android:orientation="horizontal"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:paddingLeft="@dimen/location_margin_left"
+-                        android:paddingRight="@dimen/content_margin_right"
+-                        android:background="?android:attr/selectableItemBackground"
+-                        android:clickable="true">
+-
+-
+-                        <CheckBox
+-                            android:id="@+id/location_checkbox"
+-                            android:layout_width="wrap_content"
+-                            android:layout_height="wrap_content"
+-                            android:duplicateParentState="true"
+-                            android:clickable="false"
+-                            style="@style/SudCheckBox.Multiline" />
+-
+-                        <TextView
+-                            android:id="@+id/location_summary"
+-                            android:layout_width="wrap_content"
+-                            android:layout_height="wrap_content"
+-                            android:text="@string/location_access_summary"
+-                            style="@style/SudCheckBox.Multiline" />
+-
+-                    </LinearLayout>
+-
+-                    <LinearLayout
+-                        android:id="@+id/location_agps"
+-                        android:orientation="horizontal"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="wrap_content"
+-                        android:paddingLeft="@dimen/location_margin_left"
+-                        android:paddingRight="@dimen/content_margin_right"
+-                        android:background="?android:attr/selectableItemBackground"
+-                        android:clickable="true">
+-
+-                        <CheckBox
+-                            android:id="@+id/location_agps_checkbox"
+-                            android:layout_width="wrap_content"
+-                            android:layout_height="wrap_content"
+-                            android:duplicateParentState="true"
+-                            android:clickable="false"
+-                            android:checked="true"
+-                            style="@style/SudCheckBox.Multiline" />
+-
+-                        <TextView
+-                            android:id="@+id/location_agps_summary"
+-                            android:layout_width="wrap_content"
+-                            android:layout_height="wrap_content"
+-                            android:text="@string/location_agps_access_summary"
+-                            style="@style/SudCheckBox.Multiline" />
+-                    </LinearLayout>
+-
+-                </LinearLayout>
+-            </ScrollView>
+-        </FrameLayout>
+-
+-    </LinearLayout>
+-</com.google.android.setupdesign.GlifLayout>
++    android:layout_height="match_parent"
++    android:entries="@xml/location_items" />
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 489f89e..6befdcb 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -58,8 +58,11 @@
+ 
+     <!-- Location page -->
+     <string name="setup_location">Location services</string>
+-    <string name="location_access_summary"><b>Allow apps that have asked your permission</b> to use your location information. This may include your current location and past locations.</string>
+-    <string name="location_agps_access_summary">When location is on, <b>download satellite assistance data from the internet</b>, which can greatly improve the GPS startup performance.</string>
++    <string name="location_summary">Choose how your device manages its location</string>
++    <string name="location_access_title">Use location</string>
++    <string name="location_agps_access_title">Enhanced location</string>
++    <string name="location_access_summary">Allow apps that have asked your permission to use your location information. This may include your current location and past locations.</string>
++    <string name="location_agps_access_summary">When location is on, download satellite assistance data from the internet, which can greatly improve the GPS startup performance.</string>
+ 
+     <!-- Recovery update page -->
+     <string name="update_recovery_title">Update Lineage Recovery</string>
+diff --git a/app/src/main/res/xml/location_items.xml b/app/src/main/res/xml/location_items.xml
+new file mode 100644
+index 0000000..d202eb2
+--- /dev/null
++++ b/app/src/main/res/xml/location_items.xml
+@@ -0,0 +1,21 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<ItemGroup xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <SwitchItem
++        android:id="@+id/location_item"
++        android:layout="@layout/setup_items_switch"
++        android:summary="@string/location_access_summary"
++        android:title="@string/location_access_title" />
++
++    <SwitchItem
++        android:id="@+id/location_agps_item"
++        android:checked="true"
++        android:layout="@layout/setup_items_switch"
++        android:summary="@string/location_agps_access_summary"
++        android:title="@string/location_agps_access_title" />
++
++</ItemGroup>

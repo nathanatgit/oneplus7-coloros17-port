@@ -1,0 +1,23 @@
+From de9609bc527995a2b8764b927495e37d91edd306 Mon Sep 17 00:00:00 2001
+From: Nolen Johnson <johnsonnolen@gmail.com>
+Date: Mon, 28 Sep 2026 23:43:41 -0400
+Subject: [PATCH] fixup! toolbox/modprobe: Add parallel option to load modules in parallel
+
+Change-Id: Ia6d2b04525cab06148f766debe819c3e23ab7151
+---
+
+diff --git a/toolbox/modprobe.cpp b/toolbox/modprobe.cpp
+index da252cb..41a89f9 100644
+--- a/toolbox/modprobe.cpp
++++ b/toolbox/modprobe.cpp
+@@ -306,7 +306,9 @@
+ 
+     Modprobe m(mod_dirs, modules_load_file.empty() ? "modules.load" : modules_load_file, blocklist);
+     if (mode == AddModulesMode && !modules_load_file.empty()) {
+-        bool retval = (parallel) ? m.LoadModulesParallel(std::thread::hardware_concurrency())
++        bool retval = (parallel) ? m.LoadModulesParallel(std::thread::hardware_concurrency(),
++                                                         Modprobe::LoadParallelMode::NORMAL,
++                                                         false)
+                                  : m.LoadListedModules(false);
+ 
+         if (!retval) {

@@ -1,0 +1,39 @@
+From bc8753f1d5fa18216c272aa4fc9bee1234178afc Mon Sep 17 00:00:00 2001
+From: danascape <danascape@gmail.com>
+Date: Fri, 31 Jul 2026 09:57:56 +0530
+Subject: [PATCH] SUW: Set upscale icon
+
+Change-Id: Iac342d695b9289d88bf6873eb64ddb22a577a353
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+index e45fdd1..ef7ba25 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+@@ -25,6 +25,7 @@
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+ import com.google.android.setupcompat.util.WizardManagerHelper
+ import com.google.android.setupdesign.GlifLayout
++import com.google.android.setupdesign.template.IconMixin
+ import com.google.android.setupdesign.transition.TransitionHelper
+ import com.google.android.setupdesign.util.ThemeHelper
+ import org.lineageos.setupwizard.LOGV
+@@ -228,6 +229,7 @@
+             getDrawable(iconResId)?.mutate()?.let {
+                 it.setTintList(Utils.getColorAccent(layout.context))
+                 layout.setIcon(it)
++                upscaleIcon(layout)
+             }
+         }
+     }
+@@ -235,6 +237,9 @@
+     protected val glifLayout: GlifLayout
+         get() = requireViewById(R.id.setup_wizard_layout)
+ 
++    private fun upscaleIcon(layout: GlifLayout) =
++        layout.getMixin(IconMixin::class.java)?.setUpscaleIcon(true)
++
+     protected open val layoutResId = -1
+ 
+     protected open val titleResId = -1

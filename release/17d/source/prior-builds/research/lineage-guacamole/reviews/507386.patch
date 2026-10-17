@@ -1,0 +1,21 @@
+From 73e37454cdac3892c961e554524ccc52b1bfcf00 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sun, 11 Oct 2026 09:59:46 +0200
+Subject: [PATCH] fixup! releasetools: Add os.path.exists() check to IsErofsImage()
+
+Change-Id: Ifdcc54ea80f38d3a68d683daa08c22bfc5921c46
+---
+
+diff --git a/tools/releasetools/sign_target_files_apks.py b/tools/releasetools/sign_target_files_apks.py
+index fdc3f68..32e3208 100755
+--- a/tools/releasetools/sign_target_files_apks.py
++++ b/tools/releasetools/sign_target_files_apks.py
+@@ -1740,7 +1740,7 @@
+     Checks if the given file is an EROFS image by verifying its magic number.
+     """
+ 
+-    if not os.path.exists(filepath):
++    if not os.path.exists(filename):
+       return False
+     if os.path.getsize(filename) < 4096:
+       return False

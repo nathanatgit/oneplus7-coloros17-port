@@ -1,0 +1,88 @@
+From eab39efbc08eb034b20bfa2a0e8dd598b220c1d0 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:38:51 +0300
+Subject: [PATCH] Merge tag 'LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0' into staging/lineage-24.0_merge-LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0
+
+LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0
+
+* tag 'LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0':
+  ipa: aidl: Fix file descriptor leak in clearHandles()
+  ipacm: Delete the default V6 remote driver rules
+
+Change-Id: I3cd29f12c89fd0f831e5da6472d72424c2fd568e
+---
+
+diff --git a/aidl/src/AIDL.cpp b/aidl/src/AIDL.cpp
+index 3d08c32..87ff3e5 100644
+--- a/aidl/src/AIDL.cpp
++++ b/aidl/src/AIDL.cpp
+@@ -27,9 +27,9 @@
+  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ /*
+- * ​​​​​Changes from Qualcomm Innovation Center are provided under the following license:
+- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+- * SPDX-License-Identifier: BSD-3-Clause-Clear
++Changes from Qualcomm Technologies, Inc. are provided under the following license:
++Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
++SPDX-License-Identifier: BSD-3-Clause-Clear
+  */
+ #ifndef DBG
+     #define DBG true
+@@ -200,8 +200,8 @@
+ 
+ void AIDL::clearHandles() {
+     ALOGI("clearHandles()");
+-    mHandle1.release();
+-    mHandle2.release();
++    mHandle1 = ndk::ScopedFileDescriptor();
++    mHandle2 = ndk::ScopedFileDescriptor();
+ } /* clearHandles */
+ 
+ bool AIDL::isInitialized() {
+diff --git a/ipacm/src/IPACM_Wan.cpp b/ipacm/src/IPACM_Wan.cpp
+index f93613a..c1828d7 100644
+--- a/ipacm/src/IPACM_Wan.cpp
++++ b/ipacm/src/IPACM_Wan.cpp
+@@ -62,7 +62,7 @@
+ */
+ /*
+  * ​​​​​Changes from Qualcomm Innovation Center are provided under the following license:
+- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+  * SPDX-License-Identifier: BSD-3-Clause-Clear
+  */
+ /*!
+@@ -168,6 +168,7 @@
+ 	header_partial_default_wan_v6 = false;
+ 	hdr_hdl_sta_v4 = 0;
+ 	hdr_hdl_sta_v6 = 0;
++	modem_ipv6_pdn_index = -1;
+ 	num_ipv6_dest_flt_rule = 0;
+ 	memset(ipv6_dest_flt_rule_hdl, 0, MAX_DEFAULT_v6_ROUTE_RULES*sizeof(uint32_t));
+ 	memset(ipv6_prefix, 0, sizeof(ipv6_prefix));
+@@ -6555,7 +6556,7 @@
+ 	}
+ 	else if(ip_type == IPA_IP_v6)
+ 	{
+-	    if (num_dft_rt_v6 > 1)
++		if (modem_ipv6_pdn_index != -1)
+ 			num_ipv6_modem_pdn--;
+ 		IPACMDBG_H("Now the number of ipv6 modem pdn is %d.\n", num_ipv6_modem_pdn);
+ 		/* only when default gw goes down we post WAN_DOWN event*/
+@@ -6665,7 +6666,7 @@
+ 	{
+ 		num_ipv4_modem_pdn--;
+ 		IPACMDBG_H("Now the number of ipv4 modem pdn is %d.\n", num_ipv4_modem_pdn);
+-	    if (num_dft_rt_v6 > 1)
++		if (modem_ipv6_pdn_index != -1)
+ 			num_ipv6_modem_pdn--;
+ 		IPACMDBG_H("Now the number of ipv6 modem pdn is %d.\n", num_ipv6_modem_pdn);
+ 		/* only when default gw goes down we post WAN_DOWN event*/
+@@ -9462,4 +9463,4 @@
+ 		}
+ 	}
+ 	return IPACM_FAILURE;
+-}
+\ No newline at end of file
++}

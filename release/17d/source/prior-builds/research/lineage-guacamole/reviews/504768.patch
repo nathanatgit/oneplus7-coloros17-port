@@ -1,0 +1,40 @@
+From 7b153f470247ff8f918b5bc8f0108af2f2220a8d Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 01:35:57 +0530
+Subject: [PATCH] SUW: Workaround for ATV Finish LineageOS logo
+
+Change-Id: Ideaa311dcc1bfd0f1184839178e0a6a809b4cb70
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+index b4b2022..9ad75ca 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+@@ -54,6 +54,7 @@
+     private var logoPunched = false
+ 
+     private var edgeToEdgeWallpaperBackgroundTheme: Resources.Theme? = null
++    private val revealWallpaper by lazy { !SetupWizardUtils.hasLeanback(this) }
+ 
+     private enum class FinishState {
+         NONE,
+@@ -190,7 +191,7 @@
+     }
+ 
+     private fun punchLogoOutOfBackground() {
+-        if (logoPunched) {
++        if (logoPunched || !revealWallpaper) {
+             return
+         }
+         brandLogo.setLayerType(
+@@ -331,6 +332,9 @@
+ 
+     override fun getTheme(): Resources.Theme {
+         val theme = super.getTheme()
++        if (!revealWallpaper) {
++            return theme
++        }
+         return edgeToEdgeWallpaperBackgroundTheme
+             ?: theme
+                 .apply { applyStyle(R.style.EdgeToEdgeWallpaperBackground, true) }

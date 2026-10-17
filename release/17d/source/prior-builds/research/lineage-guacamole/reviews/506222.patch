@@ -1,0 +1,21 @@
+From 8c8ed26a400df0f6c32ab2471e1bd5542de621da Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 12:31:23 +0200
+Subject: [PATCH] config: Replace Gallery2 with Canvas
+
+Change-Id: I80576338068ce74e144f6de269c90ba01913ad5c
+---
+
+diff --git a/config/common_mobile.mk b/config/common_mobile.mk
+index 2c7e496..f8e991e 100644
+--- a/config/common_mobile.mk
++++ b/config/common_mobile.mk
+@@ -17,7 +17,7 @@
+ PRODUCT_PACKAGES += \
+     AvatarPicker \
+     Backgrounds \
+-    Gallery2 \
++    Canvas \
+     Glimpse \
+     LatinIME
+ 

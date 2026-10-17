@@ -1,0 +1,54 @@
+From 6cdc375a23b72398dbe0358832c9305d31b802aa Mon Sep 17 00:00:00 2001
+From: Benjamin Wiegand <benjamin.lineageos@wiegand.pw>
+Date: Sat, 10 Oct 2026 11:37:58 -0700
+Subject: [PATCH] systemui: Add config_fullWidthNotificationsInLandscape
+
+This is a replacement for config_skinnyNotifsInLandscape for devices
+with small landscape displays (like smith/zeekr outer displays).
+
+Change-Id: I0d3815d44465ac2ecaec7f8d67d9917c7cb19162
+---
+
+diff --git a/packages/SystemUI/res/values/lineage_config.xml b/packages/SystemUI/res/values/lineage_config.xml
+index ccb178f..39a6955 100644
+--- a/packages/SystemUI/res/values/lineage_config.xml
++++ b/packages/SystemUI/res/values/lineage_config.xml
+@@ -76,4 +76,7 @@
+ 
+     <!-- Whether to play turbulence noise after clicking the play button -->
+     <bool name="config_turbulenceNoise">true</bool>
++
++    <!-- Whether to force notifications to take up the full width of the screen in landscape -->
++    <bool name="config_fullWidthNotificationsInLandscape">false</bool>
+ </resources>
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout.java b/packages/SystemUI/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout.java
+index d80394a..8ebc4fa 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayout.java
+@@ -508,6 +508,7 @@
+     private final Rect mBackgroundAnimationRect = new Rect();
+     private final ArrayList<BiConsumer<Float, Float>> mExpandedHeightListeners = new ArrayList<>();
+     private int mHeadsUpInset;
++    private boolean mFullWidthNotificationsInLandscape = false;
+ 
+     /**
+      * The position of the scroll boundary relative to this view. This is where the notifications
+@@ -990,6 +991,8 @@
+         mHeadsUpInset = mStatusBarHeight + res.getDimensionPixelSize(
+                 R.dimen.heads_up_status_bar_padding);
+         mQsScrollBoundaryPosition = SystemBarUtils.getQuickQsOffsetHeight(mContext);
++        mFullWidthNotificationsInLandscape = res.getBoolean(
++                R.bool.config_fullWidthNotificationsInLandscape);
+     }
+ 
+     void updateSidePadding(int viewWidth) {
+@@ -1020,7 +1023,8 @@
+             }
+ 
+             if (orientation == Configuration.ORIENTATION_PORTRAIT
+-                    || mShouldUseSplitNotificationShade) {
++                    || mShouldUseSplitNotificationShade
++                    || mFullWidthNotificationsInLandscape) {
+                 return;
+             }
+ 

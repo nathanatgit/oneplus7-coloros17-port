@@ -1,0 +1,209 @@
+From 96a1e3795eda785012ab6a5ad3001c0d899f8df0 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Mon, 05 Oct 2026 10:42:47 +0200
+Subject: [PATCH] interfaces: Fix OplusTouch V2 methods
+
+Match stock: reorder OplusTouchInfo fields, make
+touchWriteNodeFileOneWay() oneway, return OplusTouchStatus from
+touchNotifyClient() and add IOplusTouchEventCallback registration.
+
+Assisted-by: LLM
+Change-Id: I1cbebe5b526bc6f77c4c0bcd229172d37b65cc80
+---
+
+diff --git a/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index 386939d..f7eab27 100644
+--- a/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -6,6 +6,7 @@
+ 
+ package vendor.oplus.hardware.touch;
+ 
++import vendor.oplus.hardware.touch.IOplusTouchEventCallback;
+ import vendor.oplus.hardware.touch.OplusTouchInfo;
+ import vendor.oplus.hardware.touch.OplusTouchStatus;
+ 
+@@ -16,6 +17,8 @@
+     String touchReadNodeFile(int deviceId, int nodeFlag);
+     int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+     int touchWriteBtInfo(int deviceId, int nodeFlag, String info);
+-    void touchWriteNodeFileOneWay(int deviceId, int nodeFlag, String info);
+-    int touchNotifyClient(int clientFlag, in OplusTouchInfo info);
++    oneway void touchWriteNodeFileOneWay(int deviceId, int nodeFlag, String info);
++    OplusTouchStatus touchNotifyClient(int clientFlag, in OplusTouchInfo info);
++    OplusTouchStatus registerEventCallback(IOplusTouchEventCallback callback);
++    OplusTouchStatus unregisterEventCallback(IOplusTouchEventCallback callback);
+ }
+diff --git a/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl b/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl
+new file mode 100644
+index 0000000..95e6139
+--- /dev/null
++++ b/interfaces/aidl/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl
+@@ -0,0 +1,15 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package vendor.oplus.hardware.touch;
++
++import vendor.oplus.hardware.touch.OplusTouchInfo;
++
++@VintfStability
++interface IOplusTouchEventCallback {
++    void touchSendCommand(int clientFlag, in OplusTouchInfo info);
++    oneway void touchSendCommandOneWay(int clientFlag, in OplusTouchInfo info);
++}
+diff --git a/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchInfo.aidl b/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
+index 2a3e3d0..12c4920 100644
+--- a/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
++++ b/interfaces/aidl/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
+@@ -8,9 +8,9 @@
+ 
+ @VintfStability
+ parcelable OplusTouchInfo {
+-    String info;
+     long time;
+     int deviceId;
+     int nodeFlag;
+     int data;
++    String info;
+ }
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash
+index dbfaa8a..11e2781 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/.hash
+@@ -1 +1 @@
+-bea5eef71e698c294c6a1ae9732f6ef73bfd04b2
++015ebfff0763989a367c9255d9742b3cdf124082
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index b66027e..f533a0a 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -29,6 +29,8 @@
+   String touchReadNodeFile(int deviceId, int nodeFlag);
+   int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+   int touchWriteBtInfo(int deviceId, int nodeFlag, String info);
+-  void touchWriteNodeFileOneWay(int deviceId, int nodeFlag, String info);
+-  int touchNotifyClient(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++  oneway void touchWriteNodeFileOneWay(int deviceId, int nodeFlag, String info);
++  vendor.oplus.hardware.touch.OplusTouchStatus touchNotifyClient(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++  vendor.oplus.hardware.touch.OplusTouchStatus registerEventCallback(vendor.oplus.hardware.touch.IOplusTouchEventCallback callback);
++  vendor.oplus.hardware.touch.OplusTouchStatus unregisterEventCallback(vendor.oplus.hardware.touch.IOplusTouchEventCallback callback);
+ }
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl
+new file mode 100644
+index 0000000..277c3ea
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.touch;
++@VintfStability
++interface IOplusTouchEventCallback {
++  void touchSendCommand(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++  oneway void touchSendCommandOneWay(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchInfo.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
+index 31a3c3f..91d7b69 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/2/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
+@@ -24,9 +24,9 @@
+ package vendor.oplus.hardware.touch;
+ @VintfStability
+ parcelable OplusTouchInfo {
+-  String info;
+   long time;
+   int deviceId;
+   int nodeFlag;
+   int data;
++  String info;
+ }
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl
+index 16497b1..64c390b 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouch.aidl
+@@ -29,6 +29,8 @@
+   String touchReadNodeFile(int deviceId, int nodeFlag);
+   int touchWriteNodeFile(int deviceId, int nodeFlag, String info);
+   int touchWriteBtInfo(int deviceId, int nodeFlag, String info);
+-  void touchWriteNodeFileOneWay(int deviceId, int nodeFlag, String info);
+-  int touchNotifyClient(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++  oneway void touchWriteNodeFileOneWay(int deviceId, int nodeFlag, String info);
++  vendor.oplus.hardware.touch.OplusTouchStatus touchNotifyClient(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++  vendor.oplus.hardware.touch.OplusTouchStatus registerEventCallback(vendor.oplus.hardware.touch.IOplusTouchEventCallback callback);
++  vendor.oplus.hardware.touch.OplusTouchStatus unregisterEventCallback(vendor.oplus.hardware.touch.IOplusTouchEventCallback callback);
+ }
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl
+new file mode 100644
+index 0000000..277c3ea
+--- /dev/null
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/IOplusTouchEventCallback.aidl
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ */
++///////////////////////////////////////////////////////////////////////////////
++// THIS FILE IS IMMUTABLE. DO NOT EDIT IN ANY CASE.                          //
++///////////////////////////////////////////////////////////////////////////////
++
++// This file is a snapshot of an AIDL file. Do not edit it manually. There are
++// two cases:
++// 1). this is a frozen version file - do not edit this in any case.
++// 2). this is a 'current' file. If you make a backwards compatible change to
++//     the interface (from the latest frozen version), the build system will
++//     prompt you to update this file with `m <name>-update-api`.
++//
++// You must not make a backward incompatible change to any AIDL file built
++// with the aidl_interface module type with versions property set. The module
++// type is used to build AIDL files in a way that they can be used across
++// independently updatable components of the system. If a device is shipped
++// with such a backward incompatible change, it has a high risk of breaking
++// later when a module using the interface is updated, e.g., Mainline modules.
++
++package vendor.oplus.hardware.touch;
++@VintfStability
++interface IOplusTouchEventCallback {
++  void touchSendCommand(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++  oneway void touchSendCommandOneWay(int clientFlag, in vendor.oplus.hardware.touch.OplusTouchInfo info);
++}
+diff --git a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchInfo.aidl b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
+index 31a3c3f..91d7b69 100644
+--- a/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
++++ b/interfaces/aidl_api/vendor.oplus.hardware.touch/current/vendor/oplus/hardware/touch/OplusTouchInfo.aidl
+@@ -24,9 +24,9 @@
+ package vendor.oplus.hardware.touch;
+ @VintfStability
+ parcelable OplusTouchInfo {
+-  String info;
+   long time;
+   int deviceId;
+   int nodeFlag;
+   int data;
++  String info;
+ }

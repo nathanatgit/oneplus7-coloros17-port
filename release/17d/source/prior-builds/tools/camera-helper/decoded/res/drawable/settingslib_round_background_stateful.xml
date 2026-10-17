@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_single="true" android:drawable="@drawable/settingslib_round_background" />
+    <item android:state_first="true" android:drawable="@drawable/settingslib_round_background_top" />
+    <item android:state_middle="true" android:drawable="@drawable/settingslib_round_background_center" />
+    <item android:state_last="true" android:drawable="@drawable/settingslib_round_background_bottom" />
+    <item>
+        <ripple android:color="?android:colorControlHighlight">
+            <item android:id="@android:id/mask">
+                <color android:color="@android:color/white" />
+            </item>
+        </ripple>
+    </item>
+</selector>

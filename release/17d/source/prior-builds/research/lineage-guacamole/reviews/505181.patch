@@ -1,0 +1,125 @@
+From 12d52a79027f16b413b43c04fd1c1fe6403bd2bb Mon Sep 17 00:00:00 2001
+From: NullCode1337 <contact.nullcode@proton.me>
+Date: Wed, 19 Aug 2026 10:14:54 +0600
+Subject: [PATCH] sepolicy: qti: Add rules for TMS eSE and NFC
+
+Change-Id: Ic5cacea14c7d56b11ad81f5397b174dfa8085016
+---
+
+diff --git a/sepolicy/qti/vendor/file.te b/sepolicy/qti/vendor/file.te
+index 9c86842..60d9b0d 100644
+--- a/sepolicy/qti/vendor/file.te
++++ b/sepolicy/qti/vendor/file.te
+@@ -38,6 +38,10 @@
+ # Multimedia feedback
+ type vendor_proc_mm_fb, fs_type, proc_type;
+ 
++# NFC
++type hal_tms_nfc_chip_name, fs_type, proc_type;
++type proc_tms_logger, fs_type, proc_type;
++
+ # NVRAM
+ type nvram_socket, file_type;
+ 
+diff --git a/sepolicy/qti/vendor/file_contexts b/sepolicy/qti/vendor/file_contexts
+index c454520..d6d4b81 100644
+--- a/sepolicy/qti/vendor/file_contexts
++++ b/sepolicy/qti/vendor/file_contexts
+@@ -88,7 +88,9 @@
+ /dev/mdmfeature                         u:object_r:oplus_mdmfeature_device:s0
+ 
+ # NFC
+-/dev/pn553    u:object_r:nfc_device:s0
++/(odm|vendor/odm)/bin/hw/android\.hardware\.nfc-service-tms    u:object_r:hal_nfc_default_exec:s0
++/dev/pn553                                                     u:object_r:nfc_device:s0
++/dev/tms_nfc                                                   u:object_r:nfc_device:s0
+ 
+ # NVRAM
+ /(odm|vendor/odm)/bin/nvram_qmi                               u:object_r:nvram_exec:s0
+@@ -159,7 +161,7 @@
+ 
+ # Secure Element
+ /(odm|vendor/odm)/bin/hw/android\.hardware\.secure_element@1\.2-service-goodix    u:object_r:hal_secure_element_default_exec:s0
+-/(odm|vendor/odm)/bin/hw/android\.hardware\.secure_element-service\.qti           u:object_r:hal_secure_element_default_exec:s0
++/(odm|vendor/odm)/bin/hw/android\.hardware\.secure_element-service(\.qti|-tms)    u:object_r:hal_secure_element_default_exec:s0
+ /(odm|vendor/odm)/bin/hw/vendor\.qti\.secure_element@1\.2-service                 u:object_r:hal_secure_element_default_exec:s0
+ 
+ # Sensors
+diff --git a/sepolicy/qti/vendor/genfs_contexts b/sepolicy/qti/vendor/genfs_contexts
+index 9b9cbd5..b8c475b 100644
+--- a/sepolicy/qti/vendor/genfs_contexts
++++ b/sepolicy/qti/vendor/genfs_contexts
+@@ -53,6 +53,10 @@
+ # Multimedia feedback
+ genfscon proc /mm_fb    u:object_r:vendor_proc_mm_fb:s0
+ 
++# NFC
++genfscon proc /oplus_nfc/chipset    u:object_r:hal_tms_nfc_chip_name:s0
++genfscon proc /tmsdev/logger        u:object_r:proc_tms_logger:s0
++
+ # Performance
+ genfscon proc /oplus_scheduler                                     u:object_r:vendor_proc_oplus_scheduler:s0
+ genfscon proc /task_info/task_sched_info/d_backtrace               u:object_r:vendor_proc_oplus_ctp:s0
+diff --git a/sepolicy/qti/vendor/hal_nfc_default.te b/sepolicy/qti/vendor/hal_nfc_default.te
+index d35cc0b..ac9a3c8 100644
+--- a/sepolicy/qti/vendor/hal_nfc_default.te
++++ b/sepolicy/qti/vendor/hal_nfc_default.te
+@@ -1,3 +1,11 @@
+ allow hal_nfc_default vendor_nfc_vendor_data_file:dir search;
+ 
+ set_prop(hal_nfc_default, vendor_nfc_nq_prop)
++
++add_service(hal_nfc_default, hal_nfc_service)
++add_service(hal_nfc_default, hal_oplus_nfc_tms_service)
++
++binder_call(hal_nfc_default, servicemanager)
++
++allow hal_nfc_default hal_tms_nfc_chip_name:file r_file_perms;
++allow hal_nfc_default proc_tms_logger:file r_file_perms;
+diff --git a/sepolicy/qti/vendor/service.te b/sepolicy/qti/vendor/service.te
+index 3ad38cd..00752da 100644
+--- a/sepolicy/qti/vendor/service.te
++++ b/sepolicy/qti/vendor/service.te
+@@ -34,6 +34,9 @@
+ # ImsRtp
+ type hal_imsrtp_service, hal_service_type, service_manager_type;
+ 
++# NFC (TMS)
++type hal_oplus_nfc_tms_service, hal_service_type, service_manager_type;
++
+ # OLC
+ type hal_oplus_olc_aidl_service, hal_service_type, service_manager_type;
+ 
+diff --git a/sepolicy/qti/vendor/service_contexts b/sepolicy/qti/vendor/service_contexts
+index f1c9e3a..8a005fa 100644
+--- a/sepolicy/qti/vendor/service_contexts
++++ b/sepolicy/qti/vendor/service_contexts
+@@ -34,6 +34,9 @@
+ # Fingerprint Pay
+ vendor.oplus.hardware.biometrics.fingerprintpay.IFingerprintPay/default    u:object_r:hal_fingerprintpay_service:s0
+ 
++# NFC (TMS)
++vendor.tms.tmsnfc_aidl.ITmsNfc/default    u:object_r:hal_oplus_nfc_tms_service:s0
++
+ # OLC
+ vendor.oplus.hardware.olc2.IOplusLogCore/default    u:object_r:hal_oplus_olc_aidl_service:s0
+ 
+@@ -59,6 +62,7 @@
+ 
+ # Secure Element
+ vendor.oplus.hardware.secure_element.ISecureElement/default    u:object_r:hal_secure_element_extend_service:s0
++vendor.tms.tmsese_aidl.ITmsEse/default                         u:object_r:hal_secure_element_extend_service:s0
+ 
+ # Sensors
+ vendor.oplus.hardware.oplusSensor.ISensorFeature/default    u:object_r:hal_oplus_sensor_aidl_service:s0
+diff --git a/sepolicy/qti/vendor/tee.te b/sepolicy/qti/vendor/tee.te
+index 888aad2..70c31ff 100644
+--- a/sepolicy/qti/vendor/tee.te
++++ b/sepolicy/qti/vendor/tee.te
+@@ -5,3 +5,6 @@
+ 
+ allow tee fingerprint_vendor_data_file:dir create_dir_perms;
+ allow tee fingerprint_vendor_data_file:file create_file_perms;
++
++allow tee vendor_data_file:dir r_dir_perms;
++allow tee vendor_data_file:file r_file_perms;

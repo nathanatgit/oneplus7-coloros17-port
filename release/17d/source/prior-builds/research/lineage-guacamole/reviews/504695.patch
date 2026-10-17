@@ -1,0 +1,162 @@
+From d3472270b1ee07443f8c4f2eca9d818e42feaf73 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Thu, 24 Sep 2026 13:33:14 +0530
+Subject: [PATCH] SUW: Account for 3-button navBar and ATV in FinishScreen
+
+Change-Id: I38c861d9c0cadda7b2791c6ad44b93b45dc4c2ce
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+index 360c1a9..b4b2022 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+@@ -17,12 +17,16 @@
+ import android.os.Handler
+ import android.os.Looper
+ import android.util.Log
++import android.util.TypedValue
++import android.view.KeyEvent
+ import android.view.MotionEvent
+ import android.view.VelocityTracker
+ import android.view.View
+ import android.view.ViewGroup.MarginLayoutParams
++import android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY
+ import android.view.animation.AccelerateDecelerateInterpolator
+ import android.widget.ImageView
++import android.widget.TextView
+ import androidx.annotation.DimenRes
+ import androidx.core.view.ViewCompat
+ import androidx.core.view.WindowInsetsCompat
+@@ -38,8 +42,8 @@
+ 
+     private lateinit var rootView: View
+     private lateinit var swipeHint: View
+-    private lateinit var swipeHintIcon: View
+-    private lateinit var swipeHintText: View
++    private lateinit var swipeHintIcon: ImageView
++    private lateinit var swipeHintText: TextView
+     private lateinit var background: RevealHoleView
+     private lateinit var brandLogo: ImageView
+ 
+@@ -86,6 +90,8 @@
+ 
+         rootView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+ 
++        applyHomeAffordance()
++
+         // Ensure the main layout (not including the background view) does not get obscured by bars.
+         ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, windowInsets ->
+             val linearLayout = findViewById<View>(R.id.linear_layout)
+@@ -109,6 +115,45 @@
+         }
+     }
+ 
++    private fun applyHomeAffordance() {
++        if (usesGestureNavigation()) {
++            return
++        }
++        val hintResId =
++            if (SetupWizardUtils.hasLeanback(this)) {
++                R.string.press_center_to_go_home
++            } else {
++                R.string.tap_home_to_go_home
++            }
++        swipeHintIcon.setImageResource(R.drawable.ic_nav_home)
++        swipeHintText.setText(hintResId)
++
++        swipeHintIcon.contentDescription = getText(hintResId)
++        borderlessRippleResId()?.let { swipeHintIcon.setBackgroundResource(it) }
++        swipeHintIcon.setOnClickListener {
++            if (finishState != FinishState.NONE) {
++                return@setOnClickListener
++            }
++            punchLogoOutOfBackground()
++            commitReveal()
++        }
++    }
++
++    private fun borderlessRippleResId(): Int? {
++        val value = TypedValue()
++        val resolved =
++            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, value, true)
++        return value.resourceId.takeIf { resolved && it != 0 }
++    }
++
++    private fun usesGestureNavigation(): Boolean {
++        if (SetupWizardUtils.hasLeanback(this)) {
++            return false
++        }
++        val selected = SetupWizardApp.settingsBundle.getString(NAVIGATION_OPTION_KEY) ?: return true
++        return selected == NAV_BAR_MODE_GESTURAL_OVERLAY
++    }
++
+     override fun onDestroy() {
+         super.onDestroy()
+         velocityTracker?.recycle()
+@@ -155,6 +200,18 @@
+         logoPunched = true
+     }
+ 
++    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
++        if (finishState != FinishState.NONE || event.repeatCount != 0) {
++            return super.onKeyDown(keyCode, event)
++        }
++        if (keyCode !in COMMIT_KEY_CODES) {
++            return super.onKeyDown(keyCode, event)
++        }
++        punchLogoOutOfBackground()
++        commitReveal()
++        return true
++    }
++
+     override fun onTouchEvent(event: MotionEvent): Boolean {
+         if (finishState != FinishState.NONE) {
+             return super.onTouchEvent(event)
+@@ -336,6 +393,14 @@
+         private const val ANIM_DURATION_MS = 900L
+         private const val SPRING_BACK_DURATION_MS = 200L
+ 
++        private val COMMIT_KEY_CODES =
++            setOf(
++                KeyEvent.KEYCODE_DPAD_CENTER,
++                KeyEvent.KEYCODE_ENTER,
++                KeyEvent.KEYCODE_NUMPAD_ENTER,
++                KeyEvent.KEYCODE_BUTTON_A,
++            )
++
+         private const val REVEAL_OVERSHOOT = 1.35f
+ 
+         private const val LOGO_START_SCALE = 1.2f
+diff --git a/app/src/main/res/drawable/ic_nav_home.xml b/app/src/main/res/drawable/ic_nav_home.xml
+new file mode 100644
+index 0000000..c5b3a72
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_nav_home.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="61dp"
++    android:height="55dp"
++    android:viewportWidth="61"
++    android:viewportHeight="55">
++
++    <path
++        android:fillColor="@color/finish_swipe_arrow"
++        android:pathData="M30.5,0a27.5,27.5 0 1,0 0,55a27.5,27.5 0 1,0 0,-55Z" />
++</vector>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index a12e21e..2fd2d2a 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -108,4 +108,6 @@
+ 
+     <!-- Finish Screen -->
+     <string name="swipe_up_to_go_home">Swipe up to go home</string>
++    <string name="tap_home_to_go_home">Tap the center nav icon to go home</string>
++    <string name="press_center_to_go_home">Press the center button to go home</string>
+ </resources>

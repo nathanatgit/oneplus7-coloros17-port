@@ -1,0 +1,40 @@
+From 344238d75fd609edf1eb750fe0925b2369c5d320 Mon Sep 17 00:00:00 2001
+From: Ajender Reddy <quic_ajender@quicinc.com>
+Date: Wed, 13 Nov 2024 18:15:00 +0530
+Subject: [PATCH] effect: Update the Effects version
+
+update
+android.hardware.audio.effect-V2-ndk
+to
+android.hardware.audio.effect-V3-ndk
+
+Thereby, update the device manifest
+for 'IEffect/factory' service from
+version 2 to 3.
+
+Change-Id: Ibb43015ea5de9bf42169d6d9a96ae1d8c75f1465
+---
+
+diff --git a/configs/audio-generic-modules.mk b/configs/audio-generic-modules.mk
+index f5d47cc..7dccd6c 100644
+--- a/configs/audio-generic-modules.mk
++++ b/configs/audio-generic-modules.mk
+@@ -1,4 +1,4 @@
+-LATEST_ANDROID_HARDWARE_AUDIO_EFFECT := android.hardware.audio.effect-V2-ndk
++LATEST_ANDROID_HARDWARE_AUDIO_EFFECT := android.hardware.audio.effect-V3-ndk
+ LATEST_ANDROID_HARDWARE_COMMON := android.hardware.common-V2-ndk
+ LATEST_ANDROID_MEDIA_ADUIO_COMMON_TYPES := android.media.audio.common.types-V3-ndk
+ LATEST_ANDROID_HARDWARE_COMMON_FMQ := android.hardware.common.fmq-V1-ndk
+diff --git a/hal/effects/audioeffectservice_qti.xml b/hal/effects/audioeffectservice_qti.xml
+index c3cfe7e..4b5124f 100644
+--- a/hal/effects/audioeffectservice_qti.xml
++++ b/hal/effects/audioeffectservice_qti.xml
+@@ -5,7 +5,7 @@
+ <manifest version="1.0" type="device">
+   <hal format="aidl">
+     <name>android.hardware.audio.effect</name>
+-    <version>2</version>
++    <version>3</version>
+     <fqname>IFactory/default</fqname>
+   </hal>
+ </manifest>

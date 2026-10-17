@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:theme="?expressivePreferenceCategoryTheme" android:layout_width="match_parent" android:layout_height="wrap_content" android:filterTouchesWhenObscured="false" style="?expressivePreferenceCategoryRootLayoutStyle"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <include layout="@layout/settingslib_expressive_preference_icon_frame" />
+    <RelativeLayout style="?expressivePreferenceCategoryRelativeLayoutStyle">
+        <TextView android:id="@android:id/title" style="?expressivePreferenceCategoryTitleStyle" />
+        <TextView android:id="@android:id/summary" style="?expressivePreferenceCategorySummaryStyle" />
+    </RelativeLayout>
+</LinearLayout>

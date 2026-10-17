@@ -1,0 +1,26 @@
+From c149051682aea4ca9be1bbd7f832462ffb18334a Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Mon, 28 Sep 2026 04:36:07 +0300
+Subject: [PATCH] Revert "init: Don't enable ADB by default on userdebug builds"
+
+This reverts commit 0a9ca60c6bac2dee42d266d87bbe0258807b5c28.
+
+Reason for revert: The check is wrong, and it's also not needed anymore
+
+Test: boot, adb is not enabled by default.
+Change-Id: If8887f148db01a5581221900e97711ffa5f2f51c
+---
+
+diff --git a/init/property_service.cpp b/init/property_service.cpp
+index 3c7a0f7..89adf33 100644
+--- a/init/property_service.cpp
++++ b/init/property_service.cpp
+@@ -853,7 +853,7 @@
+ // on runtime.
+ static void update_sys_usb_config() {
+     // emulators don't have USB, they enable adb another way.
+-    const bool add_adb_func = android::base::GetBoolProperty("ro.adb.secure", false) &&
++    const bool add_adb_func = android::base::GetBoolProperty("ro.debuggable", false) &&
+                               android::base::GetBoolProperty("ro.adb.has_usb", true);
+ 
+     std::string config = android::base::GetProperty("persist.sys.usb.config", "");

@@ -1,0 +1,181 @@
+From e8ce5ed448bd8e8c145382f7059ef7eba116662b Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 11:12:41 +0530
+Subject: [PATCH] LatinIME: Build split keyboard from phone layouts
+
+Tablet layouts carry extra keys such as delete on the top row and a wide
+enter key on the home row, which leave the split halves uneven and force
+small keys. Like Gboard, build the split keyboard from the phone
+layouts instead, so each half gets the usual five letters per row.
+
+Assisted-by: LLM
+Change-Id: Ia46acc729be1f6ccd512e65ef95b7baf2c455ee0
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+index 0ea241b..43ac6b3 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+@@ -42,6 +42,7 @@
+ import com.android.inputmethod.latin.define.DebugFlags;
+ import com.android.inputmethod.latin.utils.InputTypeUtils;
+ import com.android.inputmethod.latin.utils.ScriptUtils;
++import com.android.inputmethod.latin.utils.SplitKeyboardUtils;
+ import com.android.inputmethod.latin.utils.SubtypeLocaleUtils;
+ import com.android.inputmethod.latin.utils.XmlParseUtils;
+ 
+@@ -73,6 +74,7 @@
+     private static final String KEYBOARD_LAYOUT_SET_RESOURCE_PREFIX = "keyboard_layout_set_";
+ 
+     private final Context mContext;
++    private Context mSplitLayoutContext;
+     @Nonnull
+     private final Params mParams;
+ 
+@@ -212,6 +214,13 @@
+         }
+     }
+ 
++    private Context getSplitLayoutContext() {
++        if (mSplitLayoutContext == null) {
++            mSplitLayoutContext = SplitKeyboardUtils.createPhoneLayoutContext(mContext);
++        }
++        return mSplitLayoutContext;
++    }
++
+     @Nonnull
+     private Keyboard getKeyboard(final ElementParams elementParams, final KeyboardId id) {
+         final SoftReference<Keyboard> ref = sKeyboardCache.get(id);
+@@ -223,8 +232,9 @@
+             return cachedKeyboard;
+         }
+ 
++        final Context context = id.mIsSplitLayout ? getSplitLayoutContext() : mContext;
+         final KeyboardBuilder<KeyboardParams> builder =
+-                new KeyboardBuilder<>(mContext, new KeyboardParams(sUniqueKeysCache));
++                new KeyboardBuilder<>(context, new KeyboardParams(sUniqueKeysCache));
+         sUniqueKeysCache.setEnabled(id.isAlphabetKeyboard());
+         builder.setAllowRedundantMoreKes(elementParams.mAllowRedundantMoreKeys);
+         final int keyboardXmlId = elementParams.mKeyboardXmlId;
+diff --git a/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java b/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
+index bec6ddb..5138355 100644
+--- a/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
++++ b/java/src/com/android/inputmethod/latin/utils/SplitKeyboardUtils.java
+@@ -5,9 +5,11 @@
+ 
+ package com.android.inputmethod.latin.utils;
+ 
++import android.content.Context;
+ import android.content.SharedPreferences;
+ import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.view.ContextThemeWrapper;
+ 
+ import com.android.inputmethod.latin.common.Constants;
+ import com.android.inputmethod.latin.define.ProductionFlags;
+@@ -17,6 +19,7 @@
+ 
+ public final class SplitKeyboardUtils {
+     public static final float SPLIT_KEYBOARD_HEIGHT_RATIO = 0.78f;
++    private static final int PHONE_SMALLEST_SCREEN_WIDTH_DP = 360;
+ 
+     private SplitKeyboardUtils() {
+     }
+@@ -27,6 +30,17 @@
+                 && res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+     }
+ 
++    @Nonnull
++    public static Context createPhoneLayoutContext(@Nonnull final Context context) {
++        final Configuration config =
++                new Configuration(context.getResources().getConfiguration());
++        config.smallestScreenWidthDp = PHONE_SMALLEST_SCREEN_WIDTH_DP;
++        final Context configContext = context.createConfigurationContext(config);
++        final Resources.Theme theme = configContext.getResources().newTheme();
++        theme.setTo(context.getTheme());
++        return new ContextThemeWrapper(configContext, theme);
++    }
++
+     public static int getSplitKeyboardHeight(final int keyboardHeight) {
+         return Math.round(keyboardHeight * SPLIT_KEYBOARD_HEIGHT_RATIO);
+     }
+diff --git a/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java b/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
+index 7079492..f08d614 100644
+--- a/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
++++ b/tests/src/com/android/inputmethod/keyboard/SplitKeyboardLayoutTests.java
+@@ -5,12 +5,14 @@
+ 
+ package com.android.inputmethod.keyboard;
+ 
++import android.content.Context;
+ import android.view.inputmethod.EditorInfo;
+ import android.view.inputmethod.InputMethodSubtype;
+ 
+ import androidx.test.filters.SmallTest;
+ 
+ import com.android.inputmethod.latin.common.Constants;
++import com.android.inputmethod.latin.utils.SplitKeyboardUtils;
+ 
+ import java.util.ArrayList;
+ import java.util.Collections;
+@@ -36,6 +38,19 @@
+         return layoutSet.getKeyboard(elementId);
+     }
+ 
++    private Keyboard buildUnsplitPhoneLayout(final Locale locale, final String layout,
++            final int elementId) {
++        final Context tabletContext = getContext();
++        KeyboardLayoutSet.onKeyboardThemeChanged();
++        setContext(SplitKeyboardUtils.createPhoneLayoutContext(tabletContext));
++        try {
++            return build(locale, layout, elementId, false);
++        } finally {
++            setContext(tabletContext);
++            KeyboardLayoutSet.onKeyboardThemeChanged();
++        }
++    }
++
+     private static List<String> describeKeys(final Keyboard keyboard) {
+         final ArrayList<String> keys = new ArrayList<>();
+         for (final Key key : keyboard.getSortedKeys()) {
+@@ -47,7 +62,7 @@
+     }
+ 
+     private void assertSplit(final Locale locale, final String layout, final int elementId) {
+-        final Keyboard plain = build(locale, layout, elementId, false);
++        final Keyboard plain = buildUnsplitPhoneLayout(locale, layout, elementId);
+         final Keyboard split = build(locale, layout, elementId, true);
+         final String name = layout + "/" + elementId;
+         assertTrue(name + " id", split.mId.mIsSplitLayout);
+@@ -129,6 +144,30 @@
+         assertInnerEdgesAligned(Locale.US, "qwerty", KeyboardId.ELEMENT_SYMBOLS);
+     }
+ 
++    private static int rowOf(final Keyboard keyboard, final int code) {
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.getCode() == code) return key.getY();
++        }
++        throw new AssertionError("no key " + code);
++    }
++
++    public void testSplitUsesPhoneLayout() {
++        final Keyboard keyboard = build(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET, true);
++        final int topRow = rowOf(keyboard, 'q');
++        final int homeRow = rowOf(keyboard, 'a');
++        int topRowLetters = 0;
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.getY() == topRow) {
++                assertTrue("top row " + key, key.getCode() != Constants.CODE_DELETE);
++                if (Character.isLetter(key.getCode())) topRowLetters++;
++            }
++            if (key.getY() == homeRow) {
++                assertTrue("home row " + key, key.getCode() != Constants.CODE_ENTER);
++            }
++        }
++        assertEquals(10, topRowLetters);
++    }
++
+     public void testQwertySplit() {
+         assertSplit(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET);
+         assertSplit(Locale.US, "qwerty", KeyboardId.ELEMENT_ALPHABET_MANUAL_SHIFTED);

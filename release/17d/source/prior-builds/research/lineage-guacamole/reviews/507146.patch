@@ -1,0 +1,32 @@
+From 3d0fc00672872111ce2f8ff6647898f93b88094e Mon Sep 17 00:00:00 2001
+From: Oliver Scott <olivercscott@gmail.com>
+Date: Tue, 09 Apr 2024 15:34:42 -0400
+Subject: [PATCH] Do not add SUW extras to EUICC intent
+
+Issue: calyxos#2268
+Change-Id: Ifbc9e6cf2c4b5be2002a24e06872110761b72bc9
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt b/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
+index e92c3c4..c5b6272 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/network/SimMissingActivity.kt
+@@ -13,6 +13,8 @@
+ import androidx.activity.result.ActivityResult
+ import com.google.android.material.dialog.MaterialAlertDialogBuilder
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
++import com.google.android.setupcompat.util.WizardManagerHelper
++import com.google.android.setupdesign.util.ThemeHelper
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.base.SubBaseActivity
+ import org.lineageos.setupwizard.util.SetupWizardUtils
+@@ -83,6 +85,9 @@
+             .show()
+     }
+ 
++    override fun decorateIntent(intent: Intent): Intent =
++        intent.putExtra(WizardManagerHelper.EXTRA_THEME, ThemeHelper.THEME_GLIF_EXPRESSIVE)
++
+     override val layoutResId = R.layout.sim_missing_page
+ 
+     override val titleResId = R.string.setup_sim_missing

@@ -1,0 +1,28 @@
+From f164c8b068f868897f3cd92c94c77be370ada2d4 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Wed, 07 Oct 2026 10:46:11 +0200
+Subject: [PATCH] SystemUI: Draw UDFPS illumination dot with hardware canvas
+
+Software canvas buffers aren't pre-rotated, so in landscape the
+pressed layer needs a ROT_90 transform, falls back to client
+composition and never gets the FOD z-order bits, causing the
+fingerprint HAL to time out waiting for the UI to be ready.
+
+Fixes: https://gitlab.com/LineageOS/issues/android/-/work_items/7434
+Assisted-by: LLM
+Change-Id: I6f4e6c7b7e6c0f0ae3a0dfaf4e65025ddd2974e1
+---
+
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsSurfaceView.java b/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsSurfaceView.java
+index dae25f7..6055b17 100644
+--- a/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsSurfaceView.java
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsSurfaceView.java
+@@ -140,7 +140,7 @@
+         }
+         Canvas canvas = null;
+         try {
+-            canvas = mHolder.lockCanvas();
++            canvas = mHolder.lockHardwareCanvas();
+             mUdfpsIconPressed.setBounds(
+                     Math.round(sensorRect.left),
+                     Math.round(sensorRect.top),

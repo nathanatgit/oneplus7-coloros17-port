@@ -1,0 +1,23 @@
+From b3f84d9a4bd58ac103ac01e20929afe724b82ef9 Mon Sep 17 00:00:00 2001
+From: chandu078 <chandudyavanapelli03@gmail.com>
+Date: Sun, 27 Sep 2026 12:15:04 +0000
+Subject: [PATCH] sepolicy: qti: Allow oplus touch HAL to set thread priority
+
+avc: denied { sys_nice } for comm="touchDaemon" capability=23 scontext=u:r:hal_oplus_touch_aidl:s0 tcontext=u:r:hal_oplus_touch_aidl:s0 tclass=capability permissive=0
+
+Change-Id: I12fb9be2ec144013fdb1ebc64770b98f99eab28a
+---
+
+diff --git a/sepolicy/qti/vendor/hal_oplus_touch_aidl.te b/sepolicy/qti/vendor/hal_oplus_touch_aidl.te
+index 1abfccf..2b607bc 100644
+--- a/sepolicy/qti/vendor/hal_oplus_touch_aidl.te
++++ b/sepolicy/qti/vendor/hal_oplus_touch_aidl.te
+@@ -17,6 +17,8 @@
+ 
+ unix_socket_send(hal_oplus_touch_aidl, oplus_touchdaemon, oplus_touchdaemon)
+ 
++allow hal_oplus_touch_aidl self:capability sys_nice;
++
+ allow hal_oplus_touch_aidl input_device:dir search;
+ allow hal_oplus_touch_aidl input_device:chr_file rw_file_perms;
+ 

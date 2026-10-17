@@ -1,0 +1,43 @@
+From bbe8b1f7ba9bb4fe11f2fd8f8359358fcf93de5d Mon Sep 17 00:00:00 2001
+From: Oliver Scott <olivercscott@gmail.com>
+Date: Thu, 06 Jan 2022 12:26:48 +0100
+Subject: [PATCH] Switch network setup and missing SIM activity order
+
+Missing SIM activity offers to setup an eSIM which can only be done if
+connected to a network. Therefore, show network setup activity first
+and, if a SIM is still missing after it, show the missing SIM activity.
+If connected to a network, show the option to setup an eSIM. Otherwise,
+hide it.
+
+Change-Id: Ieaa51940d916489212a35ee95cc81a33c6cabe9a
+---
+
+diff --git a/app/src/main/res/raw/lineage_wizard_script.xml b/app/src/main/res/raw/lineage_wizard_script.xml
+index 87a9102..f2694fa 100644
+--- a/app/src/main/res/raw/lineage_wizard_script.xml
++++ b/app/src/main/res/raw/lineage_wizard_script.xml
+@@ -25,18 +25,18 @@
+     <WizardAction
+         id="locale"
+         wizard:uri="intent:#Intent;action=org.lineageos.setupwizard.LINEAGE_LOCALE;end">
+-        <result wizard:action="sim_missing" />
+-    </WizardAction>
+-
+-    <WizardAction
+-        id="sim_missing"
+-        wizard:uri="intent:#Intent;action=org.lineageos.setupwizard.LINEAGE_SIM_MISSING;end">
+         <result wizard:action="network_setup" />
+     </WizardAction>
+ 
+     <WizardAction
+         id="network_setup"
+         wizard:uri="intent:#Intent;action=org.lineageos.setupwizard.LINEAGE_NETWORK_SETUP;end">
++        <result wizard:action="sim_missing" />
++    </WizardAction>
++
++    <WizardAction
++        id="sim_missing"
++        wizard:uri="intent:#Intent;action=org.lineageos.setupwizard.LINEAGE_SIM_MISSING;end">
+         <result wizard:action="datetime" />
+     </WizardAction>
+ 

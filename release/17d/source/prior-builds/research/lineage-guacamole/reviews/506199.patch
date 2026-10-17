@@ -1,0 +1,35 @@
+From 7c3f32fe89c52b4176fd288ba5bb4f907809c202 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Sat, 03 Oct 2026 23:08:23 -0400
+Subject: [PATCH] fastbootd: Start binder threadpool
+
+If this isn't set up, there is a 1s polling delay for HALs (e.g. boot,
+health, etc). Add the binder threadpool for fastbootd so it gets the
+HAL as soon as it is registered.
+
+Test: fastbootd ready at 2s instead of 3s
+Change-Id: I07b1811a5c0e74ebfeb9e68d9e3a9a5c59be1db4
+---
+
+diff --git a/fastboot/device/main.cpp b/fastboot/device/main.cpp
+index 08c9358..2e8de8a 100644
+--- a/fastboot/device/main.cpp
++++ b/fastboot/device/main.cpp
+@@ -18,6 +18,7 @@
+ 
+ #include <android-base/logging.h>
+ #include <android-base/stringprintf.h>
++#include <android/binder_process.h>
+ #include <sparse/sparse.h>
+ 
+ #include "fastboot_device.h"
+@@ -36,6 +37,9 @@
+ int main(int /*argc*/, char* argv[]) {
+     android::base::InitLogging(argv, &android::base::KernelLogger);
+ 
++    ABinderProcess_setThreadPoolMaxThreadCount(0);
++    ABinderProcess_startThreadPool();
++
+     sparse_print_verbose = LogSparseVerboseMessage;
+ 
+     while (true) {

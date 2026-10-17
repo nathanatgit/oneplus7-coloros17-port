@@ -1,0 +1,22 @@
+From 830328bc0c21ac0cc1b478c60282a81c8be810c1 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Wed, 07 Oct 2026 22:27:19 +0100
+Subject: [PATCH] sepolicy: qti: Label persist.bluetooth.a2dp_aac_abr.enable prop
+
+Change-Id: I59ae9967acf44cd4fa36167810c6b7841523ba8b
+---
+
+diff --git a/sepolicy/qti/private/property_contexts b/sepolicy/qti/private/property_contexts
+index 6521705..6a6e1c8 100644
+--- a/sepolicy/qti/private/property_contexts
++++ b/sepolicy/qti/private/property_contexts
+@@ -7,7 +7,8 @@
+ persist.sys.oplus.autotest.    u:object_r:exported_system_prop:s0
+ 
+ # Bluetooth
+-persist.sys.bt.a2dp.pendingtime    u:object_r:exported_system_prop:s0
++persist.bluetooth.a2dp_aac_abr.enable    u:object_r:exported_bluetooth_prop:s0
++persist.sys.bt.a2dp.pendingtime          u:object_r:exported_system_prop:s0
+ 
+ # Camera
+ cam.algo.                        u:object_r:exported_system_prop:s0

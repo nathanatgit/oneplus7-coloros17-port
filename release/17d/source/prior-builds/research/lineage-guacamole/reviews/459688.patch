@@ -1,0 +1,1709 @@
+From acee837e9b7c5e4e56276d750b3a9e632728c6a7 Mon Sep 17 00:00:00 2001
+From: dianlujitao <dianlujitao@lineageos.org>
+Date: Mon, 10 Nov 2025 22:24:09 +0000
+Subject: [PATCH] sensors: Move different modules to subdir
+
+Change-Id: I4ba4d32564f3f9cc2f9050307ae2006877f63936
+---
+
+diff --git a/sensors/Android.bp b/sensors/Android.bp
+deleted file mode 100644
+index e00c352..0000000
+--- a/sensors/Android.bp
++++ /dev/null
+@@ -1,41 +0,0 @@
+-//
+-// Copyright (C) 2022-2024 The LineageOS Project
+-//
+-// SPDX-License-Identifier: Apache-2.0
+-//
+-
+-cc_library_shared {
+-    name: "sensors.oplus",
+-    defaults: ["hidl_defaults"],
+-    srcs: [
+-        "Sensor.cpp",
+-        "SensorsSubHal.cpp",
+-    ],
+-    shared_libs: [
+-        "android.hardware.sensors@1.0",
+-        "android.hardware.sensors@2.0",
+-        "android.hardware.sensors@2.0-ScopedWakelock",
+-        "android.hardware.sensors@2.1",
+-        "libcutils",
+-        "libfmq",
+-        "libhardware",
+-        "libhidlbase",
+-        "liblog",
+-        "libpower",
+-        "libutils",
+-    ],
+-    static_libs: [
+-        "android.hardware.sensors@1.0-convert",
+-        "android.hardware.sensors@2.X-multihal",
+-    ],
+-    cflags: [
+-        "-DLOG_TAG=\"sensors.oplus\"",
+-    ],
+-    vendor: true,
+-}
+-
+-cc_library_shared {
+-    name: "sensors.ssc_custom_flag",
+-    srcs: ["SensorsSscCustomFlag.cpp"],
+-    vendor: true,
+-}
+diff --git a/sensors/Sensor.cpp b/sensors/Sensor.cpp
+deleted file mode 100644
+index 053672c..0000000
+--- a/sensors/Sensor.cpp
++++ /dev/null
+@@ -1,346 +0,0 @@
+-/*
+- * Copyright (C) 2019 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#include "Sensor.h"
+-
+-#include <hardware/sensors.h>
+-#include <log/log.h>
+-#include <utils/SystemClock.h>
+-
+-#include <cmath>
+-
+-namespace {
+-
+-static bool readFpState(int fd, int& screenX, int& screenY) {
+-    char buffer[512];
+-    int state = 0;
+-    int rc;
+-
+-    rc = lseek(fd, 0, SEEK_SET);
+-    if (rc) {
+-        ALOGE("failed to seek: %d", rc);
+-        return false;
+-    }
+-
+-    rc = read(fd, &buffer, sizeof(buffer));
+-    if (rc < 0) {
+-        ALOGE("failed to read state: %d", rc);
+-        return false;
+-    }
+-
+-    rc = sscanf(buffer, "%d,%d,%d", &screenX, &screenY, &state);
+-    if (rc < 0) {
+-        ALOGE("failed to parse fp state: %d", rc);
+-        return false;
+-    }
+-
+-    return state > 0;
+-}
+-
+-}  // anonymous namespace
+-
+-namespace android {
+-namespace hardware {
+-namespace sensors {
+-namespace V2_1 {
+-namespace subhal {
+-namespace implementation {
+-
+-using ::android::hardware::sensors::V1_0::MetaDataEventType;
+-using ::android::hardware::sensors::V1_0::OperationMode;
+-using ::android::hardware::sensors::V1_0::Result;
+-using ::android::hardware::sensors::V1_0::SensorFlagBits;
+-using ::android::hardware::sensors::V1_0::SensorStatus;
+-using ::android::hardware::sensors::V2_1::Event;
+-using ::android::hardware::sensors::V2_1::SensorInfo;
+-using ::android::hardware::sensors::V2_1::SensorType;
+-
+-Sensor::Sensor(int32_t sensorHandle, ISensorsEventCallback* callback)
+-    : mIsEnabled(false),
+-      mSamplingPeriodNs(0),
+-      mLastSampleTimeNs(0),
+-      mCallback(callback),
+-      mMode(OperationMode::NORMAL) {
+-    mSensorInfo.sensorHandle = sensorHandle;
+-    mSensorInfo.vendor = "The LineageOS Project";
+-    mSensorInfo.version = 1;
+-    constexpr float kDefaultMaxDelayUs = 1000 * 1000;
+-    mSensorInfo.maxDelay = kDefaultMaxDelayUs;
+-    mSensorInfo.fifoReservedEventCount = 0;
+-    mSensorInfo.fifoMaxEventCount = 0;
+-    mSensorInfo.requiredPermission = "";
+-    mSensorInfo.flags = 0;
+-    mRunThread = std::thread(startThread, this);
+-}
+-
+-Sensor::~Sensor() {
+-    // Ensure that lock is unlocked before calling mRunThread.join() or a
+-    // deadlock will occur.
+-    {
+-        std::unique_lock<std::mutex> lock(mRunMutex);
+-        mStopThread = true;
+-        mIsEnabled = false;
+-        mWaitCV.notify_all();
+-    }
+-    mRunThread.join();
+-}
+-
+-const SensorInfo& Sensor::getSensorInfo() const {
+-    return mSensorInfo;
+-}
+-
+-void Sensor::batch(int32_t samplingPeriodNs) {
+-    samplingPeriodNs =
+-            std::clamp(samplingPeriodNs, mSensorInfo.minDelay * 1000, mSensorInfo.maxDelay * 1000);
+-
+-    if (mSamplingPeriodNs != samplingPeriodNs) {
+-        mSamplingPeriodNs = samplingPeriodNs;
+-        // Wake up the 'run' thread to check if a new event should be generated now
+-        mWaitCV.notify_all();
+-    }
+-}
+-
+-void Sensor::activate(bool enable) {
+-    std::lock_guard<std::mutex> lock(mRunMutex);
+-    if (mIsEnabled != enable) {
+-        mIsEnabled = enable;
+-        mWaitCV.notify_all();
+-    }
+-}
+-
+-Result Sensor::flush() {
+-    // Only generate a flush complete event if the sensor is enabled and if the sensor is not a
+-    // one-shot sensor.
+-    if (!mIsEnabled) {
+-        return Result::BAD_VALUE;
+-    }
+-
+-    // Note: If a sensor supports batching, write all of the currently batched events for the sensor
+-    // to the Event FMQ prior to writing the flush complete event.
+-    Event ev;
+-    ev.sensorHandle = mSensorInfo.sensorHandle;
+-    ev.sensorType = SensorType::META_DATA;
+-    ev.u.meta.what = MetaDataEventType::META_DATA_FLUSH_COMPLETE;
+-    std::vector<Event> evs{ev};
+-    mCallback->postEvents(evs, isWakeUpSensor());
+-
+-    return Result::OK;
+-}
+-
+-void Sensor::startThread(Sensor* sensor) {
+-    sensor->run();
+-}
+-
+-void Sensor::run() {
+-    std::unique_lock<std::mutex> runLock(mRunMutex);
+-    constexpr int64_t kNanosecondsInSeconds = 1000 * 1000 * 1000;
+-
+-    while (!mStopThread) {
+-        if (!mIsEnabled || mMode == OperationMode::DATA_INJECTION) {
+-            mWaitCV.wait(runLock, [&] {
+-                return ((mIsEnabled && mMode == OperationMode::NORMAL) || mStopThread);
+-            });
+-        } else {
+-            timespec curTime;
+-            clock_gettime(CLOCK_REALTIME, &curTime);
+-            int64_t now = (curTime.tv_sec * kNanosecondsInSeconds) + curTime.tv_nsec;
+-            int64_t nextSampleTime = mLastSampleTimeNs + mSamplingPeriodNs;
+-
+-            if (now >= nextSampleTime) {
+-                mLastSampleTimeNs = now;
+-                nextSampleTime = mLastSampleTimeNs + mSamplingPeriodNs;
+-                mCallback->postEvents(readEvents(), isWakeUpSensor());
+-            }
+-
+-            mWaitCV.wait_for(runLock, std::chrono::nanoseconds(nextSampleTime - now));
+-        }
+-    }
+-}
+-
+-bool Sensor::isWakeUpSensor() {
+-    return mSensorInfo.flags & static_cast<uint32_t>(SensorFlagBits::WAKE_UP);
+-}
+-
+-std::vector<Event> Sensor::readEvents() {
+-    std::vector<Event> events;
+-    Event event;
+-    event.sensorHandle = mSensorInfo.sensorHandle;
+-    event.sensorType = mSensorInfo.type;
+-    event.timestamp = ::android::elapsedRealtimeNano();
+-    event.u.vec3.x = 0;
+-    event.u.vec3.y = 0;
+-    event.u.vec3.z = 0;
+-    event.u.vec3.status = SensorStatus::ACCURACY_HIGH;
+-    events.push_back(event);
+-    return events;
+-}
+-
+-void Sensor::setOperationMode(OperationMode mode) {
+-    std::lock_guard<std::mutex> lock(mRunMutex);
+-    if (mMode != mode) {
+-        mMode = mode;
+-        mWaitCV.notify_all();
+-    }
+-}
+-
+-bool Sensor::supportsDataInjection() const {
+-    return mSensorInfo.flags & static_cast<uint32_t>(SensorFlagBits::DATA_INJECTION);
+-}
+-
+-Result Sensor::injectEvent(const Event& event) {
+-    Result result = Result::OK;
+-    if (event.sensorType == SensorType::ADDITIONAL_INFO) {
+-        // When in OperationMode::NORMAL, SensorType::ADDITIONAL_INFO is used to push operation
+-        // environment data into the device.
+-    } else if (!supportsDataInjection()) {
+-        result = Result::INVALID_OPERATION;
+-    } else if (mMode == OperationMode::DATA_INJECTION) {
+-        mCallback->postEvents(std::vector<Event>{event}, isWakeUpSensor());
+-    } else {
+-        result = Result::BAD_VALUE;
+-    }
+-    return result;
+-}
+-
+-OneShotSensor::OneShotSensor(int32_t sensorHandle, ISensorsEventCallback* callback)
+-    : Sensor(sensorHandle, callback) {
+-    mSensorInfo.minDelay = -1;
+-    mSensorInfo.maxDelay = 0;
+-    mSensorInfo.flags |= SensorFlagBits::ONE_SHOT_MODE;
+-}
+-
+-UdfpsSensor::UdfpsSensor(int32_t sensorHandle, ISensorsEventCallback* callback)
+-    : OneShotSensor(sensorHandle, callback) {
+-    mSensorInfo.name = "UDFPS Sensor";
+-    mSensorInfo.type =
+-            static_cast<SensorType>(static_cast<int32_t>(SensorType::DEVICE_PRIVATE_BASE) + 1);
+-    mSensorInfo.typeAsString = "org.lineageos.sensor.udfps";
+-    mSensorInfo.maxRange = 2048.0f;
+-    mSensorInfo.resolution = 1.0f;
+-    mSensorInfo.power = 0;
+-    mSensorInfo.flags |= SensorFlagBits::WAKE_UP;
+-
+-    int rc;
+-
+-    rc = pipe(mWaitPipeFd);
+-    if (rc < 0) {
+-        mWaitPipeFd[0] = -1;
+-        mWaitPipeFd[1] = -1;
+-        ALOGE("failed to open wait pipe: %d", rc);
+-    }
+-
+-    mPollFd = open("/sys/kernel/oplus_display/fp_state", O_RDONLY);
+-    if (mPollFd < 0) {
+-        ALOGE("failed to open poll fd: %d", mPollFd);
+-    }
+-
+-    if (mWaitPipeFd[0] < 0 || mWaitPipeFd[1] < 0 || mPollFd < 0) {
+-        mStopThread = true;
+-        return;
+-    }
+-
+-    mPolls[0] = {
+-            .fd = mWaitPipeFd[0],
+-            .events = POLLIN,
+-    };
+-
+-    mPolls[1] = {
+-            .fd = mPollFd,
+-            .events = POLLERR | POLLPRI,
+-    };
+-}
+-
+-UdfpsSensor::~UdfpsSensor() {
+-    interruptPoll();
+-}
+-
+-void UdfpsSensor::activate(bool enable) {
+-    std::lock_guard<std::mutex> lock(mRunMutex);
+-
+-    if (mIsEnabled != enable) {
+-        mIsEnabled = enable;
+-
+-        interruptPoll();
+-        mWaitCV.notify_all();
+-    }
+-}
+-
+-void UdfpsSensor::setOperationMode(OperationMode mode) {
+-    Sensor::setOperationMode(mode);
+-    interruptPoll();
+-}
+-
+-void UdfpsSensor::run() {
+-    std::unique_lock<std::mutex> runLock(mRunMutex);
+-    bool reportEvent = false;
+-
+-    while (!mStopThread) {
+-        if (!mIsEnabled || mMode == OperationMode::DATA_INJECTION) {
+-            reportEvent = false;
+-            mWaitCV.wait(runLock, [&] {
+-                return ((mIsEnabled && mMode == OperationMode::NORMAL) || mStopThread);
+-            });
+-        } else {
+-            // Cannot hold lock while polling.
+-            runLock.unlock();
+-            int rc = poll(mPolls, 2, -1);
+-            runLock.lock();
+-
+-            if (rc < 0) {
+-                ALOGE("failed to poll: %d", rc);
+-                mStopThread = true;
+-                continue;
+-            }
+-
+-            if (mPolls[1].revents == mPolls[1].events && readFpState(mPollFd, mScreenX, mScreenY) &&
+-                reportEvent) {
+-                mIsEnabled = false;
+-                mCallback->postEvents(readEvents(), isWakeUpSensor());
+-            } else if (mPolls[0].revents == mPolls[0].events) {
+-                char buf;
+-                read(mWaitPipeFd[0], &buf, sizeof(buf));
+-            }
+-
+-            reportEvent = true;
+-        }
+-    }
+-}
+-
+-std::vector<Event> UdfpsSensor::readEvents() {
+-    std::vector<Event> events;
+-    Event event;
+-    event.sensorHandle = mSensorInfo.sensorHandle;
+-    event.sensorType = mSensorInfo.type;
+-    event.timestamp = ::android::elapsedRealtimeNano();
+-    event.u.data[0] = mScreenX;
+-    event.u.data[1] = mScreenY;
+-    events.push_back(event);
+-    return events;
+-}
+-
+-void UdfpsSensor::interruptPoll() {
+-    if (mWaitPipeFd[1] < 0) return;
+-
+-    char c = '1';
+-    write(mWaitPipeFd[1], &c, sizeof(c));
+-}
+-
+-}  // namespace implementation
+-}  // namespace subhal
+-}  // namespace V2_1
+-}  // namespace sensors
+-}  // namespace hardware
+-}  // namespace android
+diff --git a/sensors/Sensor.h b/sensors/Sensor.h
+deleted file mode 100644
+index 0b68971..0000000
+--- a/sensors/Sensor.h
++++ /dev/null
+@@ -1,122 +0,0 @@
+-/*
+- * Copyright (C) 2019 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#pragma once
+-
+-#include <android/hardware/sensors/2.1/types.h>
+-#include <fcntl.h>
+-#include <poll.h>
+-#include <unistd.h>
+-
+-#include <condition_variable>
+-#include <memory>
+-#include <mutex>
+-#include <thread>
+-#include <vector>
+-
+-using ::android::hardware::sensors::V1_0::OperationMode;
+-using ::android::hardware::sensors::V1_0::Result;
+-using ::android::hardware::sensors::V2_1::Event;
+-using ::android::hardware::sensors::V2_1::SensorInfo;
+-using ::android::hardware::sensors::V2_1::SensorType;
+-
+-namespace android {
+-namespace hardware {
+-namespace sensors {
+-namespace V2_1 {
+-namespace subhal {
+-namespace implementation {
+-
+-class ISensorsEventCallback {
+-  public:
+-    virtual ~ISensorsEventCallback() {};
+-    virtual void postEvents(const std::vector<Event>& events, bool wakeup) = 0;
+-};
+-
+-class Sensor {
+-  public:
+-    Sensor(int32_t sensorHandle, ISensorsEventCallback* callback);
+-    virtual ~Sensor();
+-
+-    const SensorInfo& getSensorInfo() const;
+-    virtual void batch(int32_t samplingPeriodNs);
+-    virtual void activate(bool enable);
+-    virtual Result flush();
+-
+-    virtual void setOperationMode(OperationMode mode);
+-    bool supportsDataInjection() const;
+-    Result injectEvent(const Event& event);
+-
+-  protected:
+-    virtual void run();
+-    virtual std::vector<Event> readEvents();
+-    static void startThread(Sensor* sensor);
+-
+-    bool isWakeUpSensor();
+-
+-    bool mIsEnabled;
+-    int64_t mSamplingPeriodNs;
+-    int64_t mLastSampleTimeNs;
+-    SensorInfo mSensorInfo;
+-
+-    std::atomic_bool mStopThread;
+-    std::condition_variable mWaitCV;
+-    std::mutex mRunMutex;
+-    std::thread mRunThread;
+-
+-    ISensorsEventCallback* mCallback;
+-
+-    OperationMode mMode;
+-};
+-
+-class OneShotSensor : public Sensor {
+-  public:
+-    OneShotSensor(int32_t sensorHandle, ISensorsEventCallback* callback);
+-
+-    virtual void batch(int32_t /* samplingPeriodNs */) override {}
+-
+-    virtual Result flush() override { return Result::BAD_VALUE; }
+-};
+-
+-class UdfpsSensor : public OneShotSensor {
+-  public:
+-    UdfpsSensor(int32_t sensorHandle, ISensorsEventCallback* callback);
+-    virtual ~UdfpsSensor() override;
+-
+-    virtual void activate(bool enable) override;
+-    virtual void setOperationMode(OperationMode mode) override;
+-
+-  protected:
+-    virtual void run() override;
+-    virtual std::vector<Event> readEvents();
+-
+-  private:
+-    void interruptPoll();
+-
+-    struct pollfd mPolls[2];
+-    int mWaitPipeFd[2];
+-    int mPollFd;
+-
+-    int mScreenX;
+-    int mScreenY;
+-};
+-
+-}  // namespace implementation
+-}  // namespace subhal
+-}  // namespace V2_1
+-}  // namespace sensors
+-}  // namespace hardware
+-}  // namespace android
+diff --git a/sensors/SensorsSscCustomFlag.cpp b/sensors/SensorsSscCustomFlag.cpp
+deleted file mode 100644
+index 50ce115..0000000
+--- a/sensors/SensorsSscCustomFlag.cpp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/*
+- * Copyright (C) 2024 The LineageOS Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#include <dlfcn.h>
+-#include <string.h>
+-
+-extern "C" void* sensorsHalGetSubHal(uint32_t* version) {
+-    static auto sensorsHalGetSubHalOrig = reinterpret_cast<typeof(sensorsHalGetSubHal)*>(
+-            dlsym(dlopen("sensors.ssc.so", RTLD_NOW), "sensorsHalGetSubHal"));
+-    static void* ret = nullptr;
+-
+-    if (ret == nullptr) {
+-        // Call original function
+-        ret = sensorsHalGetSubHalOrig(version);
+-
+-        // Get original VTable
+-        auto vtableOrig = reinterpret_cast<void**>(ret);
+-
+-        // Reallocate VTable
+-        static void* vtableNew[26];
+-        memcpy(vtableNew, *vtableOrig, sizeof(vtableNew));
+-        *vtableOrig = vtableNew;
+-
+-        // Modify VTable
+-        vtableNew[23] = vtableNew[24];  // setCustomFlag -> getName
+-        vtableNew[24] = vtableNew[25];  // getName -> initialize
+-        vtableNew[25] = nullptr;        // initialize -> nullptr
+-    }
+-
+-    return ret;
+-}
+diff --git a/sensors/SensorsSubHal.cpp b/sensors/SensorsSubHal.cpp
+deleted file mode 100644
+index 9306b98..0000000
+--- a/sensors/SensorsSubHal.cpp
++++ /dev/null
+@@ -1,162 +0,0 @@
+-/*
+- * Copyright (C) 2019 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#include "SensorsSubHal.h"
+-
+-#include <android/hardware/sensors/2.1/types.h>
+-#include <log/log.h>
+-
+-using ::android::hardware::sensors::V2_1::implementation::ISensorsSubHal;
+-using ::android::hardware::sensors::V2_1::subhal::implementation::SensorsSubHal;
+-
+-namespace android {
+-namespace hardware {
+-namespace sensors {
+-namespace V2_1 {
+-namespace subhal {
+-namespace implementation {
+-
+-using ::android::hardware::Void;
+-using ::android::hardware::sensors::V2_0::implementation::ScopedWakelock;
+-
+-SensorsSubHal::SensorsSubHal() : mCallback(nullptr), mNextHandle(1) {
+-    AddSensor<UdfpsSensor>();
+-}
+-
+-Return<void> SensorsSubHal::getSensorsList_2_1(ISensors::getSensorsList_2_1_cb _hidl_cb) {
+-    std::vector<SensorInfo> sensors;
+-    for (const auto& sensor : mSensors) {
+-        sensors.push_back(sensor.second->getSensorInfo());
+-    }
+-    _hidl_cb(sensors);
+-    return Void();
+-}
+-
+-Return<Result> SensorsSubHal::setOperationMode(OperationMode mode) {
+-    for (auto sensor : mSensors) {
+-        sensor.second->setOperationMode(mode);
+-    }
+-    mCurrentOperationMode = mode;
+-    return Result::OK;
+-}
+-
+-Return<Result> SensorsSubHal::activate(int32_t sensorHandle, bool enabled) {
+-    auto sensor = mSensors.find(sensorHandle);
+-    if (sensor != mSensors.end()) {
+-        sensor->second->activate(enabled);
+-        return Result::OK;
+-    }
+-    return Result::BAD_VALUE;
+-}
+-
+-Return<Result> SensorsSubHal::batch(int32_t sensorHandle, int64_t samplingPeriodNs,
+-                                    int64_t /* maxReportLatencyNs */) {
+-    auto sensor = mSensors.find(sensorHandle);
+-    if (sensor != mSensors.end()) {
+-        sensor->second->batch(samplingPeriodNs);
+-        return Result::OK;
+-    }
+-    return Result::BAD_VALUE;
+-}
+-
+-Return<Result> SensorsSubHal::flush(int32_t sensorHandle) {
+-    auto sensor = mSensors.find(sensorHandle);
+-    if (sensor != mSensors.end()) {
+-        return sensor->second->flush();
+-    }
+-    return Result::BAD_VALUE;
+-}
+-
+-Return<Result> SensorsSubHal::injectSensorData_2_1(const Event& event) {
+-    auto sensor = mSensors.find(event.sensorHandle);
+-    if (sensor != mSensors.end()) {
+-        return sensor->second->injectEvent(event);
+-    }
+-
+-    return Result::BAD_VALUE;
+-}
+-
+-Return<void> SensorsSubHal::registerDirectChannel(const SharedMemInfo& /* mem */,
+-                                                  ISensors::registerDirectChannel_cb _hidl_cb) {
+-    _hidl_cb(Result::INVALID_OPERATION, -1 /* channelHandle */);
+-    return Return<void>();
+-}
+-
+-Return<Result> SensorsSubHal::unregisterDirectChannel(int32_t /* channelHandle */) {
+-    return Result::INVALID_OPERATION;
+-}
+-
+-Return<void> SensorsSubHal::configDirectReport(int32_t /* sensorHandle */,
+-                                               int32_t /* channelHandle */, RateLevel /* rate */,
+-                                               ISensors::configDirectReport_cb _hidl_cb) {
+-    _hidl_cb(Result::INVALID_OPERATION, 0 /* reportToken */);
+-    return Return<void>();
+-}
+-
+-Return<void> SensorsSubHal::debug(const hidl_handle& fd, const hidl_vec<hidl_string>& args) {
+-    if (fd.getNativeHandle() == nullptr || fd->numFds < 1) {
+-        ALOGE("%s: missing fd for writing", __FUNCTION__);
+-        return Void();
+-    }
+-
+-    FILE* out = fdopen(dup(fd->data[0]), "w");
+-
+-    if (args.size() != 0) {
+-        fprintf(out,
+-                "Note: sub-HAL %s currently does not support args. Input arguments are "
+-                "ignored.\n",
+-                getName().c_str());
+-    }
+-
+-    std::ostringstream stream;
+-    stream << "Available sensors:" << std::endl;
+-    for (auto sensor : mSensors) {
+-        SensorInfo info = sensor.second->getSensorInfo();
+-        stream << "Name: " << info.name << std::endl;
+-        stream << "Min delay: " << info.minDelay << std::endl;
+-        stream << "Flags: " << info.flags << std::endl;
+-    }
+-    stream << std::endl;
+-
+-    fprintf(out, "%s", stream.str().c_str());
+-
+-    fclose(out);
+-    return Return<void>();
+-}
+-
+-Return<Result> SensorsSubHal::initialize(const sp<IHalProxyCallback>& halProxyCallback) {
+-    mCallback = halProxyCallback;
+-    setOperationMode(OperationMode::NORMAL);
+-    return Result::OK;
+-}
+-
+-void SensorsSubHal::postEvents(const std::vector<Event>& events, bool wakeup) {
+-    ScopedWakelock wakelock = mCallback->createScopedWakelock(wakeup);
+-    mCallback->postEvents(events, std::move(wakelock));
+-}
+-
+-}  // namespace implementation
+-}  // namespace subhal
+-}  // namespace V2_1
+-}  // namespace sensors
+-}  // namespace hardware
+-}  // namespace android
+-
+-ISensorsSubHal* sensorsHalGetSubHal_2_1(uint32_t* version) {
+-    static SensorsSubHal subHal;
+-    *version = SUB_HAL_2_1_VERSION;
+-    return &subHal;
+-}
+diff --git a/sensors/SensorsSubHal.h b/sensors/SensorsSubHal.h
+deleted file mode 100644
+index 7ac9ac2..0000000
+--- a/sensors/SensorsSubHal.h
++++ /dev/null
+@@ -1,95 +0,0 @@
+-/*
+- * Copyright (C) 2019 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#pragma once
+-
+-#include <vector>
+-
+-#include "Sensor.h"
+-#include "V2_1/SubHal.h"
+-
+-namespace android {
+-namespace hardware {
+-namespace sensors {
+-namespace V2_1 {
+-namespace subhal {
+-namespace implementation {
+-
+-using ::android::hardware::sensors::V1_0::OperationMode;
+-using ::android::hardware::sensors::V1_0::RateLevel;
+-using ::android::hardware::sensors::V1_0::Result;
+-using ::android::hardware::sensors::V1_0::SharedMemInfo;
+-using ::android::hardware::sensors::V2_1::Event;
+-using ::android::hardware::sensors::V2_1::implementation::IHalProxyCallback;
+-using ::android::hardware::sensors::V2_1::implementation::ISensorsSubHal;
+-
+-class SensorsSubHal : public ISensorsSubHal, public ISensorsEventCallback {
+-  public:
+-    SensorsSubHal();
+-
+-    Return<void> getSensorsList_2_1(ISensors::getSensorsList_2_1_cb _hidl_cb);
+-    Return<Result> injectSensorData_2_1(const Event& event);
+-    Return<Result> initialize(const sp<IHalProxyCallback>& halProxyCallback);
+-
+-    virtual Return<Result> setOperationMode(OperationMode mode);
+-
+-    OperationMode getOperationMode() const { return mCurrentOperationMode; }
+-
+-    Return<Result> activate(int32_t sensorHandle, bool enabled);
+-
+-    Return<Result> batch(int32_t sensorHandle, int64_t samplingPeriodNs,
+-                         int64_t maxReportLatencyNs);
+-
+-    Return<Result> flush(int32_t sensorHandle);
+-
+-    Return<void> registerDirectChannel(const SharedMemInfo& mem,
+-                                       ISensors::registerDirectChannel_cb _hidl_cb);
+-
+-    Return<Result> unregisterDirectChannel(int32_t channelHandle);
+-
+-    Return<void> configDirectReport(int32_t sensorHandle, int32_t channelHandle, RateLevel rate,
+-                                    ISensors::configDirectReport_cb _hidl_cb);
+-
+-    Return<void> debug(const hidl_handle& fd, const hidl_vec<hidl_string>& args);
+-
+-    const std::string getName() { return "FakeSubHal"; }
+-
+-    void postEvents(const std::vector<Event>& events, bool wakeup) override;
+-
+-  protected:
+-    template <class SensorType>
+-    void AddSensor() {
+-        std::shared_ptr<SensorType> sensor =
+-                std::make_shared<SensorType>(mNextHandle++ /* sensorHandle */, this /* callback */);
+-        mSensors[sensor->getSensorInfo().sensorHandle] = sensor;
+-    }
+-
+-    std::map<int32_t, std::shared_ptr<Sensor>> mSensors;
+-
+-    sp<IHalProxyCallback> mCallback;
+-
+-  private:
+-    OperationMode mCurrentOperationMode = OperationMode::NORMAL;
+-
+-    int32_t mNextHandle;
+-};
+-
+-}  // namespace implementation
+-}  // namespace subhal
+-}  // namespace V2_1
+-}  // namespace sensors
+-}  // namespace hardware
+-}  // namespace android
+diff --git a/sensors/custom_flag/Android.bp b/sensors/custom_flag/Android.bp
+new file mode 100644
+index 0000000..cf7fe7a
+--- /dev/null
++++ b/sensors/custom_flag/Android.bp
+@@ -0,0 +1,10 @@
++//
++// SPDX-FileCopyrightText: 2025 The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++cc_library_shared {
++    name: "sensors.ssc_custom_flag",
++    srcs: ["SensorsSscCustomFlag.cpp"],
++    vendor: true,
++}
+diff --git a/sensors/custom_flag/SensorsSscCustomFlag.cpp b/sensors/custom_flag/SensorsSscCustomFlag.cpp
+new file mode 100644
+index 0000000..50ce115
+--- /dev/null
++++ b/sensors/custom_flag/SensorsSscCustomFlag.cpp
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2024 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <dlfcn.h>
++#include <string.h>
++
++extern "C" void* sensorsHalGetSubHal(uint32_t* version) {
++    static auto sensorsHalGetSubHalOrig = reinterpret_cast<typeof(sensorsHalGetSubHal)*>(
++            dlsym(dlopen("sensors.ssc.so", RTLD_NOW), "sensorsHalGetSubHal"));
++    static void* ret = nullptr;
++
++    if (ret == nullptr) {
++        // Call original function
++        ret = sensorsHalGetSubHalOrig(version);
++
++        // Get original VTable
++        auto vtableOrig = reinterpret_cast<void**>(ret);
++
++        // Reallocate VTable
++        static void* vtableNew[26];
++        memcpy(vtableNew, *vtableOrig, sizeof(vtableNew));
++        *vtableOrig = vtableNew;
++
++        // Modify VTable
++        vtableNew[23] = vtableNew[24];  // setCustomFlag -> getName
++        vtableNew[24] = vtableNew[25];  // getName -> initialize
++        vtableNew[25] = nullptr;        // initialize -> nullptr
++    }
++
++    return ret;
++}
+diff --git a/sensors/udfps/Android.bp b/sensors/udfps/Android.bp
+new file mode 100644
+index 0000000..5e24d34
+--- /dev/null
++++ b/sensors/udfps/Android.bp
+@@ -0,0 +1,34 @@
++//
++// SPDX-FileCopyrightText: 2022-2025 The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++cc_library_shared {
++    name: "sensors.oplus",
++    defaults: ["hidl_defaults"],
++    srcs: [
++        "Sensor.cpp",
++        "SensorsSubHal.cpp",
++    ],
++    shared_libs: [
++        "android.hardware.sensors@1.0",
++        "android.hardware.sensors@2.0",
++        "android.hardware.sensors@2.0-ScopedWakelock",
++        "android.hardware.sensors@2.1",
++        "libcutils",
++        "libfmq",
++        "libhardware",
++        "libhidlbase",
++        "liblog",
++        "libpower",
++        "libutils",
++    ],
++    static_libs: [
++        "android.hardware.sensors@1.0-convert",
++        "android.hardware.sensors@2.X-multihal",
++    ],
++    cflags: [
++        "-DLOG_TAG=\"sensors.oplus\"",
++    ],
++    vendor: true,
++}
+diff --git a/sensors/udfps/Sensor.cpp b/sensors/udfps/Sensor.cpp
+new file mode 100644
+index 0000000..053672c
+--- /dev/null
++++ b/sensors/udfps/Sensor.cpp
+@@ -0,0 +1,346 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "Sensor.h"
++
++#include <hardware/sensors.h>
++#include <log/log.h>
++#include <utils/SystemClock.h>
++
++#include <cmath>
++
++namespace {
++
++static bool readFpState(int fd, int& screenX, int& screenY) {
++    char buffer[512];
++    int state = 0;
++    int rc;
++
++    rc = lseek(fd, 0, SEEK_SET);
++    if (rc) {
++        ALOGE("failed to seek: %d", rc);
++        return false;
++    }
++
++    rc = read(fd, &buffer, sizeof(buffer));
++    if (rc < 0) {
++        ALOGE("failed to read state: %d", rc);
++        return false;
++    }
++
++    rc = sscanf(buffer, "%d,%d,%d", &screenX, &screenY, &state);
++    if (rc < 0) {
++        ALOGE("failed to parse fp state: %d", rc);
++        return false;
++    }
++
++    return state > 0;
++}
++
++}  // anonymous namespace
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++
++using ::android::hardware::sensors::V1_0::MetaDataEventType;
++using ::android::hardware::sensors::V1_0::OperationMode;
++using ::android::hardware::sensors::V1_0::Result;
++using ::android::hardware::sensors::V1_0::SensorFlagBits;
++using ::android::hardware::sensors::V1_0::SensorStatus;
++using ::android::hardware::sensors::V2_1::Event;
++using ::android::hardware::sensors::V2_1::SensorInfo;
++using ::android::hardware::sensors::V2_1::SensorType;
++
++Sensor::Sensor(int32_t sensorHandle, ISensorsEventCallback* callback)
++    : mIsEnabled(false),
++      mSamplingPeriodNs(0),
++      mLastSampleTimeNs(0),
++      mCallback(callback),
++      mMode(OperationMode::NORMAL) {
++    mSensorInfo.sensorHandle = sensorHandle;
++    mSensorInfo.vendor = "The LineageOS Project";
++    mSensorInfo.version = 1;
++    constexpr float kDefaultMaxDelayUs = 1000 * 1000;
++    mSensorInfo.maxDelay = kDefaultMaxDelayUs;
++    mSensorInfo.fifoReservedEventCount = 0;
++    mSensorInfo.fifoMaxEventCount = 0;
++    mSensorInfo.requiredPermission = "";
++    mSensorInfo.flags = 0;
++    mRunThread = std::thread(startThread, this);
++}
++
++Sensor::~Sensor() {
++    // Ensure that lock is unlocked before calling mRunThread.join() or a
++    // deadlock will occur.
++    {
++        std::unique_lock<std::mutex> lock(mRunMutex);
++        mStopThread = true;
++        mIsEnabled = false;
++        mWaitCV.notify_all();
++    }
++    mRunThread.join();
++}
++
++const SensorInfo& Sensor::getSensorInfo() const {
++    return mSensorInfo;
++}
++
++void Sensor::batch(int32_t samplingPeriodNs) {
++    samplingPeriodNs =
++            std::clamp(samplingPeriodNs, mSensorInfo.minDelay * 1000, mSensorInfo.maxDelay * 1000);
++
++    if (mSamplingPeriodNs != samplingPeriodNs) {
++        mSamplingPeriodNs = samplingPeriodNs;
++        // Wake up the 'run' thread to check if a new event should be generated now
++        mWaitCV.notify_all();
++    }
++}
++
++void Sensor::activate(bool enable) {
++    std::lock_guard<std::mutex> lock(mRunMutex);
++    if (mIsEnabled != enable) {
++        mIsEnabled = enable;
++        mWaitCV.notify_all();
++    }
++}
++
++Result Sensor::flush() {
++    // Only generate a flush complete event if the sensor is enabled and if the sensor is not a
++    // one-shot sensor.
++    if (!mIsEnabled) {
++        return Result::BAD_VALUE;
++    }
++
++    // Note: If a sensor supports batching, write all of the currently batched events for the sensor
++    // to the Event FMQ prior to writing the flush complete event.
++    Event ev;
++    ev.sensorHandle = mSensorInfo.sensorHandle;
++    ev.sensorType = SensorType::META_DATA;
++    ev.u.meta.what = MetaDataEventType::META_DATA_FLUSH_COMPLETE;
++    std::vector<Event> evs{ev};
++    mCallback->postEvents(evs, isWakeUpSensor());
++
++    return Result::OK;
++}
++
++void Sensor::startThread(Sensor* sensor) {
++    sensor->run();
++}
++
++void Sensor::run() {
++    std::unique_lock<std::mutex> runLock(mRunMutex);
++    constexpr int64_t kNanosecondsInSeconds = 1000 * 1000 * 1000;
++
++    while (!mStopThread) {
++        if (!mIsEnabled || mMode == OperationMode::DATA_INJECTION) {
++            mWaitCV.wait(runLock, [&] {
++                return ((mIsEnabled && mMode == OperationMode::NORMAL) || mStopThread);
++            });
++        } else {
++            timespec curTime;
++            clock_gettime(CLOCK_REALTIME, &curTime);
++            int64_t now = (curTime.tv_sec * kNanosecondsInSeconds) + curTime.tv_nsec;
++            int64_t nextSampleTime = mLastSampleTimeNs + mSamplingPeriodNs;
++
++            if (now >= nextSampleTime) {
++                mLastSampleTimeNs = now;
++                nextSampleTime = mLastSampleTimeNs + mSamplingPeriodNs;
++                mCallback->postEvents(readEvents(), isWakeUpSensor());
++            }
++
++            mWaitCV.wait_for(runLock, std::chrono::nanoseconds(nextSampleTime - now));
++        }
++    }
++}
++
++bool Sensor::isWakeUpSensor() {
++    return mSensorInfo.flags & static_cast<uint32_t>(SensorFlagBits::WAKE_UP);
++}
++
++std::vector<Event> Sensor::readEvents() {
++    std::vector<Event> events;
++    Event event;
++    event.sensorHandle = mSensorInfo.sensorHandle;
++    event.sensorType = mSensorInfo.type;
++    event.timestamp = ::android::elapsedRealtimeNano();
++    event.u.vec3.x = 0;
++    event.u.vec3.y = 0;
++    event.u.vec3.z = 0;
++    event.u.vec3.status = SensorStatus::ACCURACY_HIGH;
++    events.push_back(event);
++    return events;
++}
++
++void Sensor::setOperationMode(OperationMode mode) {
++    std::lock_guard<std::mutex> lock(mRunMutex);
++    if (mMode != mode) {
++        mMode = mode;
++        mWaitCV.notify_all();
++    }
++}
++
++bool Sensor::supportsDataInjection() const {
++    return mSensorInfo.flags & static_cast<uint32_t>(SensorFlagBits::DATA_INJECTION);
++}
++
++Result Sensor::injectEvent(const Event& event) {
++    Result result = Result::OK;
++    if (event.sensorType == SensorType::ADDITIONAL_INFO) {
++        // When in OperationMode::NORMAL, SensorType::ADDITIONAL_INFO is used to push operation
++        // environment data into the device.
++    } else if (!supportsDataInjection()) {
++        result = Result::INVALID_OPERATION;
++    } else if (mMode == OperationMode::DATA_INJECTION) {
++        mCallback->postEvents(std::vector<Event>{event}, isWakeUpSensor());
++    } else {
++        result = Result::BAD_VALUE;
++    }
++    return result;
++}
++
++OneShotSensor::OneShotSensor(int32_t sensorHandle, ISensorsEventCallback* callback)
++    : Sensor(sensorHandle, callback) {
++    mSensorInfo.minDelay = -1;
++    mSensorInfo.maxDelay = 0;
++    mSensorInfo.flags |= SensorFlagBits::ONE_SHOT_MODE;
++}
++
++UdfpsSensor::UdfpsSensor(int32_t sensorHandle, ISensorsEventCallback* callback)
++    : OneShotSensor(sensorHandle, callback) {
++    mSensorInfo.name = "UDFPS Sensor";
++    mSensorInfo.type =
++            static_cast<SensorType>(static_cast<int32_t>(SensorType::DEVICE_PRIVATE_BASE) + 1);
++    mSensorInfo.typeAsString = "org.lineageos.sensor.udfps";
++    mSensorInfo.maxRange = 2048.0f;
++    mSensorInfo.resolution = 1.0f;
++    mSensorInfo.power = 0;
++    mSensorInfo.flags |= SensorFlagBits::WAKE_UP;
++
++    int rc;
++
++    rc = pipe(mWaitPipeFd);
++    if (rc < 0) {
++        mWaitPipeFd[0] = -1;
++        mWaitPipeFd[1] = -1;
++        ALOGE("failed to open wait pipe: %d", rc);
++    }
++
++    mPollFd = open("/sys/kernel/oplus_display/fp_state", O_RDONLY);
++    if (mPollFd < 0) {
++        ALOGE("failed to open poll fd: %d", mPollFd);
++    }
++
++    if (mWaitPipeFd[0] < 0 || mWaitPipeFd[1] < 0 || mPollFd < 0) {
++        mStopThread = true;
++        return;
++    }
++
++    mPolls[0] = {
++            .fd = mWaitPipeFd[0],
++            .events = POLLIN,
++    };
++
++    mPolls[1] = {
++            .fd = mPollFd,
++            .events = POLLERR | POLLPRI,
++    };
++}
++
++UdfpsSensor::~UdfpsSensor() {
++    interruptPoll();
++}
++
++void UdfpsSensor::activate(bool enable) {
++    std::lock_guard<std::mutex> lock(mRunMutex);
++
++    if (mIsEnabled != enable) {
++        mIsEnabled = enable;
++
++        interruptPoll();
++        mWaitCV.notify_all();
++    }
++}
++
++void UdfpsSensor::setOperationMode(OperationMode mode) {
++    Sensor::setOperationMode(mode);
++    interruptPoll();
++}
++
++void UdfpsSensor::run() {
++    std::unique_lock<std::mutex> runLock(mRunMutex);
++    bool reportEvent = false;
++
++    while (!mStopThread) {
++        if (!mIsEnabled || mMode == OperationMode::DATA_INJECTION) {
++            reportEvent = false;
++            mWaitCV.wait(runLock, [&] {
++                return ((mIsEnabled && mMode == OperationMode::NORMAL) || mStopThread);
++            });
++        } else {
++            // Cannot hold lock while polling.
++            runLock.unlock();
++            int rc = poll(mPolls, 2, -1);
++            runLock.lock();
++
++            if (rc < 0) {
++                ALOGE("failed to poll: %d", rc);
++                mStopThread = true;
++                continue;
++            }
++
++            if (mPolls[1].revents == mPolls[1].events && readFpState(mPollFd, mScreenX, mScreenY) &&
++                reportEvent) {
++                mIsEnabled = false;
++                mCallback->postEvents(readEvents(), isWakeUpSensor());
++            } else if (mPolls[0].revents == mPolls[0].events) {
++                char buf;
++                read(mWaitPipeFd[0], &buf, sizeof(buf));
++            }
++
++            reportEvent = true;
++        }
++    }
++}
++
++std::vector<Event> UdfpsSensor::readEvents() {
++    std::vector<Event> events;
++    Event event;
++    event.sensorHandle = mSensorInfo.sensorHandle;
++    event.sensorType = mSensorInfo.type;
++    event.timestamp = ::android::elapsedRealtimeNano();
++    event.u.data[0] = mScreenX;
++    event.u.data[1] = mScreenY;
++    events.push_back(event);
++    return events;
++}
++
++void UdfpsSensor::interruptPoll() {
++    if (mWaitPipeFd[1] < 0) return;
++
++    char c = '1';
++    write(mWaitPipeFd[1], &c, sizeof(c));
++}
++
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/udfps/Sensor.h b/sensors/udfps/Sensor.h
+new file mode 100644
+index 0000000..0b68971
+--- /dev/null
++++ b/sensors/udfps/Sensor.h
+@@ -0,0 +1,122 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <android/hardware/sensors/2.1/types.h>
++#include <fcntl.h>
++#include <poll.h>
++#include <unistd.h>
++
++#include <condition_variable>
++#include <memory>
++#include <mutex>
++#include <thread>
++#include <vector>
++
++using ::android::hardware::sensors::V1_0::OperationMode;
++using ::android::hardware::sensors::V1_0::Result;
++using ::android::hardware::sensors::V2_1::Event;
++using ::android::hardware::sensors::V2_1::SensorInfo;
++using ::android::hardware::sensors::V2_1::SensorType;
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++
++class ISensorsEventCallback {
++  public:
++    virtual ~ISensorsEventCallback() {};
++    virtual void postEvents(const std::vector<Event>& events, bool wakeup) = 0;
++};
++
++class Sensor {
++  public:
++    Sensor(int32_t sensorHandle, ISensorsEventCallback* callback);
++    virtual ~Sensor();
++
++    const SensorInfo& getSensorInfo() const;
++    virtual void batch(int32_t samplingPeriodNs);
++    virtual void activate(bool enable);
++    virtual Result flush();
++
++    virtual void setOperationMode(OperationMode mode);
++    bool supportsDataInjection() const;
++    Result injectEvent(const Event& event);
++
++  protected:
++    virtual void run();
++    virtual std::vector<Event> readEvents();
++    static void startThread(Sensor* sensor);
++
++    bool isWakeUpSensor();
++
++    bool mIsEnabled;
++    int64_t mSamplingPeriodNs;
++    int64_t mLastSampleTimeNs;
++    SensorInfo mSensorInfo;
++
++    std::atomic_bool mStopThread;
++    std::condition_variable mWaitCV;
++    std::mutex mRunMutex;
++    std::thread mRunThread;
++
++    ISensorsEventCallback* mCallback;
++
++    OperationMode mMode;
++};
++
++class OneShotSensor : public Sensor {
++  public:
++    OneShotSensor(int32_t sensorHandle, ISensorsEventCallback* callback);
++
++    virtual void batch(int32_t /* samplingPeriodNs */) override {}
++
++    virtual Result flush() override { return Result::BAD_VALUE; }
++};
++
++class UdfpsSensor : public OneShotSensor {
++  public:
++    UdfpsSensor(int32_t sensorHandle, ISensorsEventCallback* callback);
++    virtual ~UdfpsSensor() override;
++
++    virtual void activate(bool enable) override;
++    virtual void setOperationMode(OperationMode mode) override;
++
++  protected:
++    virtual void run() override;
++    virtual std::vector<Event> readEvents();
++
++  private:
++    void interruptPoll();
++
++    struct pollfd mPolls[2];
++    int mWaitPipeFd[2];
++    int mPollFd;
++
++    int mScreenX;
++    int mScreenY;
++};
++
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
+diff --git a/sensors/udfps/SensorsSubHal.cpp b/sensors/udfps/SensorsSubHal.cpp
+new file mode 100644
+index 0000000..9306b98
+--- /dev/null
++++ b/sensors/udfps/SensorsSubHal.cpp
+@@ -0,0 +1,162 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "SensorsSubHal.h"
++
++#include <android/hardware/sensors/2.1/types.h>
++#include <log/log.h>
++
++using ::android::hardware::sensors::V2_1::implementation::ISensorsSubHal;
++using ::android::hardware::sensors::V2_1::subhal::implementation::SensorsSubHal;
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++
++using ::android::hardware::Void;
++using ::android::hardware::sensors::V2_0::implementation::ScopedWakelock;
++
++SensorsSubHal::SensorsSubHal() : mCallback(nullptr), mNextHandle(1) {
++    AddSensor<UdfpsSensor>();
++}
++
++Return<void> SensorsSubHal::getSensorsList_2_1(ISensors::getSensorsList_2_1_cb _hidl_cb) {
++    std::vector<SensorInfo> sensors;
++    for (const auto& sensor : mSensors) {
++        sensors.push_back(sensor.second->getSensorInfo());
++    }
++    _hidl_cb(sensors);
++    return Void();
++}
++
++Return<Result> SensorsSubHal::setOperationMode(OperationMode mode) {
++    for (auto sensor : mSensors) {
++        sensor.second->setOperationMode(mode);
++    }
++    mCurrentOperationMode = mode;
++    return Result::OK;
++}
++
++Return<Result> SensorsSubHal::activate(int32_t sensorHandle, bool enabled) {
++    auto sensor = mSensors.find(sensorHandle);
++    if (sensor != mSensors.end()) {
++        sensor->second->activate(enabled);
++        return Result::OK;
++    }
++    return Result::BAD_VALUE;
++}
++
++Return<Result> SensorsSubHal::batch(int32_t sensorHandle, int64_t samplingPeriodNs,
++                                    int64_t /* maxReportLatencyNs */) {
++    auto sensor = mSensors.find(sensorHandle);
++    if (sensor != mSensors.end()) {
++        sensor->second->batch(samplingPeriodNs);
++        return Result::OK;
++    }
++    return Result::BAD_VALUE;
++}
++
++Return<Result> SensorsSubHal::flush(int32_t sensorHandle) {
++    auto sensor = mSensors.find(sensorHandle);
++    if (sensor != mSensors.end()) {
++        return sensor->second->flush();
++    }
++    return Result::BAD_VALUE;
++}
++
++Return<Result> SensorsSubHal::injectSensorData_2_1(const Event& event) {
++    auto sensor = mSensors.find(event.sensorHandle);
++    if (sensor != mSensors.end()) {
++        return sensor->second->injectEvent(event);
++    }
++
++    return Result::BAD_VALUE;
++}
++
++Return<void> SensorsSubHal::registerDirectChannel(const SharedMemInfo& /* mem */,
++                                                  ISensors::registerDirectChannel_cb _hidl_cb) {
++    _hidl_cb(Result::INVALID_OPERATION, -1 /* channelHandle */);
++    return Return<void>();
++}
++
++Return<Result> SensorsSubHal::unregisterDirectChannel(int32_t /* channelHandle */) {
++    return Result::INVALID_OPERATION;
++}
++
++Return<void> SensorsSubHal::configDirectReport(int32_t /* sensorHandle */,
++                                               int32_t /* channelHandle */, RateLevel /* rate */,
++                                               ISensors::configDirectReport_cb _hidl_cb) {
++    _hidl_cb(Result::INVALID_OPERATION, 0 /* reportToken */);
++    return Return<void>();
++}
++
++Return<void> SensorsSubHal::debug(const hidl_handle& fd, const hidl_vec<hidl_string>& args) {
++    if (fd.getNativeHandle() == nullptr || fd->numFds < 1) {
++        ALOGE("%s: missing fd for writing", __FUNCTION__);
++        return Void();
++    }
++
++    FILE* out = fdopen(dup(fd->data[0]), "w");
++
++    if (args.size() != 0) {
++        fprintf(out,
++                "Note: sub-HAL %s currently does not support args. Input arguments are "
++                "ignored.\n",
++                getName().c_str());
++    }
++
++    std::ostringstream stream;
++    stream << "Available sensors:" << std::endl;
++    for (auto sensor : mSensors) {
++        SensorInfo info = sensor.second->getSensorInfo();
++        stream << "Name: " << info.name << std::endl;
++        stream << "Min delay: " << info.minDelay << std::endl;
++        stream << "Flags: " << info.flags << std::endl;
++    }
++    stream << std::endl;
++
++    fprintf(out, "%s", stream.str().c_str());
++
++    fclose(out);
++    return Return<void>();
++}
++
++Return<Result> SensorsSubHal::initialize(const sp<IHalProxyCallback>& halProxyCallback) {
++    mCallback = halProxyCallback;
++    setOperationMode(OperationMode::NORMAL);
++    return Result::OK;
++}
++
++void SensorsSubHal::postEvents(const std::vector<Event>& events, bool wakeup) {
++    ScopedWakelock wakelock = mCallback->createScopedWakelock(wakeup);
++    mCallback->postEvents(events, std::move(wakelock));
++}
++
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android
++
++ISensorsSubHal* sensorsHalGetSubHal_2_1(uint32_t* version) {
++    static SensorsSubHal subHal;
++    *version = SUB_HAL_2_1_VERSION;
++    return &subHal;
++}
+diff --git a/sensors/udfps/SensorsSubHal.h b/sensors/udfps/SensorsSubHal.h
+new file mode 100644
+index 0000000..7ac9ac2
+--- /dev/null
++++ b/sensors/udfps/SensorsSubHal.h
+@@ -0,0 +1,95 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <vector>
++
++#include "Sensor.h"
++#include "V2_1/SubHal.h"
++
++namespace android {
++namespace hardware {
++namespace sensors {
++namespace V2_1 {
++namespace subhal {
++namespace implementation {
++
++using ::android::hardware::sensors::V1_0::OperationMode;
++using ::android::hardware::sensors::V1_0::RateLevel;
++using ::android::hardware::sensors::V1_0::Result;
++using ::android::hardware::sensors::V1_0::SharedMemInfo;
++using ::android::hardware::sensors::V2_1::Event;
++using ::android::hardware::sensors::V2_1::implementation::IHalProxyCallback;
++using ::android::hardware::sensors::V2_1::implementation::ISensorsSubHal;
++
++class SensorsSubHal : public ISensorsSubHal, public ISensorsEventCallback {
++  public:
++    SensorsSubHal();
++
++    Return<void> getSensorsList_2_1(ISensors::getSensorsList_2_1_cb _hidl_cb);
++    Return<Result> injectSensorData_2_1(const Event& event);
++    Return<Result> initialize(const sp<IHalProxyCallback>& halProxyCallback);
++
++    virtual Return<Result> setOperationMode(OperationMode mode);
++
++    OperationMode getOperationMode() const { return mCurrentOperationMode; }
++
++    Return<Result> activate(int32_t sensorHandle, bool enabled);
++
++    Return<Result> batch(int32_t sensorHandle, int64_t samplingPeriodNs,
++                         int64_t maxReportLatencyNs);
++
++    Return<Result> flush(int32_t sensorHandle);
++
++    Return<void> registerDirectChannel(const SharedMemInfo& mem,
++                                       ISensors::registerDirectChannel_cb _hidl_cb);
++
++    Return<Result> unregisterDirectChannel(int32_t channelHandle);
++
++    Return<void> configDirectReport(int32_t sensorHandle, int32_t channelHandle, RateLevel rate,
++                                    ISensors::configDirectReport_cb _hidl_cb);
++
++    Return<void> debug(const hidl_handle& fd, const hidl_vec<hidl_string>& args);
++
++    const std::string getName() { return "FakeSubHal"; }
++
++    void postEvents(const std::vector<Event>& events, bool wakeup) override;
++
++  protected:
++    template <class SensorType>
++    void AddSensor() {
++        std::shared_ptr<SensorType> sensor =
++                std::make_shared<SensorType>(mNextHandle++ /* sensorHandle */, this /* callback */);
++        mSensors[sensor->getSensorInfo().sensorHandle] = sensor;
++    }
++
++    std::map<int32_t, std::shared_ptr<Sensor>> mSensors;
++
++    sp<IHalProxyCallback> mCallback;
++
++  private:
++    OperationMode mCurrentOperationMode = OperationMode::NORMAL;
++
++    int32_t mNextHandle;
++};
++
++}  // namespace implementation
++}  // namespace subhal
++}  // namespace V2_1
++}  // namespace sensors
++}  // namespace hardware
++}  // namespace android

@@ -1,0 +1,29 @@
+From 861f0ee88831d605ecf304390646f5a2b7182a3c Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Fri, 18 Sep 2026 11:22:44 +0200
+Subject: [PATCH] Revert "fixup! Implement edge long swipe gesture to new back gesture affordance"
+
+Fixed in hwui...
+
+This reverts commit 4b74f11370f5d7d643a141288793043185ddca18.
+
+Change-Id: I667db781e5ba0c187b7ee4fd65b28b2adc359c94
+---
+
+diff --git a/packages/SystemUI/src/com/android/systemui/navigationbar/gestural/BackPanel.kt b/packages/SystemUI/src/com/android/systemui/navigationbar/gestural/BackPanel.kt
+index f82f8c8..76f7b99 100644
+--- a/packages/SystemUI/src/com/android/systemui/navigationbar/gestural/BackPanel.kt
++++ b/packages/SystemUI/src/com/android/systemui/navigationbar/gestural/BackPanel.kt
+@@ -298,11 +298,7 @@
+         arrowPath.lineTo(dx, dy)
+         arrowPath.moveTo(dx, -dy)
+         if (triggerLongSwipe) {
+-            val offset = arrowPaint.strokeWidth * 2.0f * -1
+-            arrowPath.moveTo(dx + offset, -dy)
+-            arrowPath.lineTo(offset, 0f)
+-            arrowPath.lineTo(dx + offset, dy)
+-            arrowPath.moveTo(dx + offset, -dy)
++            arrowPath.addPath(arrowPath, arrowPaint.strokeWidth * 2.0f * -1, 0.0f)
+         }
+         return arrowPath
+     }

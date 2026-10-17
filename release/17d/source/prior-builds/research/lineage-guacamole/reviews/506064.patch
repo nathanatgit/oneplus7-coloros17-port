@@ -1,0 +1,37 @@
+From ae8fc45fd55fa3aa5ee14ac4fae274e395f23304 Mon Sep 17 00:00:00 2001
+From: Lunia <lunia0251@proton.me>
+Date: Sat, 03 Oct 2026 13:51:30 +0700
+Subject: [PATCH] ims: Add soong namespace
+
+Conflicts with Pixel prebuilt CarrierSettings
+
+Change-Id: Id266d0d7899100572ae26909832a1681a3568d42
+---
+
+diff --git a/Android.bp b/Android.bp
+new file mode 100644
+index 0000000..2805bde
+--- /dev/null
++++ b/Android.bp
+@@ -0,0 +1,7 @@
++//
++// SPDX-FileCopyrightText: The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++soong_namespace {
++}
+diff --git a/ims.mk b/ims.mk
+index dd83e89..ad08928 100644
+--- a/ims.mk
++++ b/ims.mk
+@@ -5,6 +5,9 @@
+ 
+ GENERIC_IMS_PATH := hardware/lineage/generic-ims
+ 
++# Soong namespaces
++PRODUCT_SOONG_NAMESPACES += $(GENERIC_IMS_PATH)
++
+ # CarrierSettings
+ PRODUCT_PACKAGES += CarrierSettings
+ 

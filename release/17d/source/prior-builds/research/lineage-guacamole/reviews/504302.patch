@@ -1,0 +1,22 @@
+From fb79f10a2d55776216e99f07123bf0019fa3f2c5 Mon Sep 17 00:00:00 2001
+From: Akshay Kakatkar <me@kakatkarakshay.dev>
+Date: Mon, 21 Sep 2026 11:54:46 +0000
+Subject: [PATCH] sdmclient: Avoid extended config ID collisions
+
+Change-Id: I9046b3b1a00f66f44a346f7abf824e22ea05f145
+---
+
+diff --git a/sdmclient/sdm_display.cpp b/sdmclient/sdm_display.cpp
+index 7be75ac..0fe3abb 100644
+--- a/sdmclient/sdm_display.cpp
++++ b/sdmclient/sdm_display.cpp
+@@ -709,7 +709,8 @@
+   }
+   extended_display_resolutions = final_extended_display_resolutions;
+ 
+-  uint32_t config_index = variable_config_map_.size();
++  uint32_t config_index =
++      variable_config_map_.empty() ? 0 : variable_config_map_.rbegin()->first + 1;
+ 
+   // pop the extra config pushed for POMS support to make it equal to the variable_config
+   if (is_poms_mode_) {

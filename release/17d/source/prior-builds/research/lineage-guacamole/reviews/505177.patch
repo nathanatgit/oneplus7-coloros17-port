@@ -1,0 +1,26 @@
+From 3f56965f0690fee568903083f09a8349a803da31 Mon Sep 17 00:00:00 2001
+From: Chandu Dyavanapelli <chandudyavanapelli03@gmail.com>
+Date: Sun, 27 Sep 2026 17:09:42 +0000
+Subject: [PATCH] Revert "sdmclient: Avoid extended config ID collisions"
+
+This reverts commit fb79f10a2d55776216e99f07123bf0019fa3f2c5.
+
+Reason for revert: The underlying issue has been fixed in dts.
+
+Change-Id: Id2d3ba11bfec41e5d1003cae45c465bf7e7690a7
+---
+
+diff --git a/sdmclient/sdm_display.cpp b/sdmclient/sdm_display.cpp
+index 0fe3abb..7be75ac 100644
+--- a/sdmclient/sdm_display.cpp
++++ b/sdmclient/sdm_display.cpp
+@@ -709,8 +709,7 @@
+   }
+   extended_display_resolutions = final_extended_display_resolutions;
+ 
+-  uint32_t config_index =
+-      variable_config_map_.empty() ? 0 : variable_config_map_.rbegin()->first + 1;
++  uint32_t config_index = variable_config_map_.size();
+ 
+   // pop the extra config pushed for POMS support to make it equal to the variable_config
+   if (is_poms_mode_) {

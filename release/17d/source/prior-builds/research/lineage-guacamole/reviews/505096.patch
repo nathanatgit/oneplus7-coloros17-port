@@ -1,0 +1,198 @@
+From 4b9d4eccbe0ffc0bc1d89bb0eb0642a1365c34b0 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:43:00 +0300
+Subject: [PATCH] Merge tag 'LA.VENDOR.16.2.0.r1-20500-kaanapali.0' into staging/lineage-24.0_merge-LA.VENDOR.16.2.0.r1-20500-kaanapali.0
+
+LA.VENDOR.16.2.0.r1-20500-kaanapali.0
+
+* tag 'LA.VENDOR.16.2.0.r1-20500-kaanapali.0':
+  dataipa: Fix arbitrary SMMU mapping via MHI proxy QMI request
+  dataipa: Fix to validate the NAT table entries during NAT table init
+  msm:ipa: Initiate DDR access before clks are enabled
+  dataipa: Fix to validate the NAT table entries during NAT table init
+
+Change-Id: Id2c7ffbda2b57f59f6d48fc13f913385ffc99a18
+---
+
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa.c b/drivers/platform/msm/ipa/ipa_v3/ipa.c
+index b6921c1..ed91ad1 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa.c
+@@ -7165,6 +7165,18 @@
+ 	IPADBG_CLK("enabling IPA clocks and bus voting in Process:%s, PID:%d\n",
+ 			current->comm, current->pid);
+ 
++	/*
++	 * CPU-triggered DDR write to force GemNOC directory initialization
++	 * before IPA hardware starts, avoiding an uninitialized GemNOC state.
++	 * Buffer is pre-allocated at bootup; only executed when the
++	 * qcom,gemnoc-ddr-init device tree property is present.
++	 */
++	if (ipa3_ctx->gemnoc_ddr_init && ipa3_ctx->gemnoc_ddr_buf) {
++		WRITE_ONCE(*ipa3_ctx->gemnoc_ddr_buf, 0xDEADBEEF);
++		IPADBG_CLK("DDR touch write: 0x%X\n",
++			READ_ONCE(*ipa3_ctx->gemnoc_ddr_buf));
++	}
++
+ 	idx = ipa3_get_bus_vote();
+ 
+ 	IPADBG_CLK("IPA ICC Voting for BW Started\n");
+@@ -9984,6 +9996,18 @@
+ 		}
+ 	}
+ 
++	ipa3_ctx->gemnoc_ddr_init = resource_p->gemnoc_ddr_init;
++	if (ipa3_ctx->gemnoc_ddr_init) {
++		ipa3_ctx->gemnoc_ddr_buf = kmalloc(sizeof(*ipa3_ctx->gemnoc_ddr_buf),
++			GFP_KERNEL);
++		if (!ipa3_ctx->gemnoc_ddr_buf) {
++			IPAERR_BOOTUP("Failed to alloc GemNOC DDR init buffer\n");
++			result = -ENOMEM;
++			goto fail_gemnoc_buf_alloc;
++		}
++		IPADBG_BOOTUP("GemNOC DDR init buffer allocated\n");
++	}
++
+ 	ipa3_ctx->ctrl = kzalloc(sizeof(*ipa3_ctx->ctrl), GFP_KERNEL);
+ 	if (!ipa3_ctx->ctrl) {
+ 		result = -ENOMEM;
+@@ -10533,6 +10557,9 @@
+ 	kfree(ipa3_ctx->ctrl);
+ 	ipa3_ctx->ctrl = NULL;
+ fail_mem_ctrl:
++	kfree(ipa3_ctx->gemnoc_ddr_buf);
++	ipa3_ctx->gemnoc_ddr_buf = NULL;
++fail_gemnoc_buf_alloc:
+ 	kfree(ipa3_ctx->ipa_tz_unlock_reg);
+ 	ipa3_ctx->ipa_tz_unlock_reg = NULL;
+ fail_tz_unlock_reg:
+@@ -11211,6 +11238,13 @@
+ 		ipa_drv_res->ipa_wdi_opt_dpath
+ 		? "True" : "False");
+ 
++	ipa_drv_res->gemnoc_ddr_init =
++		of_property_read_bool(pdev->dev.of_node,
++		"qcom,gemnoc-ddr-init");
++	IPADBG_BOOTUP(": GemNOC DDR init on clk enable = %s\n",
++		ipa_drv_res->gemnoc_ddr_init
++		? "True" : "False");
++
+ 	/* Get IPA wrapper address */
+ 	result = of_property_read_u32(pdev->dev.of_node, "qcom,ipa-cfg-offset",
+ 		&ipa_drv_res->ipa_cfg_offset);
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_i.h b/drivers/platform/msm/ipa/ipa_v3/ipa_i.h
+index d6921ee..1760021 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_i.h
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_i.h
+@@ -2596,6 +2596,8 @@
+ 	struct mutex recycle_stats_collection_lock;
+ 	struct mutex ssr_lock;
+ 	atomic_t is_suspend_mode_enabled;
++	bool gemnoc_ddr_init;
++	u32 *gemnoc_ddr_buf;
+ };
+ 
+ struct ipa3_plat_drv_res {
+@@ -2683,6 +2685,7 @@
+ 	bool ipa_wdi_opt_dpath;
+ 	u8 coal_ipv4_id_ignore;
+ 	bool ipa_config_is_iot;
++	bool gemnoc_ddr_init;
+ };
+ 
+ /**
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c b/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c
+index cc69cda..f09cd8e 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_mhi_proxy.c
+@@ -322,6 +322,13 @@
+ 	*size_p = roundup(size + pa - *pa_p, PAGE_SIZE);
+ }
+ 
++/* true if [start, start + len) lies entirely within [base, base + size) */
++static inline bool imp_range_within(u64 base, u64 size, u64 start, u64 len)
++{
++	return start >= base && len <= size &&
++		(start - base) <= (size - len);
++}
++
+ static void __map_smmu_info(struct device *dev,
+ 	struct imp_iova_addr *partition, int num_mapping,
+ 	struct ipa_mhi_mem_addr_info_type_v01 *map_info,
+@@ -339,21 +346,42 @@
+ 		return;
+ 	}
+ 
++	if (num_mapping < 0 ||
++		num_mapping > QMI_IPA_REMOTE_MHI_MEMORY_MAPPING_NUM_MAX_V01) {
++		IMP_ERR("invalid num_mapping %d\n", num_mapping);
++		return;
++	}
++
+ 	for (i = 0; i < num_mapping; i++) {
+ 		int prot = IOMMU_READ | IOMMU_WRITE;
+ 		u32 ipa_base = ipa3_ctx->ipa_wrapper_base +
+ 			ipa3_ctx->ctrl->ipa_reg_base_ofst;
+ 		u32 ipa_size = ipa3_ctx->ipa_wrapper_size;
+ 
++		if (map_info[i].size == 0) {
++			IMP_ERR("invalid mapping size 0 for entry %d\n", i);
++			continue;
++		}
++
+ 		imp_smmu_round_to_page(map_info[i].iova, map_info[i].pa,
+ 			map_info[i].size, &iova_p, &pa_p, &size_p);
+ 
+-		if (map) {
+-			/* boundary check */
+-			WARN_ON(partition->base > iova_p ||
+-				(partition->base + partition->size) <
+-				(iova_p + size_p));
++		/*
++		 * Reject the mapping unless the iova lies fully within the
++		 * allowed partition and, for entries landing in the IPA
++		 * register aperture, the pa also lies fully within it.
++		 */
++		if (!imp_range_within(partition->base, partition->size,
++				iova_p, size_p) ||
++			(!imp_range_within(ipa_base, ipa_size,
++				pa_p, size_p))) {
++			IMP_ERR(
++				"rejecting oob mapping iova 0x%lx pa 0x%pa size %u\n",
++				iova_p, &pa_p, size_p);
++			continue;
++		}
+ 
++		if (map) {
+ 			/* for IPA uC MBOM we need to map with device type */
+ 			if (pa_p - ipa_base < ipa_size)
+ 				prot |= IOMMU_MMIO;
+@@ -362,7 +390,7 @@
+ 				iova_p, &pa_p, size_p);
+ 
+ 			iommu_map(domain, iova_p, pa_p, size_p, prot, GFP_KERNEL);
+-			
++
+ 		} else {
+ 			IMP_DBG("unmapping 0x%lx to 0x%pa size %d\n",
+ 				iova_p, &pa_p, size_p);
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c b/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
+index e258807..a3a7965 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
+@@ -1618,10 +1618,11 @@
+ 		return -EPERM;
+ 	}
+ 
+-	if (init->table_entries == 0) {
+-		IPAERR_RL("Table entries is zero\n");
+-		return -EPERM;
+-	}
++        if (init->table_entries == 0 ||
++            init->table_entries == U16_MAX) {
++                IPAERR_RL("Table entries is %d\n", init->table_entries);
++                return -EPERM;
++        }
+ 
+ 	if (!dev->is_mapped) {
+ 		IPAERR_RL("attempt to init %s before mmap\n",

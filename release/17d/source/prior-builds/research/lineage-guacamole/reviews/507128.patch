@@ -1,0 +1,172 @@
+From f1d606ca097306d0d0830de74a6f13c4a6e3181d Mon Sep 17 00:00:00 2001
+From: Alcatraz323 <alcatraz32323@gmail.com>
+Date: Tue, 20 Jan 2026 13:18:01 +0800
+Subject: [PATCH] libinput: Provide A16 QPR1 ABI shim
+
+- Align KeyEvent/MotionEvent initialize wrappers with upstream ABI (thisptr, int64_t times)
+- Add null-safe Transform/rawTransform fallback (identity)
+- Pass motion flags via ftl::Flags<MotionFlag>
+
+Log:
+Cmdline: com.qualcomm.wfd.service:wfd_service
+pid: 15101, tid: 15116, name: binder:15101_3  >>> com.qualcomm.wfd.service:wfd_service <<<
+uid: 10221
+esr: 0000000092000006 (Data Abort Exception 0x24)
+signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+Cause: null pointer dereference
+    x0  b400007a39541310  x1  00000000dbfabf3d  x2  0000000000000000  x3  0000000000001002
+    x4  0000000000000000  x5  00000078e0f935c0  x6  0000000000000000  x7  0000000000000000
+    x8  0000000000000001  x9  0000000000000000  x10 0000000000000000  x11 d6de72b430bb9c43
+    x12 0000001f8e180d8b  x13 00000000341555ad  x14 0000000000000018  x15 0000001f8e1741b5
+    x16 00000078e0b1c920  x17 00000078e0847090  x18 0000007877c48000  x19 00000078e0f97880
+    x20 00000078e0f93598  x21 00000078e0f93570  x22 b400007a7955e7d0  x23 0000000000000000
+    x24 000001c5d59db006  x25 00000000dbfabf3d  x26 00000078e0b184d8  x27 00000078e0f97880
+    x28 b400007a39541310  x29 00000078e0f93470
+    lr  00000078e0b080cc  sp  00000078e0f933e0  pc  00000078e08470c0  pst 0000000060001000
+    esr 0000000092000006
+12 total frames
+backtrace:
+      #00 pc 00000000000010c0  /system_ext/lib64/libinput_shim.so (android::MotionEvent::initialize(int, int, unsigned int, android::ui::LogicalDisplayId, std::__1::array<unsigned char, 32ul>, int, int, int, int, int, int, android::MotionClassification, android::ui::Transform const&, float, float, float, float, android::ui::Transform const&, long, long, unsigned long, android::PointerProperties const*, android::PointerCoords const*)+48) (BuildId: 2c0ba99d69610f6b89751dc2fc793fc6)
+      #01 pc 00000000000180c8  /system_ext/lib64/libwfdnative.so (SendEvent(WFD_uibc_event_t*, void const*, _jobject* const&, _jobject* const&) (.cfi)+3608) (BuildId: 8816efe099093de9a13d3dc79a6cc036)
+      #02 pc 0000000000020a54  /system_ext/lib64/libwfdclient.so (WiFiDisplaySourceClient::WifiDisplayListener::notifyUIBCGenericEvent(WFD_uibc_event_t*, void*)+72) (BuildId: b692155c62492ac1cea6fac32723adaf)
+      #03 pc 0000000000019c34  /system_ext/lib64/libwfdclient.so (BnWifiDisplayListener::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+388) (BuildId: b692155c62492ac1cea6fac32723adaf)
+      #04 pc 000000000004b58c  /system/lib64/libbinder.so (android::IPCThreadState::executeCommand(int)+716) (BuildId: a445e0294737803e1c037c89448f4036)
+      #05 pc 00000000000560e8  /system/lib64/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+296) (BuildId: a445e0294737803e1c037c89448f4036)
+      #06 pc 000000000005ed58  /system/lib64/libbinder.so (android::PoolThread::threadLoop()+24) (BuildId: a445e0294737803e1c037c89448f4036)
+      #07 pc 0000000000017cc8  /system/lib64/libutils.so (android::Thread::_threadLoop(void*)+248) (BuildId: 499031b9dbab97b0c29de3b55eb8ff46)
+      #08 pc 00000000001322cc  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::javaThreadShell(void*)+140) (BuildId: cea753946061b2bf85ab4bae27c2ada4)
+      #09 pc 0000000000019e44  /system/lib64/libutils.so (libutil_thread_trampoline(void*) (.__uniq.226528677032898775202282855395389835431)+20) (BuildId: 499031b9dbab97b0c29de3b55eb8ff46)
+      #10 pc 0000000000084cfc  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*) (.__uniq.67847048707805468364044055584648682506)+236) (BuildId: f9629a4e362009b917ebd8388f374b10)
+      #11 pc 0000000000077500  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: f9629a4e362009b917ebd8388f374b10)
+
+Co-authored-by: Flicker372 <flicker372@outlook.com>
+Change-Id: I7f39945d86f1cb4cf057d5d30312725dbdd7da4a
+(cherry picked from commit 4d124113ee007e7508cbd10515bea5eb0cd433ab)
+---
+
+diff --git a/libinput/Input.cpp b/libinput/Input.cpp
+index 97ca252..2f94e38 100644
+--- a/libinput/Input.cpp
++++ b/libinput/Input.cpp
+@@ -8,63 +8,82 @@
+ #include <input/Input.h>
+ #include <sys/types.h>
+ #include <ui/LogicalDisplayId.h>
++#include <ui/Transform.h>
++#include <array>
++#include <cstdint>
+ 
+-extern "C" void
+-_ZN7android8KeyEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiiiiill(
+-        int32_t id, int32_t deviceId, uint32_t source, android::ui::LogicalDisplayId displayId,
+-        std::array<uint8_t, 32> hmac, int32_t action, int32_t flags, int32_t keyCode,
+-        int32_t scanCode, int32_t metaState, int32_t repeatCount, void* downTime, void* eventTime);
++static const android::ui::Transform kIdentityTransform;
+ 
+ extern "C" void
+ _ZN7android11MotionEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiNS_3ftl5FlagsINS_10MotionFlagEEEiiiNS_20MotionClassificationERKNS1_9TransformEffffSD_llmPKNS_17PointerPropertiesEPKNS_13PointerCoordsE(
+-        int32_t id, int32_t deviceId, uint32_t source, android::ui::LogicalDisplayId displayId,
+-        std::array<uint8_t, 32> hmac, int32_t action, int32_t actionButton,
+-        android::ftl::Flags<android::MotionFlag> flags, int32_t edgeFlags, int32_t metaState,
+-        int32_t buttonState, void* classification, void* transform, float xPrecision,
+-        float yPrecision, float rawXCursorPosition, float rawYCursorPosition, void* rawTransform,
+-        void* downTime, void* eventTime, size_t pointerCount, void* pointerProperties,
+-        void* pointerCoords);
++        android::MotionEvent* thisptr, int32_t id, int32_t deviceId, uint32_t source,
++        android::ui::LogicalDisplayId displayId, std::array<uint8_t, 32> hmac, int32_t action,
++        int32_t actionButton, android::ftl::Flags<android::MotionFlag> flags, int32_t edgeFlags,
++        int32_t metaState, int32_t buttonState, android::MotionClassification classification,
++        const android::ui::Transform& transform, float xPrecision, float yPrecision,
++        float rawXCursorPosition, float rawYCursorPosition,
++        const android::ui::Transform& rawTransform, int64_t downTime, int64_t eventTime,
++        size_t pointerCount, const android::PointerProperties* pointerProperties,
++        const android::PointerCoords* pointerCoords);
++
++extern "C" void
++_ZN7android8KeyEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiiiiill(
++        android::KeyEvent* thisptr, int32_t id, int32_t deviceId, uint32_t source,
++        android::ui::LogicalDisplayId displayId, std::array<uint8_t, 32> hmac, int32_t action,
++        int32_t flags, int32_t keyCode, int32_t scanCode, int32_t metaState, int32_t repeatCount,
++        int64_t downTime, int64_t eventTime);
+ 
+ extern "C" void
+ _ZN7android11MotionEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiiiiiNS_20MotionClassificationERKNS1_9TransformEffffS9_llmPKNS_17PointerPropertiesEPKNS_13PointerCoordsE(
+-        int32_t id, int32_t deviceId, uint32_t source, android::ui::LogicalDisplayId displayId,
+-        std::array<uint8_t, 32> hmac, int32_t action, int32_t actionButton, int32_t flags,
+-        int32_t edgeFlags, int32_t metaState, int32_t buttonState, void* classification,
+-        void* transform, float xPrecision, float yPrecision, float rawXCursorPosition,
+-        float rawYCursorPosition, void* rawTransform, void* downTime, void* eventTime,
+-        size_t pointerCount, void* pointerProperties, void* pointerCoords) {
+-    return _ZN7android11MotionEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiNS_3ftl5FlagsINS_10MotionFlagEEEiiiNS_20MotionClassificationERKNS1_9TransformEffffSD_llmPKNS_17PointerPropertiesEPKNS_13PointerCoordsE(
+-            id, deviceId, source, displayId, hmac, action, actionButton,
+-            android::ftl::Flags<android::MotionFlag>{flags}, edgeFlags, metaState, buttonState,
+-            classification, transform, xPrecision, yPrecision, rawXCursorPosition,
+-            rawYCursorPosition, rawTransform, downTime, eventTime, pointerCount, pointerProperties,
+-            pointerCoords);
+-}
++        android::MotionEvent* thisptr, int32_t id, int32_t deviceId, uint32_t source,
++        android::ui::LogicalDisplayId displayId, std::array<uint8_t, 32> hmac, int32_t action,
++        int32_t actionButton, int32_t flags, int32_t edgeFlags, int32_t metaState,
++        int32_t buttonState, android::MotionClassification classification,
++        const android::ui::Transform* transform, float xPrecision, float yPrecision,
++        float rawXCursorPosition, float rawYCursorPosition,
++        const android::ui::Transform* rawTransform, int64_t downTime, int64_t eventTime,
++        size_t pointerCount, const android::PointerProperties* pointerProperties,
++        const android::PointerCoords* pointerCoords) {
++    const android::ui::Transform& safeTransform = transform ? *transform : kIdentityTransform;
++    const android::ui::Transform& safeRawTransform =
++            rawTransform ? *rawTransform : kIdentityTransform;
+ 
+-extern "C" void _ZN7android8KeyEvent10initializeEiijiNSt3__15arrayIhLm32EEEiiiiiill(
+-        int32_t id, int32_t deviceId, uint32_t source, int32_t displayId,
+-        std::array<uint8_t, 32> hmac, int32_t action, int32_t flags, int32_t keyCode,
+-        int32_t scanCode, int32_t metaState, int32_t repeatCount, void* downTime, void* eventTime) {
+-    _ZN7android8KeyEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiiiiill(
+-            id, deviceId, source, android::ui::LogicalDisplayId{displayId}, hmac, action, flags,
+-            keyCode, scanCode, metaState, repeatCount, downTime, eventTime);
++    const android::ftl::Flags<android::MotionFlag> safeFlags{static_cast<uint32_t>(flags)};
++
++    _ZN7android11MotionEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiNS_3ftl5FlagsINS_10MotionFlagEEEiiiNS_20MotionClassificationERKNS1_9TransformEffffSD_llmPKNS_17PointerPropertiesEPKNS_13PointerCoordsE(
++            thisptr, id, deviceId, source, displayId, hmac, action, actionButton, safeFlags,
++            edgeFlags, metaState, buttonState, classification, safeTransform, xPrecision,
++            yPrecision, rawXCursorPosition, rawYCursorPosition, safeRawTransform, downTime,
++            eventTime, pointerCount, pointerProperties, pointerCoords);
+ }
+ 
+ extern "C" void
+ _ZN7android11MotionEvent10initializeEiijiNSt3__15arrayIhLm32EEEiiiiiiNS_20MotionClassificationERKNS_2ui9TransformEffffS8_llmPKNS_17PointerPropertiesEPKNS_13PointerCoordsE(
+-        int32_t id, int32_t deviceId, uint32_t source, int32_t displayId,
+-        std::array<uint8_t, 32> hmac, int32_t action, int32_t actionButton, int32_t flags,
+-        int32_t edgeFlags, int32_t metaState, int32_t buttonState, void* classification,
+-        void* transform, float xPrecision, float yPrecision, float rawXCursorPosition,
+-        float rawYCursorPosition, void* rawTransform, void* downTime, void* eventTime,
+-        size_t pointerCount, void* pointerProperties, void* pointerCoords) {
++        android::MotionEvent* thisptr, int32_t id, int32_t deviceId, uint32_t source,
++        int32_t displayId, std::array<uint8_t, 32> hmac, int32_t action, int32_t actionButton,
++        int32_t flags, int32_t edgeFlags, int32_t metaState, int32_t buttonState,
++        android::MotionClassification classification, const android::ui::Transform* transform,
++        float xPrecision, float yPrecision, float rawXCursorPosition, float rawYCursorPosition,
++        const android::ui::Transform* rawTransform, int64_t downTime, int64_t eventTime,
++        size_t pointerCount, const android::PointerProperties* pointerProperties,
++        const android::PointerCoords* pointerCoords) {
+     _ZN7android11MotionEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiiiiiNS_20MotionClassificationERKNS1_9TransformEffffS9_llmPKNS_17PointerPropertiesEPKNS_13PointerCoordsE(
+-            id, deviceId, source, android::ui::LogicalDisplayId{displayId}, hmac, action,
++            thisptr, id, deviceId, source, android::ui::LogicalDisplayId{displayId}, hmac, action,
+             actionButton, flags, edgeFlags, metaState, buttonState, classification, transform,
+             xPrecision, yPrecision, rawXCursorPosition, rawYCursorPosition, rawTransform, downTime,
+             eventTime, pointerCount, pointerProperties, pointerCoords);
+ }
+ 
++extern "C" void _ZN7android8KeyEvent10initializeEiijiNSt3__15arrayIhLm32EEEiiiiiill(
++        android::KeyEvent* thisptr, int32_t id, int32_t deviceId, uint32_t source,
++        int32_t displayId, std::array<uint8_t, 32> hmac, int32_t action, int32_t flags,
++        int32_t keyCode, int32_t scanCode, int32_t metaState, int32_t repeatCount, int64_t downTime,
++        int64_t eventTime) {
++    _ZN7android8KeyEvent10initializeEiijNS_2ui16LogicalDisplayIdENSt3__15arrayIhLm32EEEiiiiiill(
++            thisptr, id, deviceId, source, android::ui::LogicalDisplayId{displayId}, hmac, action,
++            flags, keyCode, scanCode, metaState, repeatCount, downTime, eventTime);
++}
++
+ extern "C" void _ZN7android17PointerProperties8copyFromERKS0_(
+         android::PointerProperties* thisptr, const android::PointerProperties& other) {
+     thisptr->id = other.id;

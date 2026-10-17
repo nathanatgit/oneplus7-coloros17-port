@@ -1,0 +1,36 @@
+From 75ea11909dd9b02dfc32229dd4d307d5b47c6fac Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Tue, 29 Sep 2026 17:04:52 +0200
+Subject: [PATCH] Settings: Lock face enroll orientation when the HAL owns the camera
+
+The face HAL keeps rendering into the initial preview surface, which is
+gone once the activity is recreated.
+
+Assisted-by: LLM
+Change-Id: I7f929d66fcbaa87ec5b0d54ce6ddfb85c5d4d034
+---
+
+diff --git a/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java b/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java
+index 708fb05..22d6e7f 100644
+--- a/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java
++++ b/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java
+@@ -18,6 +18,7 @@
+ 
+ import android.app.settings.SettingsEnums;
+ import android.content.Context;
++import android.content.pm.ActivityInfo;
+ import android.graphics.Matrix;
+ import android.graphics.SurfaceTexture;
+ import android.hardware.camera2.CameraAccessException;
+@@ -190,6 +191,11 @@
+     public void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+         mHalOwnsCamera = getResources().getBoolean(R.bool.config_face_enroll_hal_owns_camera);
++        if (mHalOwnsCamera) {
++            // The face HAL keeps rendering into the initial preview surface, which is gone once
++            // the activity is recreated. Unlike portrait, locked is respected on large screens.
++            getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
++        }
+         mTextureView = getActivity().findViewById(R.id.texture_view);
+         mProgressView = getActivity().findViewById(R.id.progress_view);
+ 

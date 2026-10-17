@@ -1,0 +1,466 @@
+From b3e6a55c21f436a4e5f8ea374ffffaea078fd033 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 01:37:51 +0530
+Subject: [PATCH] LatinIME: Use switches for settings toggles
+
+Declare the settings toggles as SwitchPreferenceCompat so they render
+as Material switches, instead of declaring checkboxes and replacing them
+with switches at runtime.
+
+Assisted-by: LLM
+Change-Id: Ie44b97271c3b68cdb04f044c975be2e8dc06f3ea
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/res/xml/prefs_screen_accounts.xml b/java/res/xml/prefs_screen_accounts.xml
+index 415b0b4..7f6c858 100644
+--- a/java/res/xml/prefs_screen_accounts.xml
++++ b/java/res/xml/prefs_screen_accounts.xml
+@@ -30,7 +30,7 @@
+         android:enabled="false" />
+ 
+     <!-- Summary will be set programmatically to reflect the account status -->
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_enable_cloud_sync"
+         android:title="@string/cloud_sync_title"
+         android:defaultValue="false"
+@@ -52,7 +52,7 @@
+         android:dependency="pref_enable_cloud_sync" />
+ 
+     <!-- Title will be set programmatically to embed application name -->
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_enable_metrics_logging"
+         android:summary="@string/enable_metrics_logging_summary"
+         android:defaultValue="true"
+diff --git a/java/res/xml/prefs_screen_advanced.xml b/java/res/xml/prefs_screen_advanced.xml
+index a7358d4..ce7f76c 100644
+--- a/java/res/xml/prefs_screen_advanced.xml
++++ b/java/res/xml/prefs_screen_advanced.xml
+@@ -37,23 +37,23 @@
+         latin:minValue="@integer/config_min_longpress_timeout"
+         latin:maxValue="@integer/config_max_longpress_timeout"
+         latin:stepValue="@integer/config_longpress_timeout_step" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_enable_emoji_alt_physical_key"
+         android:title="@string/prefs_enable_emoji_alt_physical_key"
+         android:summary="@string/prefs_enable_emoji_alt_physical_key_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_show_setup_wizard_icon"
+         android:title="@string/show_setup_wizard_icon"
+         android:summary="@string/show_setup_wizard_icon_summary"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_space_trackpad"
+         android:title="@string/space_trackpad"
+         android:summary="@string/space_trackpad_summary"
+         android:defaultValue="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_backspace_trackpad"
+         android:title="@string/backspace_trackpad"
+         android:summary="@string/backspace_trackpad_summary"
+diff --git a/java/res/xml/prefs_screen_appearance.xml b/java/res/xml/prefs_screen_appearance.xml
+index 5c3a285..49fbab7 100644
+--- a/java/res/xml/prefs_screen_appearance.xml
++++ b/java/res/xml/prefs_screen_appearance.xml
+@@ -26,13 +26,13 @@
+         android:fragment="com.android.inputmethod.latin.settings.CustomInputStyleSettingsFragment"
+         android:key="custom_input_styles"
+         android:title="@string/custom_input_styles_title" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_split_keyboard"
+         android:title="@string/enable_split_keyboard"
+         android:summary="@string/enable_split_keyboard_summary"
+         android:persistent="true"
+         android:defaultValue="false" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_split_keyboard_duplicate_keys"
+         android:title="@string/split_keyboard_duplicate_keys"
+         android:summary="@string/split_keyboard_duplicate_keys_summary"
+diff --git a/java/res/xml/prefs_screen_correction.xml b/java/res/xml/prefs_screen_correction.xml
+index 687a3cb..98e8a3e 100644
+--- a/java/res/xml/prefs_screen_correction.xml
++++ b/java/res/xml/prefs_screen_correction.xml
+@@ -35,37 +35,37 @@
+                 android:value="@string/dictionary_pack_client_id" />
+         </intent>
+     </Preference>
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_key_block_potentially_offensive"
+         android:title="@string/prefs_block_potentially_offensive_title"
+         android:summary="@string/prefs_block_potentially_offensive_summary"
+         android:defaultValue="@bool/config_block_potentially_offensive"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_key_auto_correction"
+         android:title="@string/auto_correction"
+         android:summary="@string/auto_correction_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="show_suggestions"
+         android:summary="@string/prefs_show_suggestions_summary"
+         android:title="@string/prefs_show_suggestions"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_key_use_personalized_dicts"
+         android:title="@string/use_personalized_dicts"
+         android:summary="@string/use_personalized_dicts_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_key_use_contacts_dict"
+         android:title="@string/use_contacts_dict"
+         android:summary="@string/use_contacts_dict_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="next_word_prediction"
+         android:title="@string/bigram_prediction"
+         android:summary="@string/bigram_prediction_summary"
+diff --git a/java/res/xml/prefs_screen_debug.xml b/java/res/xml/prefs_screen_debug.xml
+index 325df57..f4aee53 100644
+--- a/java/res/xml/prefs_screen_debug.xml
++++ b/java/res/xml/prefs_screen_debug.xml
+@@ -20,28 +20,28 @@
+     android:title="@string/prefs_debug_mode"
+     android:key="english_ime_debug_settings"
+ >
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="debug_mode"
+         android:title="@string/prefs_debug_mode"
+         android:defaultValue="false"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="force_non_distinct_multitouch"
+         android:title="@string/prefs_force_non_distinct_multitouch"
+         android:defaultValue="false"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_should_show_lxx_suggestion_ui"
+         android:title="@string/prefs_should_show_lxx_suggestion_ui"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_sliding_key_input_preview"
+         android:title="@string/sliding_key_input_preview"
+         android:summary="@string/sliding_key_input_preview_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_has_custom_key_preview_animation_params"
+         android:title="@string/prefs_customize_key_preview_animation"
+         android:defaultValue="false"
+diff --git a/java/res/xml/prefs_screen_gesture.xml b/java/res/xml/prefs_screen_gesture.xml
+index 38c7eda..ab87191 100644
+--- a/java/res/xml/prefs_screen_gesture.xml
++++ b/java/res/xml/prefs_screen_gesture.xml
+@@ -18,20 +18,20 @@
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     android:title="@string/settings_screen_gesture"
+     android:key="screen_gesture">
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="gesture_input"
+         android:title="@string/gesture_input"
+         android:summary="@string/gesture_input_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_gesture_floating_preview_text"
+         android:dependency="gesture_input"
+         android:title="@string/gesture_floating_preview_text"
+         android:summary="@string/gesture_floating_preview_text_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_gesture_preview_trail"
+         android:dependency="gesture_input"
+         android:title="@string/gesture_preview_trail"
+diff --git a/java/res/xml/prefs_screen_preferences.xml b/java/res/xml/prefs_screen_preferences.xml
+index 37a96e2..390aff0 100644
+--- a/java/res/xml/prefs_screen_preferences.xml
++++ b/java/res/xml/prefs_screen_preferences.xml
+@@ -18,58 +18,58 @@
+     xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:latin="http://schemas.android.com/apk/res/com.android.inputmethod.latin"
+     android:title="@string/settings_screen_preferences">
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="auto_cap"
+         android:title="@string/auto_cap"
+         android:summary="@string/auto_cap_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_show_number_row"
+         android:title="@string/number_row"
+         android:summary="@string/number_row_summary"
+         android:defaultValue="false"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_show_number_row_password"
+         android:title="@string/number_row_password"
+         android:summary="@string/number_row_password_summary"
+         android:defaultValue="false"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_show_emoji_key"
+         android:title="@string/show_emoji_key"
+         android:summary="@string/show_emoji_key_summary"
+         android:defaultValue="false"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_show_longpress_hints"
+         android:title="@string/show_longpress_hints"
+         android:summary="@string/show_longpress_hints_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_key_use_double_space_period"
+         android:title="@string/use_double_space_period"
+         android:summary="@string/use_double_space_period_summary"
+         android:defaultValue="true"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="vibrate_on"
+         android:title="@string/vibrate_on_keypress"
+         android:defaultValue="@bool/config_default_vibration_enabled"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="sound_on"
+         android:title="@string/sound_on_keypress"
+         android:defaultValue="@bool/config_default_sound_enabled"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="popup_on"
+         android:title="@string/popup_on_keypress"
+         android:defaultValue="@bool/config_default_key_preview_popup"
+         android:persistent="true" />
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_voice_input_key"
+         android:title="@string/voice_input"
+         android:defaultValue="true"
+diff --git a/java/res/xml/spell_checker_settings.xml b/java/res/xml/spell_checker_settings.xml
+index 3d95018..977b6e6 100644
+--- a/java/res/xml/spell_checker_settings.xml
++++ b/java/res/xml/spell_checker_settings.xml
+@@ -17,7 +17,7 @@
+ <PreferenceScreen
+     xmlns:android="http://schemas.android.com/apk/res/android"
+ >
+-    <CheckBoxPreference
++    <SwitchPreferenceCompat
+         android:key="pref_spellcheck_use_contacts"
+         android:title="@string/use_contacts_for_spellchecking_option_title"
+         android:summary="@string/use_contacts_for_spellchecking_option_summary"
+diff --git a/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java b/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java
+index e8db316..090cad2 100644
+--- a/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/CorrectionSettingsFragment.java
+@@ -26,7 +26,7 @@
+ import android.os.Build;
+ import android.os.Bundle;
+ import androidx.preference.Preference;
+-import androidx.preference.SwitchPreference;
++import androidx.preference.SwitchPreferenceCompat;
+ import android.text.TextUtils;
+ 
+ import com.android.inputmethod.dictionarypack.DictionarySettingsActivity;
+@@ -60,7 +60,7 @@
+             DBG_USE_INTERNAL_PERSONAL_DICTIONARY_SETTINGS
+             || Build.VERSION.SDK_INT <= Build.VERSION_CODES.JELLY_BEAN_MR2;
+ 
+-    private SwitchPreference mUseContactsPreference;
++    private SwitchPreferenceCompat mUseContactsPreference;
+ 
+     @Override
+     public void onCreate(final Bundle icicle) {
+@@ -88,7 +88,8 @@
+             overwriteUserDictionaryPreference(editPersonalDictionary);
+         }
+ 
+-        mUseContactsPreference = (SwitchPreference) findPreference(Settings.PREF_KEY_USE_CONTACTS_DICT);
++        mUseContactsPreference = (SwitchPreferenceCompat) findPreference(
++                Settings.PREF_KEY_USE_CONTACTS_DICT);
+         turnOffUseContactsIfNoPermission();
+     }
+ 
+diff --git a/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java b/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java
+index 55c4adb..c3275cc 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java
++++ b/java/src/com/android/inputmethod/latin/settings/SubScreenFragment.java
+@@ -90,13 +90,6 @@
+     }
+ 
+     @Override
+-    public void addPreferencesFromResource(final int preferencesResId) {
+-        super.addPreferencesFromResource(preferencesResId);
+-        TwoStatePreferenceHelper.replaceCheckBoxPreferencesBySwitchPreferences(
+-                getPreferenceScreen());
+-    }
+-
+-    @Override
+     public void onActivityCreated(Bundle savedInstanceState) {
+         super.onActivityCreated(savedInstanceState);
+     }
+diff --git a/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java b/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java
+deleted file mode 100644
+index 66bc464..0000000
+--- a/java/src/com/android/inputmethod/latin/settings/TwoStatePreferenceHelper.java
++++ /dev/null
+@@ -1,82 +0,0 @@
+-/*
+- * Copyright (C) 2014 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.inputmethod.latin.settings;
+-
+-import android.os.Build;
+-import androidx.preference.CheckBoxPreference;
+-import androidx.preference.Preference;
+-import androidx.preference.PreferenceGroup;
+-import androidx.preference.SwitchPreference;
+-
+-import java.util.ArrayList;
+-
+-public class TwoStatePreferenceHelper {
+-    private static final String EMPTY_TEXT = "";
+-
+-    private TwoStatePreferenceHelper() {
+-        // This utility class is not publicly instantiable.
+-    }
+-
+-    public static void replaceCheckBoxPreferencesBySwitchPreferences(final PreferenceGroup group) {
+-        // The keyboard settings keeps using a CheckBoxPreference on KitKat or previous.
+-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
+-            return;
+-        }
+-        // The keyboard settings starts using a SwitchPreference without switch on/off text on
+-        // API versions newer than KitKat.
+-        replaceAllCheckBoxPreferencesBySwitchPreferences(group);
+-    }
+-
+-    private static void replaceAllCheckBoxPreferencesBySwitchPreferences(
+-            final PreferenceGroup group) {
+-        final ArrayList<Preference> preferences = new ArrayList<>();
+-        final int count = group.getPreferenceCount();
+-        for (int index = 0; index < count; index++) {
+-            preferences.add(group.getPreference(index));
+-        }
+-        group.removeAll();
+-        for (int index = 0; index < count; index++) {
+-            final Preference preference = preferences.get(index);
+-            if (preference instanceof CheckBoxPreference) {
+-                addSwitchPreferenceBasedOnCheckBoxPreference((CheckBoxPreference)preference, group);
+-            } else {
+-                group.addPreference(preference);
+-                if (preference instanceof PreferenceGroup) {
+-                    replaceAllCheckBoxPreferencesBySwitchPreferences((PreferenceGroup)preference);
+-                }
+-            }
+-        }
+-    }
+-
+-    static void addSwitchPreferenceBasedOnCheckBoxPreference(final CheckBoxPreference checkBox,
+-            final PreferenceGroup group) {
+-        final SwitchPreference switchPref = new SwitchPreference(checkBox.getContext());
+-        switchPref.setTitle(checkBox.getTitle());
+-        switchPref.setKey(checkBox.getKey());
+-        switchPref.setOrder(checkBox.getOrder());
+-        switchPref.setPersistent(checkBox.isPersistent());
+-        switchPref.setEnabled(checkBox.isEnabled());
+-        switchPref.setChecked(checkBox.isChecked());
+-        switchPref.setSummary(checkBox.getSummary());
+-        switchPref.setSummaryOn(checkBox.getSummaryOn());
+-        switchPref.setSummaryOff(checkBox.getSummaryOff());
+-        switchPref.setSwitchTextOn(EMPTY_TEXT);
+-        switchPref.setSwitchTextOff(EMPTY_TEXT);
+-        group.addPreference(switchPref);
+-        switchPref.setDependency(checkBox.getDependency());
+-    }
+-}
+diff --git a/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java b/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java
+index 7d5db9d..c93bdce 100644
+--- a/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java
++++ b/java/src/com/android/inputmethod/latin/spellcheck/SpellCheckerSettingsFragment.java
+@@ -20,14 +20,13 @@
+ import android.content.SharedPreferences;
+ import android.os.Bundle;
+ import androidx.preference.PreferenceScreen;
+-import androidx.preference.SwitchPreference;
++import androidx.preference.SwitchPreferenceCompat;
+ import android.text.TextUtils;
+ 
+ import com.android.inputmethod.latin.R;
+ import com.android.inputmethod.latin.permissions.PermissionsManager;
+ import com.android.inputmethod.latin.permissions.PermissionsUtil;
+ import com.android.inputmethod.latin.settings.SubScreenFragment;
+-import com.android.inputmethod.latin.settings.TwoStatePreferenceHelper;
+ import com.android.inputmethod.latin.utils.ApplicationUtils;
+ 
+ import static com.android.inputmethod.latin.permissions.PermissionsManager.get;
+@@ -39,7 +38,7 @@
+     implements SharedPreferences.OnSharedPreferenceChangeListener,
+             PermissionsManager.PermissionsResultCallback {
+ 
+-    private SwitchPreference mLookupContactsPreference;
++    private SwitchPreferenceCompat mLookupContactsPreference;
+ 
+     @Override
+     public void onActivityCreated(final Bundle savedInstanceState) {
+@@ -48,9 +47,7 @@
+         final PreferenceScreen preferenceScreen = getPreferenceScreen();
+         preferenceScreen.setTitle(ApplicationUtils.getActivityTitleResId(
+                 getActivity(), SpellCheckerSettingsActivity.class));
+-        TwoStatePreferenceHelper.replaceCheckBoxPreferencesBySwitchPreferences(preferenceScreen);
+-
+-        mLookupContactsPreference = (SwitchPreference) findPreference(
++        mLookupContactsPreference = (SwitchPreferenceCompat) findPreference(
+                 AndroidSpellCheckerService.PREF_USE_CONTACTS_KEY);
+         turnOffLookupContactsIfNoPermission();
+     }

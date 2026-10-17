@@ -1,0 +1,28 @@
+From d168e057b27006badedd25a8d383ee53e4d7b72d Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Fri, 18 Sep 2026 11:00:23 +0200
+Subject: [PATCH] Fix PathWrapper::addPath self-add
+
+When adding a PathWrapper to itself, ensureBuilder() is evaluated before
+getPath(). The latter detaches and resets the builder, so addPath() gets
+executed on the reset builder instead of the original path.
+
+Test: path.addPath(path, 1.0f, 1.0f)
+Bug: 563542884
+Change-Id: If31cab6c8d37b2c42df7b083de58c3e0dedca407
+---
+
+diff --git a/libs/hwui/jni/Path.cpp b/libs/hwui/jni/Path.cpp
+index 5437aed..b1547ba 100644
+--- a/libs/hwui/jni/Path.cpp
++++ b/libs/hwui/jni/Path.cpp
+@@ -144,7 +144,8 @@
+         this->ensureBuilder().addRRect(rrect, dir);
+     }
+     void addPath(const PathWrapper& path, const SkMatrix& m) {
+-        this->ensureBuilder().addPath(path.getPath(), m);
++        SkPath src = path.getPath();
++        this->ensureBuilder().addPath(src, m);
+     }
+     void setLastPt(float x, float y) { this->ensureBuilder().setLastPt(x, y); }
+ 

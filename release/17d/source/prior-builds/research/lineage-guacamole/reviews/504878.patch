@@ -1,0 +1,47 @@
+From f9b0e6852944e3df0f548ce4defe1fc7f5a5f406 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 23:54:50 +0530
+Subject: [PATCH] SUW: Disable the recovery update component completely
+
+Change-Id: I16f288cf1bfc1c04bf3f5d666c781181f37d7c6d
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+index dc70f2b..fbf3189 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/system/UpdateRecoveryActivity.kt
+@@ -33,6 +33,7 @@
+ 
+         if (!SetupWizardUtils.hasRecoveryUpdater(this)) {
+             Log.v(TAG, "No recovery updater, skipping UpdateRecoveryActivity")
++            SetupWizardUtils.disableComponent(this, UpdateRecoveryActivity::class.java)
+             finishAction(RESULT_SKIP)
+             return
+         }
+diff --git a/start_lineage_wizard.sh b/start_lineage_wizard.sh
+index 638f3bb..f4710b7 100755
+--- a/start_lineage_wizard.sh
++++ b/start_lineage_wizard.sh
+@@ -11,6 +11,8 @@
+ wait ${!}
+ adb shell pm enable org.lineageos.setupwizard/.system.DeviceSpecificActivity || true
+ wait ${!}
++adb shell pm enable org.lineageos.setupwizard/.system.UpdateRecoveryActivity || true
++wait ${!}
+ if adb shell pm list packages | grep com.google.android.setupwizard; then
+   adb shell pm disable com.google.android.setupwizard || true
+   wait ${!}
+diff --git a/start_lineage_wizard_with_gms.sh b/start_lineage_wizard_with_gms.sh
+index 763ace2..f92664d 100755
+--- a/start_lineage_wizard_with_gms.sh
++++ b/start_lineage_wizard_with_gms.sh
+@@ -11,6 +11,8 @@
+ wait ${!}
+ adb shell pm enable org.lineageos.setupwizard/.system.DeviceSpecificActivity || true
+ wait ${!}
++adb shell pm enable org.lineageos.setupwizard/.system.UpdateRecoveryActivity || true
++wait ${!}
+ adb shell pm enable com.google.android.setupwizard || true
+ wait ${!}
+ if adb shell pm list packages | grep com.android.provision; then

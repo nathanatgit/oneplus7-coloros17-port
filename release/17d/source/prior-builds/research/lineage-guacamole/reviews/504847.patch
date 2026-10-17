@@ -1,0 +1,50 @@
+From 2b25660bb5c309688cc4550569cd6949c313cc40 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 21:53:24 +0530
+Subject: [PATCH] SUW: Fade the finish screen where no wallpaper can show
+
+Change-Id: Id17154246b88a84b79e01b7f7b38b3ad9d12c3f3
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+index f91d334..0b721aa 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+@@ -361,6 +361,10 @@
+         finishState = FinishState.ANIMATING
+         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED)
+         disableNavigation()
++        if (!revealWallpaper) {
++            fadeOutAndFinish()
++            return
++        }
+         ValueAnimator.ofFloat(revealProgress, 1f).apply {
+             duration = (ANIM_DURATION_MS * (1f - revealProgress)).toLong().coerceAtLeast(200L)
+             interpolator = AccelerateDecelerateInterpolator()
+@@ -382,6 +386,17 @@
+         }
+     }
+ 
++    private fun fadeOutAndFinish() {
++        findViewById<View>(R.id.linear_layout)
++            .animate()
++            .alpha(0f)
++            .setDuration(FADE_OUT_DURATION_MS)
++            .withEndAction {
++                rootView.visibility = View.INVISIBLE
++                handler.post { finishAfterAnimation() }
++            }
++    }
++
+     private fun finishAfterAnimation() {
+         SetupWizardUtils.finishSetupWizard(this)
+         finishState = FinishState.FINISHED
+@@ -404,6 +419,7 @@
+ 
+         private const val ANIM_DURATION_MS = 900L
+         private const val SPRING_BACK_DURATION_MS = 200L
++        private const val FADE_OUT_DURATION_MS = 400L
+ 
+         private val COMMIT_KEY_CODES =
+             setOf(

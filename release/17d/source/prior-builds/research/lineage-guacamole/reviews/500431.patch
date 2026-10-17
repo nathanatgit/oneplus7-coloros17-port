@@ -1,0 +1,598 @@
+From 212b309b5d8cf473a1a2757db6ac5b500a300c89 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Sat, 20 Jun 2026 04:56:13 +0530
+Subject: [PATCH] SUW: Migrate to FooterBarMixin
+
+Change-Id: I33906ea5a8aefaddafe975f89cf1f8aad0b724f8
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+index 2cd499d..2690a68 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/FinishActivity.kt
+@@ -17,6 +17,7 @@
+ import android.view.View
+ import android.view.ViewAnimationUtils
+ import android.view.ViewGroup.MarginLayoutParams
++import android.widget.Button
+ import androidx.core.view.ViewCompat
+ import androidx.core.view.WindowInsetsCompat
+ import com.google.android.setupcompat.util.SystemBarHelper
+@@ -29,6 +30,7 @@
+     private val handler = Handler(Looper.getMainLooper())
+ 
+     private lateinit var rootView: View
++    private lateinit var startButton: Button
+     private var edgeToEdgeWallpaperBackgroundTheme: Resources.Theme? = null
+ 
+     private enum class FinishState {
+@@ -51,7 +53,8 @@
+         if (LOGV) {
+             logActivityState("onCreate savedInstanceState=$savedInstanceState")
+         }
+-        setNextText(R.string.start)
++        startButton = findViewById(R.id.start)
++        startButton.setOnClickListener { onNextPressed() }
+ 
+         // Edge-to-edge. Needed for the background view to fill the full screen.
+         val window = window
+@@ -90,7 +93,7 @@
+     }
+ 
+     private fun disableNavigation() {
+-        hideNextButton()
++        startButton.visibility = View.INVISIBLE
+         SystemBarHelper.setBackButtonVisible(window, false)
+     }
+ 
+@@ -113,6 +116,8 @@
+ 
+     override val layoutResId = R.layout.finish_activity
+ 
++    override val installFooterBar = false
++
+     override fun getTheme(): Resources.Theme {
+         val theme = super.getTheme()
+         if (finishState == FinishState.NONE) {
+@@ -124,7 +129,7 @@
+                 .also { edgeToEdgeWallpaperBackgroundTheme = it }
+     }
+ 
+-    override fun onNavigateNext() {
++    override fun onNextPressed() {
+         when (finishState) {
+             FinishState.NONE -> relaunchAndRunAnimation()
+             else -> Log.e(TAG, "Unexpected state $finishState when navigating next")
+diff --git a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+index 8e5ba52..5e923b1 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+@@ -11,7 +11,6 @@
+ import android.view.View
+ import android.widget.Button
+ import android.widget.TextView
+-import com.google.android.setupcompat.template.FooterButtonStyleUtils
+ import com.google.android.setupcompat.util.SystemBarHelper
+ import org.lineageos.setupwizard.base.SubBaseActivity
+ import org.lineageos.setupwizard.util.SetupWizardUtils
+@@ -27,8 +26,6 @@
+         onSetupStart()
+         SystemBarHelper.setBackButtonVisible(window, false)
+ 
+-        setNextText(R.string.start)
+-
+         val startButton: Button = findViewById(R.id.start)
+         val emergButton: Button = findViewById(R.id.emerg_dialer)
+         val skipButton: Button = findViewById(R.id.skip)
+@@ -38,12 +35,8 @@
+             startSubactivity(Intent(ACTION_ACCESSIBILITY_SETTINGS))
+         }
+ 
+-        FooterButtonStyleUtils.applyPrimaryButtonPartnerResource(this, startButton, true)
+-
+         if (SetupWizardUtils.hasTelephony(this)) {
+-            setSkipText(R.string.emergency_call)
+             emergButton.setOnClickListener { startSubactivity(Intent(ACTION_EMERGENCY_DIAL)) }
+-            FooterButtonStyleUtils.applySecondaryButtonPartnerResource(this, emergButton, true)
+         } else {
+             emergButton.visibility = View.GONE
+         }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt b/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt
+index 698cf10..d359111 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/backup/RestoreIntroActivity.kt
+@@ -47,6 +47,10 @@
+ 
+     override val iconResId = R.drawable.ic_restore
+ 
++    override val installFooterBar = true
++
++    override val showSkipButton = true
++
+     private fun launchRestore() {
+         startSubactivity(Intent(ACTION_RESTORE_FROM_BACKUP))
+     }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+index ef7ba25..49c2642 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+@@ -13,7 +13,6 @@
+ import android.text.TextUtils
+ import android.util.Log
+ import android.view.View
+-import android.view.View.INVISIBLE
+ import android.widget.Button
+ import androidx.activity.OnBackPressedCallback
+ import androidx.activity.result.ActivityResult
+@@ -22,6 +21,8 @@
+ import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
+ import androidx.appcompat.app.AppCompatActivity
+ import com.android.settingslib.Utils
++import com.google.android.setupcompat.template.FooterBarMixin
++import com.google.android.setupcompat.template.FooterButton
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+ import com.google.android.setupcompat.util.WizardManagerHelper
+ import com.google.android.setupdesign.GlifLayout
+@@ -31,12 +32,12 @@
+ import org.lineageos.setupwizard.LOGV
+ import org.lineageos.setupwizard.R
+ import org.lineageos.setupwizard.util.SetupWizardUtils
+-import org.lineageos.setupwizard.widget.NavigationLayout
+-import org.lineageos.setupwizard.widget.NavigationLayout.NavigationBarListener
+ 
+-abstract class BaseSetupWizardActivity : AppCompatActivity(), NavigationBarListener {
++abstract class BaseSetupWizardActivity : AppCompatActivity() {
+ 
+-    private var navigationBar: NavigationLayout? = null
++    private var footerBarMixin: FooterBarMixin? = null
++    private var nextFooterButton: FooterButton? = null
++
+     private lateinit var nextIntentResultLauncher: ActivityResultLauncher<Intent>
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+@@ -47,8 +48,9 @@
+         nextIntentResultLauncher =
+             registerForActivityResult(StartDecoratedActivityForResult(), this::onNextIntentResult)
+         initLayout()
+-        navigationBar = findViewById<View>(R.id.navigation_bar) as? NavigationLayout
+-        navigationBar?.setNavigationBarListener(this)
++        if (installFooterBar) {
++            setupFooterBar()
++        }
+         onBackPressedDispatcher.addCallback(
+             this,
+             object : OnBackPressedCallback(true) {
+@@ -119,8 +121,31 @@
+         }
+     }
+ 
++    private fun setupFooterBar() {
++        val mixin = glifLayout.getMixin(FooterBarMixin::class.java)
++        footerBarMixin = mixin
++
++        nextFooterButton =
++            FooterButton.Builder(this)
++                .setText(R.string.next)
++                .setListener { onNextPressed() }
++                .setButtonType(FooterButton.ButtonType.NEXT)
++                .build()
++                .also { mixin.setPrimaryButton(it) }
++
++        if (showSkipButton) {
++            mixin.setSecondaryButton(
++                FooterButton.Builder(this)
++                    .setText(R.string.skip)
++                    .setListener { onSkipPressed() }
++                    .setButtonType(FooterButton.ButtonType.SKIP)
++                    .build()
++            )
++        }
++    }
++
+     fun setNextAllowed(allowed: Boolean) {
+-        navigationBar?.nextButton?.isEnabled = allowed
++        nextFooterButton?.isEnabled = allowed
+     }
+ 
+     protected open fun onNextPressed() {
+@@ -132,27 +157,11 @@
+     }
+ 
+     protected fun setNextText(resId: Int) {
+-        navigationBar?.nextButton?.setText(resId)
++        nextFooterButton?.setText(this, resId)
+     }
+ 
+-    val nextButton: Button
+-        get() = navigationBar!!.nextButton
+-
+-    protected fun setSkipText(resId: Int) {
+-        navigationBar?.skipButton?.setText(resId)
+-    }
+-
+-    protected fun hideNextButton() {
+-        navigationBar?.nextButton?.visibility = INVISIBLE
+-    }
+-
+-    override fun onNavigateNext() {
+-        onNextPressed()
+-    }
+-
+-    override fun onSkip() {
+-        onSkipPressed()
+-    }
++    val nextButton: Button?
++        get() = footerBarMixin?.primaryButtonView
+ 
+     protected fun onSetupStart() {
+         if (SetupWizardUtils.isOwner()) {
+@@ -246,6 +255,10 @@
+ 
+     protected open val iconResId = -1
+ 
++    protected open val installFooterBar = true
++
++    protected open val showSkipButton = false
++
+     protected open fun applyForwardTransition() {
+         TransitionHelper.applyForwardTransition(this, DEFAULT_TRANSITION, true)
+     }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/SubBaseActivity.kt b/app/src/main/java/org/lineageos/setupwizard/base/SubBaseActivity.kt
+index e77c5ba..017518d 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/base/SubBaseActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/base/SubBaseActivity.kt
+@@ -96,6 +96,8 @@
+ 
+     override val titleResId = R.string.loading
+ 
++    override val installFooterBar = false
++
+     companion object {
+         private const val TAG = "SubBaseActivity"
+     }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+index f72387c..19ca3f0 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/locale/LocaleActivity.kt
+@@ -63,10 +63,10 @@
+         SystemBarHelper.setBackButtonVisible(window, true)
+         setNextText(R.string.next)
+         languagePicker = findViewById(R.id.locale_list)
+-        languagePicker.setNextRight(nextButton.id)
++        nextButton?.let { languagePicker.setNextRight(it.id) }
+         languagePicker.requestFocus()
+         if (resources.getBoolean(R.bool.config_isLargeNoTouch)) {
+-            languagePicker.setOnClickListener { nextButton.performClick() }
++            languagePicker.setOnClickListener { nextButton?.performClick() }
+         }
+         loadLanguages()
+     }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/widget/NavigationLayout.kt b/app/src/main/java/org/lineageos/setupwizard/widget/NavigationLayout.kt
+deleted file mode 100644
+index 85a1357..0000000
+--- a/app/src/main/java/org/lineageos/setupwizard/widget/NavigationLayout.kt
++++ /dev/null
+@@ -1,52 +0,0 @@
+-/*
+- * SPDX-FileCopyrightText: The LineageOS Project
+- * SPDX-License-Identifier: Apache-2.0
+- */
+-
+-package org.lineageos.setupwizard.widget
+-
+-import android.content.Context
+-import android.util.AttributeSet
+-import android.view.View
+-import android.widget.Button
+-import android.widget.RelativeLayout
+-import com.google.android.setupcompat.template.FooterButtonStyleUtils
+-import org.lineageos.setupwizard.R
+-
+-class NavigationLayout(context: Context, attrs: AttributeSet) : RelativeLayout(context, attrs) {
+-
+-    /*
+-     * An interface to listen to events of the navigation bar,
+-     * namely when the user clicks on the back or next button.
+-     */
+-    interface NavigationBarListener {
+-        fun onNavigateNext()
+-
+-        fun onSkip()
+-    }
+-
+-    val nextButton: Button
+-    val skipButton: Button
+-
+-    init {
+-        View.inflate(context, R.layout.navigation_layout, this)
+-        nextButton = findViewById(R.id.navbar_next)
+-        skipButton = findViewById(R.id.navbar_skip)
+-        FooterButtonStyleUtils.applyPrimaryButtonPartnerResource(context, nextButton, true)
+-        FooterButtonStyleUtils.applySecondaryButtonPartnerResource(context, skipButton, true)
+-
+-        val showSkipButton =
+-            context.theme.obtainStyledAttributes(attrs, R.styleable.NavigationLayout, 0, 0).use {
+-                it.getBoolean(R.styleable.NavigationLayout_showSkipButton, false)
+-            }
+-
+-        if (showSkipButton) {
+-            skipButton.visibility = View.VISIBLE
+-        }
+-    }
+-
+-    fun setNavigationBarListener(listener: NavigationBarListener) {
+-        skipButton.setOnClickListener { listener.onSkip() }
+-        nextButton.setOnClickListener { listener.onNavigateNext() }
+-    }
+-}
+diff --git a/app/src/main/res/layout/finish_activity.xml b/app/src/main/res/layout/finish_activity.xml
+index ab0f321..7aebd36 100644
+--- a/app/src/main/res/layout/finish_activity.xml
++++ b/app/src/main/res/layout/finish_activity.xml
+@@ -39,10 +39,23 @@
+             android:gravity="center"
+             android:padding="@dimen/content_margin_left"/>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
++        <LinearLayout
++            style="@style/SudGlifButtonBar.Stackable"
+             android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
++            android:layout_height="wrap_content">
++
++            <Space
++                android:layout_width="0dp"
++                android:layout_height="0dp"
++                android:layout_weight="1" />
++
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/start"
++                style="@style/SucGlifMaterialButton.Primary"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:text="@string/start" />
++        </LinearLayout>
+ 
+     </LinearLayout>
+ 
+diff --git a/app/src/main/res/layout/intro_restore_activity.xml b/app/src/main/res/layout/intro_restore_activity.xml
+index 7cc5092..0e1bff4 100644
+--- a/app/src/main/res/layout/intro_restore_activity.xml
++++ b/app/src/main/res/layout/intro_restore_activity.xml
+@@ -23,11 +23,5 @@
+             android:layout_height="0dp"
+             android:layout_weight="1" />
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content"
+-            app:showSkipButton="true" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/location_settings.xml b/app/src/main/res/layout/location_settings.xml
+index 9d31232..a9a8144 100644
+--- a/app/src/main/res/layout/location_settings.xml
++++ b/app/src/main/res/layout/location_settings.xml
+@@ -91,10 +91,5 @@
+             </ScrollView>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/navigation_layout.xml b/app/src/main/res/layout/navigation_layout.xml
+deleted file mode 100644
+index 83baca8..0000000
+--- a/app/src/main/res/layout/navigation_layout.xml
++++ /dev/null
+@@ -1,28 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<!--
+-     SPDX-FileCopyrightText: The LineageOS Project
+-     SPDX-License-Identifier: Apache-2.0
+--->
+-<RelativeLayout
+-    xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:layout_width="match_parent"
+-    android:layout_height="wrap_content">
+-
+-    <Button
+-        android:id="@+id/navbar_skip"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_alignParentStart="true"
+-        android:text="@string/skip"
+-        android:visibility="gone"
+-        style="@style/SudGlifButton.Secondary" />
+-
+-    <Button
+-        android:id="@+id/navbar_next"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_alignParentEnd="true"
+-        android:text="@string/next"
+-        style="@style/SudGlifButton.Primary" />
+-
+-</RelativeLayout>
+diff --git a/app/src/main/res/layout/setup_datetime_page.xml b/app/src/main/res/layout/setup_datetime_page.xml
+index b318aaf..6440c19 100644
+--- a/app/src/main/res/layout/setup_datetime_page.xml
++++ b/app/src/main/res/layout/setup_datetime_page.xml
+@@ -97,10 +97,5 @@
+             </ScrollView>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/setup_lineage_settings.xml b/app/src/main/res/layout/setup_lineage_settings.xml
+index 61b6945..55ddda9 100644
+--- a/app/src/main/res/layout/setup_lineage_settings.xml
++++ b/app/src/main/res/layout/setup_lineage_settings.xml
+@@ -94,10 +94,5 @@
+             </ScrollView>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/setup_loading_page.xml b/app/src/main/res/layout/setup_loading_page.xml
+index 7a8d769..062dde9 100644
+--- a/app/src/main/res/layout/setup_loading_page.xml
++++ b/app/src/main/res/layout/setup_loading_page.xml
+@@ -31,11 +31,5 @@
+             android:layout_weight="1"
+             style="@style/SudContentFrame" />
+ 
+-        <com.google.android.setupdesign.view.NavigationBar
+-            android:id="@+id/navigation_bar"
+-            style="@style/SudNavBarTheme"
+-            android:layout_width="match_parent"
+-            android:layout_height="@dimen/sud_navbar_height" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/setup_locale.xml b/app/src/main/res/layout/setup_locale.xml
+index bc9f04d..808b1f3 100644
+--- a/app/src/main/res/layout/setup_locale.xml
++++ b/app/src/main/res/layout/setup_locale.xml
+@@ -34,10 +34,5 @@
+ 
+         </RelativeLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/setup_navigation.xml b/app/src/main/res/layout/setup_navigation.xml
+index 21c98c8..7c2460d 100644
+--- a/app/src/main/res/layout/setup_navigation.xml
++++ b/app/src/main/res/layout/setup_navigation.xml
+@@ -73,10 +73,5 @@
+             </ScrollView>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/setup_theme.xml b/app/src/main/res/layout/setup_theme.xml
+index 944cbd1..ced50b9 100644
+--- a/app/src/main/res/layout/setup_theme.xml
++++ b/app/src/main/res/layout/setup_theme.xml
+@@ -46,10 +46,5 @@
+             </ScrollView>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/sim_missing_page.xml b/app/src/main/res/layout/sim_missing_page.xml
+index 7ec8ce9..45ea2a4 100644
+--- a/app/src/main/res/layout/sim_missing_page.xml
++++ b/app/src/main/res/layout/sim_missing_page.xml
+@@ -30,10 +30,5 @@
+             </LinearLayout>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/update_recovery_page.xml b/app/src/main/res/layout/update_recovery_page.xml
+index adacdc7..be4aed8 100644
+--- a/app/src/main/res/layout/update_recovery_page.xml
++++ b/app/src/main/res/layout/update_recovery_page.xml
+@@ -62,10 +62,5 @@
+             </ScrollView>
+         </FrameLayout>
+ 
+-        <org.lineageos.setupwizard.widget.NavigationLayout
+-            android:id="@+id/navigation_bar"
+-            android:layout_width="match_parent"
+-            android:layout_height="wrap_content" />
+-
+     </LinearLayout>
+ </com.google.android.setupdesign.GlifLayout>
+diff --git a/app/src/main/res/layout/welcome_activity.xml b/app/src/main/res/layout/welcome_activity.xml
+index b5b3ef0..53388ff 100644
+--- a/app/src/main/res/layout/welcome_activity.xml
++++ b/app/src/main/res/layout/welcome_activity.xml
+@@ -96,9 +96,9 @@
+             android:layout_height="wrap_content"
+             android:layout_gravity="bottom">
+ 
+-            <Button
++            <com.google.android.material.button.MaterialButton
+                 android:id="@+id/emerg_dialer"
+-                style="@style/SudGlifButton.Secondary"
++                style="@style/SucGlifMaterialButton.Secondary"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:text="@string/emergency_call" />
+@@ -108,9 +108,9 @@
+                 android:layout_height="0.0dip"
+                 android:layout_weight="1.0" />
+ 
+-            <Button
++            <com.google.android.material.button.MaterialButton
+                 android:id="@+id/skip"
+-                style="@style/SudGlifButton.Secondary"
++                style="@style/SucGlifMaterialButton.Secondary"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:text="@string/skip"
+@@ -121,9 +121,9 @@
+                 android:layout_height="0.0dip"
+                 android:layout_weight="1.0" />
+ 
+-            <Button
++            <com.google.android.material.button.MaterialButton
+                 android:id="@id/start"
+-                style="@style/SudGlifButton.Primary"
++                style="@style/SucGlifMaterialButton.Primary"
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:text="@string/start" />
+diff --git a/app/src/main/res/values/attrs.xml b/app/src/main/res/values/attrs.xml
+index a9f60a1..1e11fef 100644
+--- a/app/src/main/res/values/attrs.xml
++++ b/app/src/main/res/values/attrs.xml
+@@ -22,8 +22,4 @@
+         <attr name="internalLayout" format="reference" />
+         <attr name="virtualButtonPressedDrawable" format="reference" />
+     </declare-styleable>
+-
+-    <declare-styleable name="NavigationLayout">
+-        <attr name="showSkipButton" format="boolean" />
+-    </declare-styleable>
+ </resources>

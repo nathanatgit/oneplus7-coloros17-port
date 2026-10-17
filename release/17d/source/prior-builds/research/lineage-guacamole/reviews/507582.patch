@@ -1,0 +1,24 @@
+From fd5398ae59ca898b7907a376df4bd293692ad0fe Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Mon, 12 Oct 2026 18:45:25 +0300
+Subject: [PATCH] fixup! Launcher3: Ability to toggle themed icons for all apps
+
+Also theme the prediction row
+
+Change-Id: I372e9a996cd631843fbc03ab6f42707566081a6f
+---
+
+diff --git a/src/com/android/launcher3/BubbleTextView.java b/src/com/android/launcher3/BubbleTextView.java
+index 8097389..81bd9ab 100644
+--- a/src/com/android/launcher3/BubbleTextView.java
++++ b/src/com/android/launcher3/BubbleTextView.java
+@@ -703,7 +703,8 @@
+     protected boolean shouldUseTheme() {
+         return mDisplay == DISPLAY_WORKSPACE || mDisplay == DISPLAY_FOLDER
+                 || mDisplay == DISPLAY_TASKBAR
+-                || (mThemeAllAppsIcons && mDisplay == DISPLAY_ALL_APPS);
++                || (mThemeAllAppsIcons
++                        && (mDisplay == DISPLAY_ALL_APPS || mDisplay == DISPLAY_PREDICTION_ROW));
+     }
+ 
+     /**

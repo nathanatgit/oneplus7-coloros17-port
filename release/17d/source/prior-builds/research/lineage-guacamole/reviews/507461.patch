@@ -1,0 +1,42 @@
+From 534a9a0525c6b2967291a8f78b696e93784d9ec0 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 11 Oct 2026 19:40:26 +0300
+Subject: [PATCH] sepolicy: Update ignored policy for CP3A
+
+Change-Id: I8c3a07304158da3f9eb8f61942b035b31090168b
+---
+
+diff --git a/ignored/system_ext/pixelsystemservice_app.te b/ignored/system_ext/pixelsystemservice_app.te
+index 7b35ee5..62b0f25 100644
+--- a/ignored/system_ext/pixelsystemservice_app.te
++++ b/ignored/system_ext/pixelsystemservice_app.te
+@@ -6,8 +6,10 @@
+ 
+ allow pixelsystemservice_app app_api_service:service_manager find;
+ allow pixelsystemservice_app audioserver_service:service_manager find;
++allow pixelsystemservice_app fwk_stats_service:service_manager find;
+ allow pixelsystemservice_app mediaextractor_service:service_manager find;
+ allow pixelsystemservice_app mediametrics_service:service_manager find;
+ allow pixelsystemservice_app mediaserver_service:service_manager find;
++allow pixelsystemservice_app nfc_service:service_manager find;
+ allow pixelsystemservice_app radio_service:service_manager find;
+ allow pixelsystemservice_app statsmanager_service:service_manager find;
+diff --git a/ignored/vendor/edgetpu_tachyon.te b/ignored/vendor/edgetpu_tachyon.te
+index f64f4b4..ba8d7ca 100644
+--- a/ignored/vendor/edgetpu_tachyon.te
++++ b/ignored/vendor/edgetpu_tachyon.te
+@@ -1 +1,2 @@
+ binder_call(edgetpu_tachyon_server, google_camera_app)
++binder_call(edgetpu_tachyon_server, pixelsupport_app)
+diff --git a/ignored/vendor/pixelsystemservice_app.te b/ignored/vendor/pixelsystemservice_app.te
+index 38ca0b9..1ef2930 100644
+--- a/ignored/vendor/pixelsystemservice_app.te
++++ b/ignored/vendor/pixelsystemservice_app.te
+@@ -19,6 +19,7 @@
+ 
+ set_prop(pixelsystemservice_app, touch_property_type)
+ set_prop(pixelsystemservice_app, vendor_intelligence_prop)
++set_prop(pixelsystemservice_app, vendor_pixelmd_config_experiment_prop)
+ set_prop(pixelsystemservice_app, vendor_pss_systemphenotype_prop)
+ 
+ net_domain(pixelsystemservice_app)

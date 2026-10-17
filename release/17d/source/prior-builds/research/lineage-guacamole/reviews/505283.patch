@@ -1,0 +1,360 @@
+From 79dfd673880f5251b8e948f300203bed533efa4c Mon Sep 17 00:00:00 2001
+From: tonyfan <waterwet@outlook.com>
+Date: Fri, 17 Jul 2026 01:21:19 +0800
+Subject: [PATCH] Settings: Replace face enroll particle animation with progress ring
+
+Draw enrollment progress as a ring around the preview cutout instead
+of the legacy particle animation, move the help text above the
+preview, keep each help message visible long enough to be read and
+drop the "Steps: Remaining:" debug text.
+
+Assisted-by: LLM
+Change-Id: Ic3166406c665523bb5846db85f60ab2efc83427a
+---
+
+diff --git a/res/layout/face_enroll_enrolling.xml b/res/layout/face_enroll_enrolling.xml
+index 7e1863b..abf8001 100644
+--- a/res/layout/face_enroll_enrolling.xml
++++ b/res/layout/face_enroll_enrolling.xml
+@@ -37,6 +37,18 @@
+             android:gravity="center"
+             android:orientation="vertical">
+ 
++            <TextView
++                android:id="@+id/error_text"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginBottom="16dp"
++                android:gravity="center"
++                android:paddingStart="24dp"
++                android:paddingEnd="24dp"
++                android:accessibilityLiveRegion="polite"
++                android:textColor="?android:textColorPrimary"
++                android:visibility="invisible" />
++
+             <com.android.settings.biometrics.face.FaceSquareFrameLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="match_parent"
+@@ -48,22 +60,14 @@
+                     android:layout_height="wrap_content"
+                     android:contentDescription="@null" />
+ 
+-                <ImageView
+-                    android:id="@+id/circle_view"
++                <com.android.settings.biometrics.face.FaceEnrollProgressView
++                    android:id="@+id/progress_view"
+                     android:layout_width="match_parent"
+-                    android:layout_height="match_parent" />
++                    android:layout_height="match_parent"
++                    android:clickable="false" />
+ 
+             </com.android.settings.biometrics.face.FaceSquareFrameLayout>
+ 
+-            <TextView
+-                style="@style/TextAppearance.ErrorText"
+-                android:id="@+id/error_text"
+-                android:layout_width="wrap_content"
+-                android:layout_height="wrap_content"
+-                android:layout_gravity="center_horizontal|bottom"
+-                android:accessibilityLiveRegion="polite"
+-                android:gravity="center"
+-                android:visibility="invisible"/>
+ 
+         </LinearLayout>
+ 
+diff --git a/res/values/colors.xml b/res/values/colors.xml
+index 2f5a0b5..4d076e2 100644
+--- a/res/values/colors.xml
++++ b/res/values/colors.xml
+@@ -130,6 +130,10 @@
+     <color name="face_anim_particle_color_3">#ff4caf50</color> <!-- Material Green 500 -->
+     <color name="face_anim_particle_color_4">#fffdd835</color> <!-- Material Yellow 600 -->
+     <color name="face_anim_particle_error">#ff9e9e9e</color> <!-- Material Gray 500 -->
++    <color name="face_enroll_progress">#5c6bc0</color>
++    <color name="face_enroll_success">#4caf50</color>
++    <color name="face_enroll_warning">#ff9800</color>
++    <color name="face_enroll_error">#f44336</color>
+ 
+     <!-- Face and fingerprint enrollment -->
+     <color name="biometric_enroll_intro_color_bar">#1e8e3e</color>
+diff --git a/src/com/android/settings/biometrics/face/FaceEnrollEnrolling.java b/src/com/android/settings/biometrics/face/FaceEnrollEnrolling.java
+index d520cd6..5a7fc8b 100644
+--- a/src/com/android/settings/biometrics/face/FaceEnrollEnrolling.java
++++ b/src/com/android/settings/biometrics/face/FaceEnrollEnrolling.java
+@@ -24,6 +24,7 @@
+ import android.app.settings.SettingsEnums;
+ import android.content.Intent;
+ import android.os.Bundle;
++import android.os.Handler;
+ import android.text.TextUtils;
+ import android.util.Log;
+ import android.view.View;
+@@ -55,12 +56,15 @@
+     private TextView mErrorText;
+     private Interpolator mLinearOutSlowInInterpolator;
+     private FaceEnrollPreviewFragment mPreviewFragment;
++    private boolean mCompletionStarted;
++    private boolean mPromptVisible;
++    private final Handler mPromptHandler = new Handler();
+ 
+     private ArrayList<Integer> mDisabledFeatures = new ArrayList<>();
+     private ParticleCollection.Listener mListener = new ParticleCollection.Listener() {
+         @Override
+         public void onEnrolled() {
+-            FaceEnrollEnrolling.this.launchFinish(mToken);
++            // Completion is driven by the biometric callback, not the retired particle animation.
+         }
+     };
+ 
+@@ -137,6 +141,12 @@
+     }
+ 
+     @Override
++    protected void onDestroy() {
++        mPromptHandler.removeCallbacksAndMessages(null);
++        super.onDestroy();
++    }
++
++    @Override
+     protected boolean shouldFinishWhenBackgrounded() {
+         // Prevent super.onStop() from finishing, since we handle this in our onStop().
+         return false;
+@@ -210,11 +220,9 @@
+         }
+         mPreviewFragment.onEnrollmentProgressChange(steps, remaining);
+ 
+-        // TODO: Update the actual animation
+-        showError("Steps: " + steps + " Remaining: " + remaining);
+-
+         // TODO: Have this match any animations that UX comes up with
+-        if (remaining == 0) {
++        if (remaining == 0 && !mCompletionStarted) {
++            mCompletionStarted = true;
+             // Force the reload of the FaceEnroll slice in case a user has enrolled,
+             // this will cause the slice to no longer appear.
+             getApplicationContext().getContentResolver().notifyChange(
+@@ -229,7 +237,29 @@
+     }
+ 
+     private void showError(CharSequence error) {
+-        mErrorText.setText(error);
++        // Keep one instruction visible for its full dwell time. Rapidly alternating HAL help
++        // messages are otherwise unreadable and make the guidance appear to flicker.
++        if (mPromptVisible) return;
++        mPromptVisible = true;
++        showPrompt(error);
++        mPromptHandler.postDelayed(() -> {
++            if (!mCompletionStarted) {
++                mErrorText.animate()
++                        .alpha(0f)
++                        .setDuration(200)
++                        .withEndAction(() -> {
++                            mErrorText.setVisibility(View.INVISIBLE);
++                            mPromptVisible = false;
++                        })
++                        .start();
++            }
++        }, 1800);
++    }
++
++    private void showPrompt(CharSequence prompt) {
++        if (mErrorText.getVisibility() == View.VISIBLE
++                && TextUtils.equals(mErrorText.getText(), prompt)) return;
++        mErrorText.setText(prompt);
+         if (mErrorText.getVisibility() == View.INVISIBLE) {
+             mErrorText.setVisibility(View.VISIBLE);
+             mErrorText.setTranslationY(getResources().getDimensionPixelSize(
+diff --git a/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java b/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java
+index 853ca7c..134e498 100644
+--- a/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java
++++ b/src/com/android/settings/biometrics/face/FaceEnrollPreviewFragment.java
+@@ -35,8 +35,6 @@
+ import android.util.TypedValue;
+ import android.view.Surface;
+ import android.view.TextureView;
+-import android.view.View;
+-import android.widget.ImageView;
+ 
+ import com.android.settings.R;
+ import com.android.settings.biometrics.BiometricEnrollSidecar;
+@@ -67,10 +65,7 @@
+     private ParticleCollection.Listener mListener;
+ 
+     // View used to contain the circular cutout and enrollment animation drawable
+-    private ImageView mCircleView;
+-
+-    // Drawable containing the circular cutout and enrollment animations
+-    private FaceEnrollAnimationDrawable mAnimationDrawable;
++    private FaceEnrollProgressView mProgressView;
+ 
+     // Texture used for showing the camera preview
+     private FaceSquareTextureView mTextureView;
+@@ -188,13 +183,7 @@
+     public void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+         mTextureView = getActivity().findViewById(R.id.texture_view);
+-        mCircleView = getActivity().findViewById(R.id.circle_view);
+-
+-        // Must disable hardware acceleration for this view, otherwise transparency breaks
+-        mCircleView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+-
+-        mAnimationDrawable = new FaceEnrollAnimationDrawable(getContext(), mAnimationListener);
+-        mCircleView.setImageDrawable(mAnimationDrawable);
++        mProgressView = getActivity().findViewById(R.id.progress_view);
+ 
+         mCameraManager = (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
+     }
+@@ -222,17 +211,18 @@
+ 
+     @Override
+     public void onEnrollmentError(int errMsgId, CharSequence errString) {
+-        mAnimationDrawable.onEnrollmentError(errMsgId, errString);
++        mProgressView.setErrorState();
+     }
+ 
+     @Override
+     public void onEnrollmentHelp(int helpMsgId, CharSequence helpString) {
+-        mAnimationDrawable.onEnrollmentHelp(helpMsgId, helpString);
++        mProgressView.setHelpState();
+     }
+ 
+     @Override
+     public void onEnrollmentProgressChange(int steps, int remaining) {
+-        mAnimationDrawable.onEnrollmentProgressChange(steps, remaining);
++        mProgressView.setProgress(steps, remaining);
++        if (remaining == 0) mProgressView.setCompleteState();
+     }
+ 
+     public void setListener(ParticleCollection.Listener listener) {
+diff --git a/src/com/android/settings/biometrics/face/FaceEnrollProgressView.java b/src/com/android/settings/biometrics/face/FaceEnrollProgressView.java
+new file mode 100644
+index 0000000..24db107
+--- /dev/null
++++ b/src/com/android/settings/biometrics/face/FaceEnrollProgressView.java
+@@ -0,0 +1,126 @@
++package com.android.settings.biometrics.face;
++
++import android.animation.ValueAnimator;
++import android.content.Context;
++import android.graphics.Canvas;
++import android.graphics.Paint;
++import android.graphics.Path;
++import android.graphics.RectF;
++import android.os.Handler;
++import android.os.Looper;
++import android.util.AttributeSet;
++import android.util.TypedValue;
++import android.view.View;
++import android.view.animation.DecelerateInterpolator;
++
++import com.android.settings.R;
++
++/** Draws the enrollment state without the legacy particle animation. */
++public class FaceEnrollProgressView extends View {
++    private static final long PROGRESS_ANIMATION_DURATION_MS = 400;
++    private static final long COLOR_ANIMATION_DURATION_MS = 300;
++    private static final long HELP_STATE_DURATION_MS = 1800;
++
++    private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final Paint mMaskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
++    private final Path mMaskPath = new Path();
++    private final RectF mBounds = new RectF();
++    private float mProgress;
++    private float mTargetProgress;
++    private int mColor;
++    private ValueAnimator mProgressAnimator;
++    private ValueAnimator mColorAnimator;
++    private final Handler mHandler = new Handler(Looper.getMainLooper());
++    private final Runnable mRestoreProgressState = this::animateToProgressColor;
++
++    public FaceEnrollProgressView(Context context, AttributeSet attrs) {
++        super(context, attrs);
++        mPaint.setStyle(Paint.Style.STROKE);
++        mPaint.setStrokeCap(Paint.Cap.ROUND);
++        mPaint.setStrokeWidth(getResources().getDisplayMetrics().density * 12f);
++        mColor = getResources().getColor(R.color.face_enroll_progress, context.getTheme());
++        TypedValue background = new TypedValue();
++        context.getTheme().resolveAttribute(android.R.attr.colorBackground, background, true);
++        mMaskPaint.setColor(background.data);
++        mMaskPaint.setStyle(Paint.Style.FILL);
++    }
++
++    public void setProgress(int steps, int remaining) {
++        int total = steps + remaining;
++        float target = total > 0 ? Math.max(0f, Math.min(1f, (float) steps / total)) : 0f;
++        // Some face HALs briefly report stale progress. Never animate the ring backwards.
++        target = Math.max(mTargetProgress, target);
++        if (target == mTargetProgress) return;
++        mTargetProgress = target;
++
++        if (mProgressAnimator != null) mProgressAnimator.cancel();
++        mProgressAnimator = ValueAnimator.ofFloat(mProgress, target);
++        mProgressAnimator.setDuration(PROGRESS_ANIMATION_DURATION_MS);
++        mProgressAnimator.setInterpolator(new DecelerateInterpolator());
++        mProgressAnimator.addUpdateListener(animation -> {
++            mProgress = (float) animation.getAnimatedValue();
++            invalidate();
++        });
++        mProgressAnimator.start();
++    }
++
++    public void setHelpState() {
++        mHandler.removeCallbacks(mRestoreProgressState);
++        animateToColor(R.color.face_enroll_warning);
++        // Progress callbacks may continue during help; only the sweep changes until this expires.
++        mHandler.postDelayed(mRestoreProgressState, HELP_STATE_DURATION_MS);
++    }
++
++    public void setErrorState() {
++        mHandler.removeCallbacks(mRestoreProgressState);
++        animateToColor(R.color.face_enroll_error);
++    }
++
++    public void setCompleteState() {
++        mHandler.removeCallbacks(mRestoreProgressState);
++        animateToColor(R.color.face_enroll_success);
++    }
++
++    private void animateToProgressColor() {
++        animateToColor(R.color.face_enroll_progress);
++    }
++
++    private void animateToColor(int colorRes) {
++        int target = getResources().getColor(colorRes, getContext().getTheme());
++        if (target == mColor) return;
++        if (mColorAnimator != null) mColorAnimator.cancel();
++        mColorAnimator = ValueAnimator.ofArgb(mColor, target);
++        mColorAnimator.setDuration(COLOR_ANIMATION_DURATION_MS);
++        mColorAnimator.addUpdateListener(animation -> {
++            mColor = (int) animation.getAnimatedValue();
++            invalidate();
++        });
++        mColorAnimator.start();
++    }
++
++    @Override
++    protected void onDetachedFromWindow() {
++        mHandler.removeCallbacks(mRestoreProgressState);
++        if (mProgressAnimator != null) mProgressAnimator.cancel();
++        if (mColorAnimator != null) mColorAnimator.cancel();
++        super.onDetachedFromWindow();
++    }
++
++    @Override protected void onDraw(Canvas canvas) {
++        // Match the legacy face preview cutout exactly: it used a 20 px inset.
++        float inset = 20f;
++        mBounds.set(inset, inset, getWidth() - inset, getHeight() - inset);
++
++        mMaskPath.reset();
++        mMaskPath.setFillType(Path.FillType.EVEN_ODD);
++        mMaskPath.addRect(0, 0, getWidth(), getHeight(), Path.Direction.CW);
++        mMaskPath.addCircle(getWidth() / 2f, getHeight() / 2f,
++                Math.min(getWidth(), getHeight()) / 2f - inset, Path.Direction.CW);
++        canvas.drawPath(mMaskPath, mMaskPaint);
++
++        mPaint.setColor(0x33000000 | (mColor & 0x00ffffff));
++        canvas.drawArc(mBounds, -90, 360, false, mPaint);
++        mPaint.setColor(mColor);
++        canvas.drawArc(mBounds, -90, 360f * mProgress, false, mPaint);
++    }
++}

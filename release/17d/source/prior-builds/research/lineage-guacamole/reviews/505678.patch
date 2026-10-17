@@ -1,0 +1,52 @@
+From 37c5d17bec80020b8dbfb0a0d39b4ba93b2b6efd Mon Sep 17 00:00:00 2001
+From: Benjamin Wiegand <benjamin.lineageos@wiegand.pw>
+Date: Mon, 14 Sep 2026 16:20:09 -0700
+Subject: [PATCH] recoveryui: Apply margin_width_ when drawing menu items
+
+On smith the display is defined as 1080x2142 in
+the dt, but the resolution is actually 876x2142.
+Stock recovery fixes this with a horizontal
+margin.
+
+Everything else already respects the margin, this
+just fixes the menu items.
+
+Fixes: 48e923955cf3ad5ca3a7126e51fda0133fd3751c
+Change-Id: If8d38159354253a13ad3eb25e6296f8910c65060
+---
+
+diff --git a/recovery_ui/screen_ui.cpp b/recovery_ui/screen_ui.cpp
+index 2920beb..0dcc4c6 100644
+--- a/recovery_ui/screen_ui.cpp
++++ b/recovery_ui/screen_ui.cpp
+@@ -183,7 +183,7 @@
+   return offset;
+ }
+ 
+-int TextMenu::DrawItems(int /*x*/, int y, int screen_width, bool long_press) const {
++int TextMenu::DrawItems(int x, int y, int screen_width, bool long_press) const {
+   int horizontal_rule_height = 8;
+   int offset = 0;
+   int padding = draw_funcs_.MenuItemPadding();
+@@ -203,10 +203,10 @@
+                                     : UIElement::MENU_BG);
+ 
+     int bar_height = padding + char_height_ + padding;
+-    draw_funcs_.DrawHighlightBar(padding, y + offset, screen_width - (padding * 2), bar_height);
++    draw_funcs_.DrawHighlightBar(padding + x, y + offset, screen_width - (padding + x) * 2, bar_height);
+ 
+     draw_funcs_.SetColor(selected ? UIElement::MENU_SEL_FG : UIElement::MENU);
+-    offset += draw_funcs_.DrawTextLine(padding * 2, y + offset, TextItem(i), false /* bold */);
++    offset += draw_funcs_.DrawTextLine(padding * 2 + x, y + offset, TextItem(i), false /* bold */);
+     offset += spacing;
+   }
+   offset += horizontal_rule_height;
+@@ -855,7 +855,7 @@
+     if (!menu_->IsMain()) {
+       auto icon_w = gr_get_width(back_icon_.get());
+       auto icon_h = gr_get_height(back_icon_.get());
+-      auto icon_x = centered_x / 2 - icon_w / 2;
++      auto icon_x = (centered_x - margin_width_) / 2 - icon_w / 2 + margin_width_;
+       auto icon_y = y - logo_height / 2 - icon_h / 2;
+       gr_blit(back_icon_sel_ && menu_->selection() == -1 ? back_icon_sel_.get() : back_icon_.get(),
+               0, 0, icon_w, icon_h, icon_x, icon_y);

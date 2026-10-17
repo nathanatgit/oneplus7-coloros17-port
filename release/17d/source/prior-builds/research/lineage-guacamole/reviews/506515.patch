@@ -1,0 +1,162 @@
+From 6172a44b431b290437bc463a22421b46b9da5334 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Tue, 06 Oct 2026 22:30:05 +0200
+Subject: [PATCH] Settings: Fall back to legacy network query when scan is unsupported
+
+Some RILs reject START_NETWORK_SCAN with REQUEST_NOT_SUPPORTED
+(e.g. on DSDS), leaving manual network selection empty. Use
+QUERY_AVAILABLE_NETWORKS instead and keep one entry per PLMN.
+
+Assisted-by: LLM
+Change-Id: Ic7e9406a9555cba50281ccbd1fe4b2346c97c9b0
+---
+
+diff --git a/src/com/android/settings/network/telephony/CellInfoUtil.kt b/src/com/android/settings/network/telephony/CellInfoUtil.kt
+index d1fe89c..5b213bc 100644
+--- a/src/com/android/settings/network/telephony/CellInfoUtil.kt
++++ b/src/com/android/settings/network/telephony/CellInfoUtil.kt
+@@ -16,10 +16,19 @@
+ 
+ package com.android.settings.network.telephony
+ 
++import android.telephony.AccessNetworkConstants.AccessNetworkType
+ import android.telephony.CellIdentity
++import android.telephony.CellIdentityGsm
++import android.telephony.CellIdentityLte
++import android.telephony.CellIdentityWcdma
+ import android.telephony.CellInfo
++import android.telephony.CellInfoGsm
++import android.telephony.CellInfoLte
++import android.telephony.CellInfoWcdma
++import android.telephony.ServiceState
+ import android.text.BidiFormatter
+ import android.text.TextDirectionHeuristics
++import com.android.internal.telephony.OperatorInfo
+ 
+ /**
+  * Add static Utility functions to get information from the CellInfo object.
+@@ -45,6 +54,45 @@
+     }
+ 
+     /**
++     * Convert an [OperatorInfo] from the legacy network query to a [CellInfo].
++     *
++     * Some RILs append the radio technology to the numeric, e.g. "26006+14".
++     */
++    @JvmStatic
++    fun OperatorInfo.toCellInfo(): CellInfo? {
++        val numericWithRat = operatorNumeric ?: return null
++        val numeric = numericWithRat.substringBefore('+')
++        if (!numeric.matches(Regex("^[0-9]{5,6}$"))) return null
++        val mcc = numeric.substring(0, 3)
++        val mnc = numeric.substring(3)
++        val alphaLong = operatorAlphaLong
++        val alphaShort = operatorAlphaShort
++        val ran = numericWithRat.substringAfter('+', "").toIntOrNull()
++            ?.let { ServiceState.rilRadioTechnologyToAccessNetworkType(it) }
++            ?: this.ran
++        val cellInfo = when (ran) {
++            AccessNetworkType.EUTRAN -> CellInfoLte().apply {
++                setCellIdentity(CellIdentityLte(
++                    CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE,
++                    CellInfo.UNAVAILABLE, intArrayOf(), CellInfo.UNAVAILABLE,
++                    mcc, mnc, alphaLong, alphaShort, emptyList(), null))
++            }
++            AccessNetworkType.UTRAN -> CellInfoWcdma().apply {
++                setCellIdentity(CellIdentityWcdma(
++                    CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE,
++                    CellInfo.UNAVAILABLE, mcc, mnc, alphaLong, alphaShort, emptyList(), null))
++            }
++            else -> CellInfoGsm().apply {
++                setCellIdentity(CellIdentityGsm(
++                    CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE,
++                    CellInfo.UNAVAILABLE, mcc, mnc, alphaLong, alphaShort, emptyList()))
++            }
++        }
++        cellInfo.isRegistered = state == OperatorInfo.State.CURRENT
++        return cellInfo
++    }
++
++    /**
+      * Convert a list of cellInfos to readable string without sensitive info.
+      */
+     @JvmStatic
+diff --git a/src/com/android/settings/network/telephony/scan/NetworkScanRepository.kt b/src/com/android/settings/network/telephony/scan/NetworkScanRepository.kt
+index caf8549..081bc9c 100644
+--- a/src/com/android/settings/network/telephony/scan/NetworkScanRepository.kt
++++ b/src/com/android/settings/network/telephony/scan/NetworkScanRepository.kt
+@@ -19,6 +19,10 @@
+ import android.content.Context
+ import android.telephony.AccessNetworkConstants.AccessNetworkType
+ import android.telephony.CellInfo
++import android.telephony.CellInfoGsm
++import android.telephony.CellInfoLte
++import android.telephony.CellInfoWcdma
++import android.telephony.NetworkScan
+ import android.telephony.NetworkScanRequest
+ import android.telephony.PhoneCapability
+ import android.telephony.RadioAccessSpecifier
+@@ -26,8 +30,11 @@
+ import android.telephony.TelephonyScanManager
+ import android.util.Log
+ import androidx.lifecycle.LifecycleOwner
++import com.android.internal.telephony.CellNetworkScanResult
+ import com.android.settings.R
+ import com.android.settings.network.telephony.CellInfoUtil.getNetworkTitle
++import com.android.settings.network.telephony.CellInfoUtil.getOperatorNumeric
++import com.android.settings.network.telephony.CellInfoUtil.toCellInfo
+ import com.android.settings.network.telephony.telephonyManager
+ import com.android.settingslib.spa.framework.util.collectLatestWithLifecycle
+ import java.util.concurrent.Executors
+@@ -84,11 +91,39 @@
+             }
+ 
+             override fun onError(error: Int) {
++                if (error == NetworkScan.ERROR_UNSUPPORTED) {
++                    Log.d(TAG, "network scan unsupported, falling back to legacy query")
++                    queryAvailableNetworks()
++                    return
++                }
+                 state = NetworkScanState.ERROR
+                 sendResult()
+                 close()
+             }
+ 
++            private fun queryAvailableNetworks() {
++                val result = telephonyManager.getAvailableNetworks()
++                if (result.status == CellNetworkScanResult.STATUS_SUCCESS) {
++                    // The legacy query lists every PLMN once per RAT,
++                    // keep the registered or best one
++                    cellInfos = result.operators.orEmpty()
++                        .mapNotNull { it.toCellInfo() }
++                        .groupBy { it.cellIdentity.getOperatorNumeric() }
++                        .values
++                        .map { infos ->
++                            infos.maxWith(compareBy<CellInfo>(
++                                { it.isRegistered },
++                                { LEGACY_RAT_ORDER.indexOf(it.javaClass) },
++                            ))
++                        }
++                    state = NetworkScanState.COMPLETE
++                } else {
++                    state = NetworkScanState.ERROR
++                }
++                sendResult()
++                close()
++            }
++
+             private fun sendResult() {
+                 trySend(NetworkScanResult(state, cellInfos))
+             }
+@@ -173,5 +208,11 @@
+         private const val TAG = "NetworkScanRepository"
+ 
+         private const val INCREMENTAL_RESULTS_PERIODICITY_SEC = 3
++
++        private val LEGACY_RAT_ORDER = listOf(
++            CellInfoGsm::class.java,
++            CellInfoWcdma::class.java,
++            CellInfoLte::class.java,
++        )
+     }
+ }

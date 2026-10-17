@@ -1,0 +1,62 @@
+From c7788ef34a7fe89e6515782cedbc8b0803cdfecf Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:44:25 +0300
+Subject: [PATCH] Merge tag 'LA.VENDOR.16.2.0.r1-20500-kaanapali.0' into staging/lineage-24.0_merge-LA.VENDOR.16.2.0.r1-20500-kaanapali.0
+
+LA.VENDOR.16.2.0.r1-20500-kaanapali.0
+
+* tag 'LA.VENDOR.16.2.0.r1-20500-kaanapali.0':
+  usb: compositions: Add new PID for Shikra default composition without DPL
+  USB: Set sys.usb.controller property
+
+ Conflicts:
+	etc/init.qcom.usb.sh
+
+Change-Id: I6ba60a4cc6d765a0a03af7343c34e2460d42ad30
+---
+
+diff --git a/etc/init.qcom.usb.rc b/etc/init.qcom.usb.rc
+index bad127a..84e4965 100644
+--- a/etc/init.qcom.usb.rc
++++ b/etc/init.qcom.usb.rc
+@@ -209,6 +209,7 @@
+    mount functionfs ptp /dev/usb-ffs/ptp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
+ 
+ on boot && property:vendor.usb.use_gadget_hal=1
++   setprop sys.usb.controller ${vendor.usb.controller}
+    setprop sys.usb.configfs 2
+ 
+ on property:sys.usb.config=* && property:sys.usb.configfs=2
+diff --git a/etc/init.qcom.usb.sh b/etc/init.qcom.usb.sh
+index af0deb2..4a898ef 100644
+--- a/etc/init.qcom.usb.sh
++++ b/etc/init.qcom.usb.sh
+@@ -121,7 +121,7 @@
+ 		      "gen4")
+ 			  setprop persist.vendor.usb.config adb
+ 		      ;;
+-		      "vienna" | "monaco" | "malabar" | "shikra")
++		      "vienna" | "monaco" | "malabar")
+ 			  setprop persist.vendor.usb.config diag,qdss,rmnet,adb
+ 		      ;;
+ 		      "chora")
+@@ -134,6 +134,9 @@
+ 			           ;;
+ 		               esac
+ 		      ;;
++		      "shikra")
++			  setprop persist.vendor.usb.config diag,serial_cdev,rmnet,qdss,adb
++		      ;;
+ 	              *)
+ 		          setprop persist.vendor.usb.config diag,adb
+ 		      ;;
+diff --git a/hal/usb_compositions.conf b/hal/usb_compositions.conf
+index f50a1f1..6551095 100644
+--- a/hal/usb_compositions.conf
++++ b/hal/usb_compositions.conf
+@@ -78,3 +78,5 @@
+ diag,diag_cnss,serial_cdev,rmnet,dpl,qdss				0x05C6	0x9111
+ diag,serial_cdev,rmnet,dpl,qdss,ipcr,adb				0x05C6	0x912C
+ diag,serial_cdev,rmnet,dpl,qdss,ipcr					0x05C6	0x912D
++diag,serial_cdev,rmnet,qdss,adb						0x05C6	0x9148
++diag,serial_cdev,rmnet,qdss						0x05C6	0x9149

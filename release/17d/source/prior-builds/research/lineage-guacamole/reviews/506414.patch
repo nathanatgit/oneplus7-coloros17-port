@@ -1,0 +1,23 @@
+From 1e10681cb7626295b898c706ecc61ce1bec6a7e9 Mon Sep 17 00:00:00 2001
+From: chandu078 <chandudyavanapelli03@gmail.com>
+Date: Wed, 30 Sep 2026 08:54:02 +0000
+Subject: [PATCH] sepolicy: qti: Let hal_oplus_pogo_keyboard_aidl create a netlink socket
+
+As seen in erhai's stock sepolicy.
+
+Change-Id: I0fad827c8ee67c4cc629cbd379d950092e8834f7
+---
+
+diff --git a/sepolicy/qti/vendor/hal_oplus_pogo_keyboard_aidl.te b/sepolicy/qti/vendor/hal_oplus_pogo_keyboard_aidl.te
+index 01dd4f7..e0f44d3 100644
+--- a/sepolicy/qti/vendor/hal_oplus_pogo_keyboard_aidl.te
++++ b/sepolicy/qti/vendor/hal_oplus_pogo_keyboard_aidl.te
+@@ -6,6 +6,8 @@
+ 
+ add_service(hal_oplus_pogo_keyboard_aidl, hal_oplus_pogo_keyboard_aidl_service)
+ 
++allow hal_oplus_pogo_keyboard_aidl hal_oplus_pogo_keyboard_aidl:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
++
+ allow hal_oplus_pogo_keyboard_aidl oplus_pogo_keyboard_device:chr_file rw_file_perms;
+ 
+ r_dir_file(hal_oplus_pogo_keyboard_aidl, vendor_proc_oplus_pogo_keyboard)

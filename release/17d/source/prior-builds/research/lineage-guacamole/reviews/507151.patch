@@ -1,0 +1,67 @@
+From 0492094e7076e5c07d61232c1f3720b74664eb18 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Fri, 09 Oct 2026 09:13:24 +0530
+Subject: [PATCH] LatinIME: Fix more keys keyboard padding on tablets
+
+The more keys keyboard styles inherit the keyboard left and right
+padding, which is non-zero on sw600dp. The key positions include the
+left padding but the occupied width does not, so the keys are shifted
+right and the last column is clipped out of the panel.
+
+Assisted-by: LLM
+Change-Id: Idb24fa3afd32c585bccea27ee49fe0fc4deb4fd2
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/res/values/themes-lxx-dark.xml b/java/res/values/themes-lxx-dark.xml
+index ae8dd1d..b39a88e 100644
+--- a/java/res/values/themes-lxx-dark.xml
++++ b/java/res/values/themes-lxx-dark.xml
+@@ -108,6 +108,8 @@
+     >
+         <item name="keyboardTopPadding">0%p</item>
+         <item name="keyboardBottomPadding">0%p</item>
++        <item name="keyboardLeftPadding">0%p</item>
++        <item name="keyboardRightPadding">0%p</item>
+         <item name="horizontalGap">0%p</item>
+         <item name="touchPositionCorrectionData">@null</item>
+     </style>
+diff --git a/java/res/values/themes-lxx-light.xml b/java/res/values/themes-lxx-light.xml
+index eecd191..5a9228a 100644
+--- a/java/res/values/themes-lxx-light.xml
++++ b/java/res/values/themes-lxx-light.xml
+@@ -108,6 +108,8 @@
+     >
+         <item name="keyboardTopPadding">0%p</item>
+         <item name="keyboardBottomPadding">0%p</item>
++        <item name="keyboardLeftPadding">0%p</item>
++        <item name="keyboardRightPadding">0%p</item>
+         <item name="horizontalGap">0%p</item>
+         <item name="touchPositionCorrectionData">@null</item>
+     </style>
+diff --git a/java/res/values/themes-oled.xml b/java/res/values/themes-oled.xml
+index 9f319a2..829cc8c 100644
+--- a/java/res/values/themes-oled.xml
++++ b/java/res/values/themes-oled.xml
+@@ -96,6 +96,8 @@
+     >
+         <item name="keyboardTopPadding">0%p</item>
+         <item name="keyboardBottomPadding">0%p</item>
++        <item name="keyboardLeftPadding">0%p</item>
++        <item name="keyboardRightPadding">0%p</item>
+         <item name="horizontalGap">0%p</item>
+         <item name="touchPositionCorrectionData">@null</item>
+     </style>
+diff --git a/java/res/values/themes-you.xml b/java/res/values/themes-you.xml
+index 8f96910..fc1a526 100644
+--- a/java/res/values/themes-you.xml
++++ b/java/res/values/themes-you.xml
+@@ -123,6 +123,8 @@
+     >
+         <item name="keyboardTopPadding">0%p</item>
+         <item name="keyboardBottomPadding">0%p</item>
++        <item name="keyboardLeftPadding">0%p</item>
++        <item name="keyboardRightPadding">0%p</item>
+         <item name="horizontalGap">0%p</item>
+         <item name="touchPositionCorrectionData">@null</item>
+     </style>

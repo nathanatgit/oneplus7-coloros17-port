@@ -1,0 +1,246 @@
+From 28707c99d3b5c45ed4aed28d0689838829fd7bce Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 21:53:06 +0530
+Subject: [PATCH] SUW: Add the leanback theme and list row for ATV
+
+Change-Id: I4e8c5b7333f9f8ba6542b3c6a198987ef568ce27
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/res/color/tv_list_item_foreground.xml b/app/src/main/res/color/tv_list_item_foreground.xml
+new file mode 100644
+index 0000000..8ebc18b
+--- /dev/null
++++ b/app/src/main/res/color/tv_list_item_foreground.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<selector xmlns:android="http://schemas.android.com/apk/res/android">
++    <item android:state_focused="true" android:color="@color/tv_list_item_text_focused" />
++    <item android:color="@color/tv_list_item_text" />
++</selector>
+diff --git a/app/src/main/res/drawable/ic_tv_expand.xml b/app/src/main/res/drawable/ic_tv_expand.xml
+new file mode 100644
+index 0000000..bd36cef
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_tv_expand.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M480,616L240,376l56,-56l184,184l184,-184l56,56L480,616Z" />
++</vector>
+diff --git a/app/src/main/res/drawable/tv_list_item_background.xml b/app/src/main/res/drawable/tv_list_item_background.xml
+new file mode 100644
+index 0000000..3190259
+--- /dev/null
++++ b/app/src/main/res/drawable/tv_list_item_background.xml
+@@ -0,0 +1,21 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<selector xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <item android:state_focused="true">
++        <shape android:shape="rectangle">
++            <corners android:radius="@dimen/tv_list_item_radius" />
++            <solid android:color="@color/tv_list_item_focused" />
++        </shape>
++    </item>
++
++    <item>
++        <shape android:shape="rectangle">
++            <corners android:radius="@dimen/tv_list_item_radius" />
++            <solid android:color="@android:color/transparent" />
++        </shape>
++    </item>
++</selector>
+diff --git a/app/src/main/res/layout/tv_list_item.xml b/app/src/main/res/layout/tv_list_item.xml
+new file mode 100644
+index 0000000..2c654ad
+--- /dev/null
++++ b/app/src/main/res/layout/tv_list_item.xml
+@@ -0,0 +1,71 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<LinearLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:background="@drawable/tv_list_item_background"
++    android:baselineAligned="false"
++    android:focusable="true"
++    android:tag="noBackground"
++    android:gravity="center_vertical"
++    android:minHeight="@dimen/tv_list_item_min_height"
++    android:orientation="horizontal"
++    android:paddingStart="@dimen/tv_list_item_padding_horizontal"
++    android:paddingEnd="@dimen/tv_list_item_padding_horizontal">
++
++    <FrameLayout
++        android:id="@id/sud_items_icon_container"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginEnd="@dimen/tv_list_item_icon_spacing"
++        android:visibility="gone">
++
++        <ImageView
++            android:id="@id/sud_items_icon"
++            android:layout_width="@dimen/tv_list_item_icon_size"
++            android:layout_height="@dimen/tv_list_item_icon_size"
++            android:contentDescription="@null" />
++    </FrameLayout>
++
++    <LinearLayout
++        android:layout_width="0dp"
++        android:layout_height="wrap_content"
++        android:layout_weight="1"
++        android:duplicateParentState="true"
++        android:orientation="vertical">
++
++        <TextView
++            android:id="@id/sud_items_title"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:duplicateParentState="true"
++            android:textColor="@color/tv_list_item_foreground"
++            android:textSize="@dimen/tv_list_item_title_text_size" />
++
++        <TextView
++            android:id="@id/sud_items_summary"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:duplicateParentState="true"
++            android:ellipsize="end"
++            android:maxLines="@integer/tv_list_item_summary_max_lines"
++            android:textColor="@color/tv_list_item_foreground"
++            android:textSize="@dimen/tv_list_item_summary_text_size"
++            android:visibility="gone" />
++    </LinearLayout>
++
++    <ImageView
++        android:id="@+id/tv_list_item_expand"
++        android:layout_width="@dimen/tv_list_item_expand_size"
++        android:layout_height="@dimen/tv_list_item_expand_size"
++        android:layout_marginStart="@dimen/tv_list_item_icon_spacing"
++        android:contentDescription="@null"
++        android:duplicateParentState="true"
++        android:src="@drawable/ic_tv_expand"
++        android:tint="@color/tv_list_item_foreground"
++        android:visibility="gone" />
++</LinearLayout>
+diff --git a/app/src/main/res/values-w600dp-television/styles.xml b/app/src/main/res/values-w600dp-television/styles.xml
+new file mode 100644
+index 0000000..3c70078
+--- /dev/null
++++ b/app/src/main/res/values-w600dp-television/styles.xml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <style name="Theme.Setup.Tv" parent="@style/Theme.AppCompat.Leanback">
++        <item name="android:windowBackground">@color/tv_background</item>
++        <item name="android:colorBackground">@color/tv_background</item>
++    </style>
++</resources>
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index 43dd6b3..5b2749b 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -18,4 +18,11 @@
+     <color name="materialColorOnPrimary">@*android:color/system_on_primary_light</color>
+ 
+     <color name="finish_swipe_arrow">#82D5C7</color>
++
++    <!-- TV -->
++    <color name="tv_background">#000000</color>
++    <color name="tv_welcome_title">#FFFFFF</color>
++    <color name="tv_list_item_focused">#F1F3F4</color>
++    <color name="tv_list_item_text">#E3E3E3</color>
++    <color name="tv_list_item_text_focused">#1B1B1B</color>
+ </resources>
+diff --git a/app/src/main/res/values/dimens_tv.xml b/app/src/main/res/values/dimens_tv.xml
+new file mode 100644
+index 0000000..f19baa3
+--- /dev/null
++++ b/app/src/main/res/values/dimens_tv.xml
+@@ -0,0 +1,30 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <dimen name="tv_overscan_horizontal">48dp</dimen>
++    <dimen name="tv_overscan_vertical">27dp</dimen>
++
++    <dimen name="tv_welcome_logo_height">72dp</dimen>
++    <dimen name="tv_welcome_title_margin_top">24dp</dimen>
++    <dimen name="tv_welcome_title_text_size">32sp</dimen>
++
++    <dimen name="tv_list_item_min_height">56dp</dimen>
++    <dimen name="tv_list_item_padding_horizontal">24dp</dimen>
++    <dimen name="tv_list_item_radius">28dp</dimen>
++    <dimen name="tv_list_item_title_text_size">18sp</dimen>
++    <dimen name="tv_list_item_summary_text_size">14sp</dimen>
++    <dimen name="tv_list_item_icon_size">32dp</dimen>
++    <dimen name="tv_list_item_icon_spacing">16dp</dimen>
++    <dimen name="tv_list_item_expand_size">24dp</dimen>
++
++    <item name="tv_guidance_weight" format="float" type="dimen">1</item>
++    <item name="tv_gutter_weight" format="float" type="dimen">0.8</item>
++    <item name="tv_actions_weight" format="float" type="dimen">1.4</item>
++    <dimen name="tv_guidance_padding_end">32dp</dimen>
++    <item name="tv_guidance_space_above" format="float" type="dimen">2</item>
++    <item name="tv_guidance_space_below" format="float" type="dimen">1</item>
++    <dimen name="tv_actions_padding_vertical">24dp</dimen>
++</resources>
+diff --git a/app/src/main/res/values/integers_tv.xml b/app/src/main/res/values/integers_tv.xml
+new file mode 100644
+index 0000000..11d0dff
+--- /dev/null
++++ b/app/src/main/res/values/integers_tv.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <integer name="tv_list_item_summary_max_lines">2</integer>
++</resources>
+diff --git a/app/src/main/res/values/styles.xml b/app/src/main/res/values/styles.xml
+index e87ee1d..88c07bb 100644
+--- a/app/src/main/res/values/styles.xml
++++ b/app/src/main/res/values/styles.xml
+@@ -10,6 +10,9 @@
+         <item name="sudUsePartnerHeavyTheme">true</item>
+     </style>
+ 
++    <!-- TV -->
++    <style name="Theme.Setup.Tv" />
++
+     <style name="SpinnerItem">
+         <item name="android:textSize">15sp</item>
+         <item name="android:paddingLeft">@dimen/content_margin_left</item>

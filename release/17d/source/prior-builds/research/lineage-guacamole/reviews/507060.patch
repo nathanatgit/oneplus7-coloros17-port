@@ -1,0 +1,55 @@
+From b12fb307bb2f96c06370d143e38c3630f14044e0 Mon Sep 17 00:00:00 2001
+From: Khargosxh18 <khargosxh18@gmail.com>
+Date: Sat, 03 Oct 2026 20:53:53 +0000
+Subject: [PATCH] update_engine: Grow recorded super size in recovery
+
+The super table already on the device can record a smaller size than
+the real partition, for example when an earlier install was made for a
+different super size. The new payload then does not fit in the recorded
+size even though the device has room for it, and sideloading in
+recovery fails with:
+
+  The maximum size of all groups for the target slot (9122611200) has
+  exceeded allocatable space for dynamic partitions 6441402368.
+  Unable to initialize partition metadata for slot B
+  Error applying update: 7 (ErrorCode::kInstallDeviceOpenError)
+
+ErrorCode 7 (kInstallDeviceOpenError) is only the generic result. The
+real cause is the allocatable space. It is worked out from the recorded
+super size (6 GiB here), not from the real device (9126805504 bytes).
+
+In recovery only, raise the recorded size to the real device size
+before the update layout is checked, using the new
+MetadataBuilder::GrowBlockDevicesToLiveSize. The size never shrinks. The
+normal system update_engine is not affected.
+
+Requires: liblp: Add GrowBlockDevicesToLiveSize
+
+Test: Sideloaded a full OTA in recovery. The log shows "Raised recorded
+      super size to the live device size" and the update installs.
+
+Change-Id: I1222b68f7e037f4d1c928a66e3e8a547462452f9
+Signed-off-by: Khargosxh18 <khargosxh18@gmail.com>
+---
+
+diff --git a/aosp/dynamic_partition_control_android.cc b/aosp/dynamic_partition_control_android.cc
+index 3fae0fa..9453668 100644
+--- a/aosp/dynamic_partition_control_android.cc
++++ b/aosp/dynamic_partition_control_android.cc
+@@ -406,6 +406,16 @@
+                  << super_device;
+     return nullptr;
+   }
++  // The super table already on the device can record a smaller size than
++  // the real partition, for example when an earlier install was made for a
++  // different super size. The payload then does not fit in the recorded size
++  // even though the device has room for it.
++  // So in recovery, grow the recorded size to match the real device size.
++  // It never shrinks.
++  if (IsRecovery() && builder->GrowBlockDevicesToLiveSize(PartitionOpener())) {
++    LOG(INFO) << "Raised recorded super size to the live device size in "
++              << super_device;
++  }
+   LOG(INFO) << "Created metadata for new update from slot "
+             << BootControlInterface::SlotName(source_slot) << " in "
+             << super_device;

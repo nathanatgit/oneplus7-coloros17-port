@@ -1,0 +1,1651 @@
+From 6003f77340d7f6ad702d25b1dacb6d9554c6f774 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 11:28:00 +0530
+Subject: [PATCH] LatinIME: Add floating keyboard mode
+
+Like Gboard, allow detaching the keyboard into a smaller floating panel
+that can be dragged anywhere on screen, leaving the app underneath
+unresized. A key in the suggestion strip floats or docks the keyboard,
+the panel position is remembered per orientation, and dragging it to
+the bottom edge docks it again.
+
+The floating panel uses the phone layouts at a phone-like size and is
+never split.
+
+Assisted-by: LLM
+Change-Id: Ie5a900c6284821043740644fa0b0efcdcb5677d4
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/res/drawable/floating_drag_handle_pill.xml b/java/res/drawable/floating_drag_handle_pill.xml
+new file mode 100644
+index 0000000..41aae59
+--- /dev/null
++++ b/java/res/drawable/floating_drag_handle_pill.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="rectangle">
++    <corners android:radius="2dp" />
++    <solid android:color="#FFFFFFFF" />
++</shape>
+diff --git a/java/res/drawable/ic_floating_hide_keyboard.xml b/java/res/drawable/ic_floating_hide_keyboard.xml
+new file mode 100644
+index 0000000..e414c42
+--- /dev/null
++++ b/java/res/drawable/ic_floating_hide_keyboard.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: Material Design Authors / Google LLC
++    SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M7.41,8.59L12,13.17l4.59,-4.58L18,10l-6,6 -6,-6 1.41,-1.41z" />
++</vector>
+diff --git a/java/res/drawable/ic_floating_keyboard.xml b/java/res/drawable/ic_floating_keyboard.xml
+new file mode 100644
+index 0000000..dc2486f
+--- /dev/null
++++ b/java/res/drawable/ic_floating_keyboard.xml
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:fillType="evenOdd"
++        android:pathData="M5,3h14a2,2 0,0 1,2 2v9a2,2 0,0 1,-2 2h-14a2,2 0,0 1,-2 -2v-9a2,2 0,0 1,2 -2zM6,6v2h2v-2zM9,6v2h2v-2zM12,6v2h2v-2zM15,6v2h3v-2zM6,9v2h2v-2zM9,9v2h2v-2zM12,9v2h2v-2zM15,9v2h3v-2zM8,12v2h8v-2z" />
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M9,19h6v2h-6z" />
++</vector>
+diff --git a/java/res/drawable/ic_floating_reset.xml b/java/res/drawable/ic_floating_reset.xml
+new file mode 100644
+index 0000000..2519561
+--- /dev/null
++++ b/java/res/drawable/ic_floating_reset.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="16dp"
++    android:height="16dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M12,5V2L8,6l4,4V7c3.31,0 6,2.69 6,6s-2.69,6 -6,6 -6,-2.69 -6,-6H4c0,4.42 3.58,8 8,8s8,-3.58 8,-8 -3.58,-8 -8,-8z" />
++</vector>
+diff --git a/java/res/drawable/ic_floating_resize.xml b/java/res/drawable/ic_floating_resize.xml
+new file mode 100644
+index 0000000..9f1ea7a
+--- /dev/null
++++ b/java/res/drawable/ic_floating_resize.xml
+@@ -0,0 +1,16 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:strokeColor="#FFFFFFFF"
++        android:strokeWidth="3"
++        android:strokeLineCap="round"
++        android:pathData="M21,7A14,14 0,0 1,7 21" />
++</vector>
+diff --git a/java/res/drawable/ic_floating_switch_ime.xml b/java/res/drawable/ic_floating_switch_ime.xml
+new file mode 100644
+index 0000000..8db2ae7
+--- /dev/null
++++ b/java/res/drawable/ic_floating_switch_ime.xml
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: Material Design Authors / Google LLC
++    SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M11.99,2C6.47,2 2,6.48 2,12s4.47,10 9.99,10C17.52,22 22,17.52 22,12S17.52,2 11.99,2zM18.92,8h-2.95c-0.32,-1.25 -0.78,-2.45 -1.38,-3.56 1.84,0.63 3.37,1.91 4.33,3.56zM12,4.04c0.83,1.2 1.48,2.53 1.91,3.96h-3.82c0.43,-1.43 1.08,-2.76 1.91,-3.96zM4.26,14C4.1,13.36 4,12.69 4,12s0.1,-1.36 0.26,-2h3.38c-0.08,0.66 -0.14,1.32 -0.14,2 0,0.68 0.06,1.34 0.14,2L4.26,14zM5.08,16h2.95c0.32,1.25 0.78,2.45 1.38,3.56 -1.84,-0.63 -3.37,-1.9 -4.33,-3.56zM8.03,8L5.08,8c0.96,-1.66 2.49,-2.93 4.33,-3.56C8.81,5.55 8.35,6.75 8.03,8zM12,19.96c-0.83,-1.2 -1.48,-2.53 -1.91,-3.96h3.82c-0.43,1.43 -1.08,2.76 -1.91,3.96zM14.34,14L9.66,14c-0.09,-0.66 -0.16,-1.32 -0.16,-2 0,-0.68 0.07,-1.35 0.16,-2h4.68c0.09,0.65 0.16,1.32 0.16,2 0,0.68 -0.07,1.34 -0.16,2zM14.59,19.56c0.6,-1.11 1.06,-2.31 1.38,-3.56h2.95c-0.96,1.65 -2.49,2.93 -4.33,3.56zM16.36,14c0.08,-0.66 0.14,-1.32 0.14,-2 0,-0.68 -0.06,-1.34 -0.14,-2h3.38c0.16,0.64 0.26,1.31 0.26,2s-0.1,1.36 -0.26,2h-3.38z" />
++</vector>
+diff --git a/java/res/layout/main_keyboard_frame.xml b/java/res/layout/main_keyboard_frame.xml
+index ebf7466..cd4a1d9 100644
+--- a/java/res/layout/main_keyboard_frame.xml
++++ b/java/res/layout/main_keyboard_frame.xml
+@@ -42,4 +42,55 @@
+         android:layoutDirection="ltr"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content" />
++
++    <FrameLayout
++        android:id="@+id/floating_drag_handle"
++        android:layout_width="match_parent"
++        android:layout_height="@dimen/config_floating_drag_handle_height"
++        android:contentDescription="@string/floating_keyboard_drag_handle"
++        android:visibility="gone">
++
++        <ImageView
++            android:id="@+id/floating_hide_button"
++            android:layout_width="@dimen/config_floating_drag_handle_height"
++            android:layout_height="@dimen/config_floating_drag_handle_height"
++            android:layout_gravity="start|center_vertical"
++            android:scaleType="center"
++            android:src="@drawable/ic_floating_hide_keyboard"
++            android:contentDescription="@string/floating_keyboard_hide"
++            android:background="?android:attr/selectableItemBackgroundBorderless" />
++
++        <ImageView
++            android:id="@+id/floating_switch_ime_button"
++            android:layout_width="@dimen/config_floating_drag_handle_height"
++            android:layout_height="@dimen/config_floating_drag_handle_height"
++            android:layout_gravity="end|center_vertical"
++            android:scaleType="center"
++            android:src="@drawable/ic_floating_switch_ime"
++            android:contentDescription="@string/floating_keyboard_switch_ime"
++            android:background="?android:attr/selectableItemBackgroundBorderless" />
++
++        <View
++            android:id="@+id/floating_drag_handle_pill"
++            android:layout_width="@dimen/config_floating_drag_handle_pill_width"
++            android:layout_height="@dimen/config_floating_drag_handle_pill_height"
++            android:layout_gravity="center"
++            android:background="@drawable/floating_drag_handle_pill" />
++
++        <TextView
++            android:id="@+id/floating_reset_button"
++            android:layout_width="wrap_content"
++            android:layout_height="match_parent"
++            android:layout_gravity="end|center_vertical"
++            android:layout_marginEnd="@dimen/config_floating_reset_button_margin"
++            android:paddingStart="@dimen/config_floating_reset_button_margin"
++            android:paddingEnd="@dimen/config_floating_reset_button_margin"
++            android:gravity="center_vertical"
++            android:drawableStart="@drawable/ic_floating_reset"
++            android:drawablePadding="@dimen/config_floating_reset_button_drawable_padding"
++            android:text="@string/floating_keyboard_reset"
++            android:textSize="@dimen/config_floating_reset_button_text_size"
++            android:background="?android:attr/selectableItemBackgroundBorderless"
++            android:visibility="gone" />
++    </FrameLayout>
+ </LinearLayout>
+diff --git a/java/res/layout/suggestions_strip.xml b/java/res/layout/suggestions_strip.xml
+index dc0284d..dd524ab 100644
+--- a/java/res/layout/suggestions_strip.xml
++++ b/java/res/layout/suggestions_strip.xml
+@@ -53,14 +53,24 @@
+             style="?attr/suggestionWordStyle" />
+     </LinearLayout>
+     <ImageButton
+-        android:id="@+id/suggestions_strip_split_key"
++        android:id="@+id/suggestions_strip_float_key"
+         android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
+         android:layout_height="fill_parent"
+         android:layout_alignParentStart="true"
+         android:layout_alignParentLeft="true"
+         android:layout_centerVertical="true"
++        android:src="@drawable/ic_floating_keyboard"
++        android:contentDescription="@string/spoken_description_float_keyboard"
++        style="?attr/suggestionWordStyle" />
++    <ImageButton
++        android:id="@+id/suggestions_strip_split_key"
++        android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
++        android:layout_height="fill_parent"
++        android:layout_toEndOf="@id/suggestions_strip_float_key"
++        android:layout_toRightOf="@id/suggestions_strip_float_key"
++        android:layout_centerVertical="true"
+         android:src="@drawable/ic_split_keyboard"
+-        android:visibility="invisible"
++        android:visibility="gone"
+         android:contentDescription="@string/spoken_description_split_keyboard"
+         style="?attr/suggestionWordStyle" />
+     <ImageButton
+diff --git a/java/res/values/cm_strings.xml b/java/res/values/cm_strings.xml
+index c578dad..33e44bc 100644
+--- a/java/res/values/cm_strings.xml
++++ b/java/res/values/cm_strings.xml
+@@ -67,4 +67,19 @@
+     <string name="spoken_description_split_keyboard">Split keyboard</string>
+     <!-- Spoken description of the suggestion strip key that joins the split keyboard halves -->
+     <string name="spoken_description_merge_keyboard">Merge keyboard</string>
++
++    <!-- Spoken description of the suggestion strip key that detaches the keyboard into a floating window -->
++    <string name="spoken_description_float_keyboard">Float keyboard</string>
++    <!-- Spoken description of the suggestion strip key that docks the floating keyboard back to the bottom -->
++    <string name="spoken_description_dock_keyboard">Dock keyboard</string>
++    <!-- Content description of the handle used to move the floating keyboard -->
++    <string name="floating_keyboard_drag_handle">Move keyboard</string>
++    <!-- Content description of the handle used to resize the floating keyboard -->
++    <string name="floating_keyboard_resize_handle">Resize keyboard</string>
++    <!-- Button that restores the default size and position of the floating keyboard [CHAR LIMIT=12] -->
++    <string name="floating_keyboard_reset">Reset</string>
++    <!-- Content description of the floating keyboard button that hides the keyboard -->
++    <string name="floating_keyboard_hide">Hide keyboard</string>
++    <!-- Content description of the floating keyboard button that switches to another input method -->
++    <string name="floating_keyboard_switch_ime">Switch input method</string>
+ </resources>
+diff --git a/java/res/values/floating-keyboard-dimens.xml b/java/res/values/floating-keyboard-dimens.xml
+new file mode 100644
+index 0000000..64f65d2
+--- /dev/null
++++ b/java/res/values/floating-keyboard-dimens.xml
+@@ -0,0 +1,13 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <dimen name="config_floating_drag_handle_height">40dp</dimen>
++    <dimen name="config_floating_drag_handle_pill_width">48dp</dimen>
++    <dimen name="config_floating_drag_handle_pill_height">4dp</dimen>
++    <dimen name="config_floating_reset_button_margin">8dp</dimen>
++    <dimen name="config_floating_reset_button_drawable_padding">4dp</dimen>
++    <dimen name="config_floating_reset_button_text_size">12sp</dimen>
++</resources>
+diff --git a/java/src/com/android/inputmethod/keyboard/FloatingKeyboardController.java b/java/src/com/android/inputmethod/keyboard/FloatingKeyboardController.java
+new file mode 100644
+index 0000000..2ec97c0
+--- /dev/null
++++ b/java/src/com/android/inputmethod/keyboard/FloatingKeyboardController.java
+@@ -0,0 +1,421 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.keyboard;
++
++import android.content.SharedPreferences;
++import android.content.res.ColorStateList;
++import android.content.res.Configuration;
++import android.graphics.Color;
++import android.graphics.Outline;
++import android.graphics.Point;
++import android.graphics.Rect;
++import android.graphics.drawable.Drawable;
++import android.graphics.drawable.GradientDrawable;
++import android.view.Gravity;
++import android.view.MotionEvent;
++import android.view.View;
++import android.view.ViewGroup;
++import android.view.ViewConfiguration;
++import android.view.ViewOutlineProvider;
++import android.widget.FrameLayout;
++import android.widget.ImageView;
++import android.widget.TextView;
++
++import com.android.inputmethod.latin.R;
++import com.android.inputmethod.latin.utils.FloatingKeyboardUtils;
++
++import javax.annotation.Nonnull;
++
++public final class FloatingKeyboardController {
++    public interface Listener {
++        void onFloatingKeyboardDocked();
++
++        void onFloatingKeyboardResized();
++
++        void onFloatingKeyboardHideRequested();
++
++        void onFloatingKeyboardSwitchImeRequested();
++    }
++
++    private static final int CORNER_HANDLE_SIZE_DP = 24;
++    private static final int DOCK_HIGHLIGHT_HEIGHT_DP = 96;
++    private static final int DOCK_HIGHLIGHT_ALPHA = 0x66;
++    private static final long DOCK_HIGHLIGHT_FADE_MS = 150;
++    private static final int RESIZE_OUTLINE_STROKE_DP = 2;
++    private static final long RESIZE_MODE_TIMEOUT_MS = 4000;
++    private static final long RESIZE_MODE_FADE_MS = 200;
++
++    private final ViewGroup mInputView;
++    private final View mPanel;
++    private final View mDockedOnlyView;
++    private final FrameLayout.LayoutParams mDockedLayoutParams;
++    private final View mDragHandle;
++    private final ImageView[] mCornerHandles = new ImageView[4];
++    private final View mDockHighlight;
++    private final View mResizeOutline;
++    private final TextView mResetButton;
++    private final View mSwitchImeButton;
++    private final Runnable mExitResizeMode = () -> setResizeMode(false);
++    private final int mTouchSlop;
++    private final Drawable mPanelBackground;
++    private final int mPanelPadding;
++    private final int mCornerHandleSize;
++    private final float mCornerRadius;
++    private final float mDensity;
++    private final SharedPreferences mPrefs;
++    private final Listener mListener;
++    private boolean mIsFloating;
++    private boolean mIsDragging;
++    private boolean mIsInDockZone;
++    private boolean mIsResizeMode;
++    private int mPanelWidth;
++    private float mDownRawX;
++    private float mDownRawY;
++    private float mDownX;
++    private float mDownY;
++    private int mDownWidth;
++    private int mDownHeight;
++    private int mDownKeyboardHeight;
++    private int mResizedWidth;
++    private int mResizedKeyboardHeight;
++    private int mResizedX;
++    private int mResizedY;
++
++    public FloatingKeyboardController(@Nonnull final ViewGroup inputView,
++            @Nonnull final View panel, @Nonnull final View dockedOnlyView,
++            @Nonnull final View dragHandle, final Drawable keyboardBackground,
++            @Nonnull final ColorStateList accentTint, @Nonnull final SharedPreferences prefs,
++            @Nonnull final Listener listener) {
++        mInputView = inputView;
++        mPanel = panel;
++        mDockedOnlyView = dockedOnlyView;
++        mDockedLayoutParams =
++                new FrameLayout.LayoutParams((FrameLayout.LayoutParams) panel.getLayoutParams());
++        mDragHandle = dragHandle;
++        mPanelBackground = keyboardBackground == null ? null
++                : keyboardBackground.getConstantState().newDrawable();
++        mDensity = inputView.getResources().getDisplayMetrics().density;
++        mPanelPadding = FloatingKeyboardUtils.dpToPx(
++                FloatingKeyboardUtils.PANEL_PADDING_DP, mDensity);
++        mCornerHandleSize = FloatingKeyboardUtils.dpToPx(CORNER_HANDLE_SIZE_DP, mDensity);
++        mCornerRadius = FloatingKeyboardUtils.dpToPx(
++                FloatingKeyboardUtils.PANEL_CORNER_RADIUS_DP, mDensity);
++        mPrefs = prefs;
++        mListener = listener;
++        mPanel.setOutlineProvider(new ViewOutlineProvider() {
++            @Override
++            public void getOutline(final View view, final Outline outline) {
++                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), mCornerRadius);
++            }
++        });
++        mDragHandle.setOnTouchListener(this::onMoveTouch);
++        mDockHighlight = createDockHighlight(accentTint);
++        mResizeOutline = createResizeOutline(accentTint);
++        mTouchSlop = ViewConfiguration.get(inputView.getContext()).getScaledTouchSlop();
++        mResetButton = dragHandle.findViewById(R.id.floating_reset_button);
++        mResetButton.setTextColor(accentTint);
++        mResetButton.setCompoundDrawableTintList(accentTint);
++        mResetButton.setOnClickListener(v -> resetPanel());
++        mSwitchImeButton = dragHandle.findViewById(R.id.floating_switch_ime_button);
++        ((ImageView) mSwitchImeButton).setImageTintList(accentTint);
++        mSwitchImeButton.setOnClickListener(
++                v -> mListener.onFloatingKeyboardSwitchImeRequested());
++        final ImageView hideButton = dragHandle.findViewById(R.id.floating_hide_button);
++        hideButton.setImageTintList(accentTint);
++        hideButton.setOnClickListener(v -> mListener.onFloatingKeyboardHideRequested());
++        for (int corner = 0; corner < mCornerHandles.length; corner++) {
++            mCornerHandles[corner] = createCornerHandle(corner, accentTint);
++        }
++        mInputView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop,
++                oldRight, oldBottom) -> applySavedPosition());
++    }
++
++    public boolean isFloating() {
++        return mIsFloating;
++    }
++
++    public void setFloating(final boolean floating, final int keyboardWidth) {
++        if (floating == mIsFloating && keyboardWidth == mPanelWidth) {
++            return;
++        }
++        mIsFloating = floating;
++        mPanelWidth = keyboardWidth;
++        if (floating) {
++            mPanel.setLayoutParams(new FrameLayout.LayoutParams(
++                    keyboardWidth + 2 * mPanelPadding, ViewGroup.LayoutParams.WRAP_CONTENT,
++                    Gravity.TOP | Gravity.LEFT));
++            mPanel.setPadding(mPanelPadding, mPanelPadding, mPanelPadding, 0);
++            mPanel.setBackground(mPanelBackground);
++            mPanel.setClipToOutline(true);
++        } else {
++            mPanel.setLayoutParams(new FrameLayout.LayoutParams(mDockedLayoutParams));
++            mPanel.setPadding(0, 0, 0, 0);
++            mPanel.setBackground(null);
++            mPanel.setClipToOutline(false);
++            mPanel.setTranslationX(0);
++            mPanel.setTranslationY(0);
++        }
++        if (!floating) {
++            setResizeMode(false);
++        }
++        mDragHandle.setVisibility(floating ? View.VISIBLE : View.GONE);
++        mInputView.requestLayout();
++    }
++
++    public void getPanelRect(@Nonnull final Rect outRect) {
++        if (mDockedOnlyView.getVisibility() == View.VISIBLE) {
++            outRect.set(mDockedOnlyView.getLeft(), mDockedOnlyView.getTop(),
++                    mDockedOnlyView.getRight(), mDockedOnlyView.getBottom());
++            return;
++        }
++        final int x = Math.round(mPanel.getTranslationX());
++        final int y = Math.round(mPanel.getTranslationY());
++        final int inset = mIsResizeMode ? mCornerHandleSize / 2 : 0;
++        outRect.set(x - inset, y - inset, x + mPanel.getWidth() + inset,
++                y + mPanel.getHeight() + inset);
++    }
++
++    private boolean onMoveTouch(final View view, final MotionEvent event) {
++        switch (event.getActionMasked()) {
++        case MotionEvent.ACTION_DOWN:
++            mIsDragging = true;
++            mDownRawX = event.getRawX();
++            mDownRawY = event.getRawY();
++            mDownX = mPanel.getTranslationX();
++            mDownY = mPanel.getTranslationY();
++            return true;
++        case MotionEvent.ACTION_MOVE:
++            final Point position = FloatingKeyboardUtils.clampPosition(
++                    Math.round(mDownX + event.getRawX() - mDownRawX),
++                    Math.round(mDownY + event.getRawY() - mDownRawY),
++                    mPanel.getWidth(), mPanel.getHeight(),
++                    mInputView.getWidth(), mInputView.getHeight());
++            setPanelPosition(position.x, position.y);
++            setInDockZone(FloatingKeyboardUtils.shouldDock(position.y + mPanel.getHeight(),
++                    mInputView.getHeight(), mDensity));
++            return true;
++        case MotionEvent.ACTION_UP:
++        case MotionEvent.ACTION_CANCEL:
++            mIsDragging = false;
++            final boolean dock = mIsInDockZone;
++            setInDockZone(false);
++            if (Math.abs(event.getRawX() - mDownRawX) < mTouchSlop
++                    && Math.abs(event.getRawY() - mDownRawY) < mTouchSlop) {
++                setResizeMode(!mIsResizeMode);
++            } else if (dock) {
++                mListener.onFloatingKeyboardDocked();
++            } else {
++                FloatingKeyboardUtils.savePosition(mPrefs, isLandscape(),
++                        Math.round(mPanel.getTranslationX()),
++                        Math.round(mPanel.getTranslationY()),
++                        mPanel.getWidth(), mPanel.getHeight(),
++                        mInputView.getWidth(), mInputView.getHeight());
++            }
++            return true;
++        default:
++            return false;
++        }
++    }
++
++    private boolean onCornerTouch(final int corner, final MotionEvent event) {
++        final boolean isLeft = corner == 0 || corner == 2;
++        final boolean isTop = corner == 0 || corner == 1;
++        switch (event.getActionMasked()) {
++        case MotionEvent.ACTION_DOWN:
++            mInputView.removeCallbacks(mExitResizeMode);
++            mIsDragging = true;
++            mDownRawX = event.getRawX();
++            mDownRawY = event.getRawY();
++            mDownX = mPanel.getTranslationX();
++            mDownY = mPanel.getTranslationY();
++            mDownWidth = mPanel.getWidth();
++            mDownHeight = mPanel.getHeight();
++            mDownKeyboardHeight = mPanel.findViewById(R.id.keyboard_view).getHeight();
++            mResizedWidth = mDownWidth;
++            mResizedKeyboardHeight = mDownKeyboardHeight;
++            return true;
++        case MotionEvent.ACTION_MOVE:
++            final float dx = event.getRawX() - mDownRawX;
++            final float dy = event.getRawY() - mDownRawY;
++            mResizedWidth = FloatingKeyboardUtils.clampPanelWidth(
++                    Math.round(mDownWidth + (isLeft ? -dx : dx)),
++                    mInputView.getWidth(), mDensity);
++            mResizedKeyboardHeight = FloatingKeyboardUtils.clampKeyboardHeight(
++                    Math.round(mDownKeyboardHeight + (isTop ? -dy : dy)),
++                    mInputView.getHeight(), mDensity);
++            final int height = mDownHeight + mResizedKeyboardHeight - mDownKeyboardHeight;
++            mResizedX = Math.round(isLeft ? mDownX + mDownWidth - mResizedWidth : mDownX);
++            mResizedY = Math.round(isTop ? mDownY + mDownHeight - height : mDownY);
++            showResizeOutline(mResizedX, mResizedY, mResizedWidth, height);
++            return true;
++        case MotionEvent.ACTION_UP:
++        case MotionEvent.ACTION_CANCEL:
++            mIsDragging = false;
++            mResizeOutline.setVisibility(View.GONE);
++            mInputView.postDelayed(mExitResizeMode, RESIZE_MODE_TIMEOUT_MS);
++            if (mResizedWidth != mDownWidth || mResizedKeyboardHeight != mDownKeyboardHeight) {
++                final int finalHeight =
++                        mDownHeight + mResizedKeyboardHeight - mDownKeyboardHeight;
++                FloatingKeyboardUtils.savePanelWidth(mPrefs, isLandscape(), mResizedWidth,
++                        mDensity);
++                FloatingKeyboardUtils.saveKeyboardHeight(mPrefs, isLandscape(),
++                        mResizedKeyboardHeight, mDensity);
++                FloatingKeyboardUtils.savePosition(mPrefs, isLandscape(), mResizedX, mResizedY,
++                        mResizedWidth, finalHeight,
++                        mInputView.getWidth(), mInputView.getHeight());
++                mListener.onFloatingKeyboardResized();
++            } else {
++                setPanelPosition(Math.round(mDownX), Math.round(mDownY));
++            }
++            return true;
++        default:
++            return false;
++        }
++    }
++
++    private void showResizeOutline(final int x, final int y, final int width,
++            final int height) {
++        final ViewGroup.LayoutParams params = mResizeOutline.getLayoutParams();
++        params.width = width;
++        params.height = height;
++        mResizeOutline.setLayoutParams(params);
++        mResizeOutline.setTranslationX(x);
++        mResizeOutline.setTranslationY(y);
++        mResizeOutline.setVisibility(View.VISIBLE);
++        positionCornerHandles(x, y, width, height);
++    }
++
++    private void setResizeMode(final boolean resizeMode) {
++        mInputView.removeCallbacks(mExitResizeMode);
++        final boolean show = resizeMode && mIsFloating;
++        if (show == mIsResizeMode) {
++            return;
++        }
++        mIsResizeMode = show;
++        for (final View handle : mCornerHandles) {
++            fade(handle, show);
++        }
++        fade(mResetButton, show);
++        fade(mSwitchImeButton, !show);
++        mInputView.requestLayout();
++        if (show) {
++            mInputView.postDelayed(mExitResizeMode, RESIZE_MODE_TIMEOUT_MS);
++        }
++    }
++
++    private static void fade(final View view, final boolean in) {
++        view.animate().cancel();
++        if (in) {
++            if (view.getVisibility() != View.VISIBLE) {
++                view.setAlpha(0f);
++                view.setVisibility(View.VISIBLE);
++            }
++            view.animate().alpha(1f).setDuration(RESIZE_MODE_FADE_MS);
++        } else if (view.getVisibility() == View.VISIBLE) {
++            view.animate().alpha(0f).setDuration(RESIZE_MODE_FADE_MS)
++                    .withEndAction(() -> view.setVisibility(View.GONE));
++        }
++    }
++
++    private void resetPanel() {
++        FloatingKeyboardUtils.resetPanel(mPrefs, isLandscape());
++        setResizeMode(false);
++        mListener.onFloatingKeyboardResized();
++        mInputView.post(this::applySavedPosition);
++    }
++
++    private void applySavedPosition() {
++        if (!mIsFloating || mIsDragging) {
++            return;
++        }
++        final Point position = FloatingKeyboardUtils.loadPosition(mPrefs, isLandscape(),
++                mPanel.getWidth(), mPanel.getHeight(),
++                mInputView.getWidth(), mInputView.getHeight());
++        setPanelPosition(position.x, position.y);
++    }
++
++    private void setPanelPosition(final int x, final int y) {
++        mPanel.setTranslationX(x);
++        mPanel.setTranslationY(y);
++        positionCornerHandles(x, y, mPanel.getWidth(), mPanel.getHeight());
++    }
++
++    private void positionCornerHandles(final int x, final int y, final int width,
++            final int height) {
++        final float half = mCornerHandleSize / 2f;
++        for (int corner = 0; corner < mCornerHandles.length; corner++) {
++            final boolean isLeft = corner == 0 || corner == 2;
++            final boolean isTop = corner == 0 || corner == 1;
++            mCornerHandles[corner].setTranslationX(x - half + (isLeft ? 0 : width));
++            mCornerHandles[corner].setTranslationY(y - half + (isTop ? 0 : height));
++        }
++    }
++
++    private void setInDockZone(final boolean inDockZone) {
++        if (inDockZone == mIsInDockZone) {
++            return;
++        }
++        mIsInDockZone = inDockZone;
++        mDockHighlight.animate().cancel();
++        if (inDockZone) {
++            mDockHighlight.setVisibility(View.VISIBLE);
++            mDockHighlight.animate().alpha(1f).setDuration(DOCK_HIGHLIGHT_FADE_MS);
++        } else {
++            mDockHighlight.animate().alpha(0f).setDuration(DOCK_HIGHLIGHT_FADE_MS)
++                    .withEndAction(() -> mDockHighlight.setVisibility(View.GONE));
++        }
++    }
++
++    private ImageView createCornerHandle(final int corner, final ColorStateList tint) {
++        final ImageView handle = new ImageView(mInputView.getContext());
++        handle.setImageResource(R.drawable.ic_floating_resize);
++        handle.setImageTintList(tint);
++        handle.setScaleX(corner == 0 || corner == 2 ? -1f : 1f);
++        handle.setScaleY(corner == 0 || corner == 1 ? -1f : 1f);
++        handle.setContentDescription(
++                mInputView.getResources().getString(R.string.floating_keyboard_resize_handle));
++        handle.setVisibility(View.GONE);
++        handle.setOnTouchListener((v, event) -> onCornerTouch(corner, event));
++        mInputView.addView(handle, new FrameLayout.LayoutParams(mCornerHandleSize,
++                mCornerHandleSize, Gravity.TOP | Gravity.LEFT));
++        return handle;
++    }
++
++    private View createDockHighlight(final ColorStateList tint) {
++        final int color = tint.getDefaultColor();
++        final GradientDrawable glow = new GradientDrawable(
++                GradientDrawable.Orientation.BOTTOM_TOP, new int[] {
++                        Color.argb(DOCK_HIGHLIGHT_ALPHA, Color.red(color), Color.green(color),
++                                Color.blue(color)),
++                        Color.TRANSPARENT });
++        final View highlight = new View(mInputView.getContext());
++        highlight.setBackground(glow);
++        highlight.setAlpha(0f);
++        highlight.setVisibility(View.GONE);
++        mInputView.addView(highlight, 0, new FrameLayout.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT,
++                FloatingKeyboardUtils.dpToPx(DOCK_HIGHLIGHT_HEIGHT_DP, mDensity),
++                Gravity.BOTTOM));
++        return highlight;
++    }
++
++    private View createResizeOutline(final ColorStateList tint) {
++        final GradientDrawable outline = new GradientDrawable();
++        outline.setCornerRadius(mCornerRadius);
++        outline.setStroke(FloatingKeyboardUtils.dpToPx(RESIZE_OUTLINE_STROKE_DP, mDensity),
++                tint.getDefaultColor());
++        final View view = new View(mInputView.getContext());
++        view.setBackground(outline);
++        view.setVisibility(View.GONE);
++        mInputView.addView(view, new FrameLayout.LayoutParams(0, 0, Gravity.TOP | Gravity.LEFT));
++        return view;
++    }
++
++    private boolean isLandscape() {
++        return mInputView.getResources().getConfiguration().orientation
++                == Configuration.ORIENTATION_LANDSCAPE;
++    }
++}
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardId.java b/java/src/com/android/inputmethod/keyboard/KeyboardId.java
+index 5944a4b..22d2c8b 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardId.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardId.java
+@@ -85,6 +85,7 @@
+     public final boolean mHasShortcutKey;
+     public final boolean mIsSplitLayout;
+     public final boolean mIsSplitDuplicateKeys;
++    public final boolean mIsFloating;
+ 
+     private final int mHashCode;
+ 
+@@ -105,6 +106,7 @@
+         mHasShortcutKey = params.mVoiceInputKeyEnabled;
+         mIsSplitLayout = params.mIsSplitLayoutEnabled;
+         mIsSplitDuplicateKeys = mIsSplitLayout && params.mSplitDuplicateKeysEnabled;
++        mIsFloating = params.mIsFloating;
+ 
+         mHashCode = computeHashCode(this);
+     }
+@@ -128,7 +130,8 @@
+                 id.navigatePrevious(),
+                 id.mSubtype,
+                 id.mIsSplitLayout,
+-                id.mIsSplitDuplicateKeys
++                id.mIsSplitDuplicateKeys,
++                id.mIsFloating
+         });
+     }
+ 
+@@ -152,7 +155,8 @@
+                 && other.navigatePrevious() == navigatePrevious()
+                 && other.mSubtype.equals(mSubtype)
+                 && other.mIsSplitLayout == mIsSplitLayout
+-                && other.mIsSplitDuplicateKeys == mIsSplitDuplicateKeys;
++                && other.mIsSplitDuplicateKeys == mIsSplitDuplicateKeys
++                && other.mIsFloating == mIsFloating;
+     }
+ 
+     private static boolean isAlphabetKeyboard(final int elementId) {
+@@ -203,7 +207,7 @@
+ 
+     @Override
+     public String toString() {
+-        return String.format(Locale.ROOT, "[%s %s:%s %dx%d %s %s%s%s%s%s%s%s%s%s%s%s%s]",
++        return String.format(Locale.ROOT, "[%s %s:%s %dx%d %s %s%s%s%s%s%s%s%s%s%s%s%s%s]",
+                 elementIdToName(mElementId),
+                 mSubtype.getLocale(),
+                 mSubtype.getExtraValueOf(KEYBOARD_LAYOUT_SET),
+@@ -220,7 +224,8 @@
+                 (mEmojiKeyEnabled ? " emojiKeyEnabled" : ""),
+                 (isMultiLine() ? " isMultiLine" : ""),
+                 (mIsSplitLayout ? " isSplitLayout" : ""),
+-                (mIsSplitDuplicateKeys ? " isSplitDuplicateKeys" : "")
++                (mIsSplitDuplicateKeys ? " isSplitDuplicateKeys" : ""),
++                (mIsFloating ? " isFloating" : "")
+         );
+     }
+ 
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+index 43ac6b3..57334a7 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardLayoutSet.java
+@@ -74,7 +74,7 @@
+     private static final String KEYBOARD_LAYOUT_SET_RESOURCE_PREFIX = "keyboard_layout_set_";
+ 
+     private final Context mContext;
+-    private Context mSplitLayoutContext;
++    private Context mPhoneLayoutContext;
+     @Nonnull
+     private final Params mParams;
+ 
+@@ -136,6 +136,7 @@
+         // whether the user has enabled it, and the keyboard layout supports it.
+         boolean mIsSplitLayoutEnabled;
+         boolean mSplitDuplicateKeysEnabled;
++        boolean mIsFloating;
+         // Sparse array of KeyboardLayoutSet element parameters indexed by element's id.
+         final SparseArray<ElementParams> mKeyboardLayoutSetElementIdToParamsMap =
+                 new SparseArray<>();
+@@ -204,6 +205,7 @@
+         // The KeyboardId is an internal key for a Keyboard object.
+ 
+         mParams.mIsSplitLayoutEnabled = mParams.mIsSplitLayoutEnabledByUser
++                && !mParams.mIsFloating
+                 && keyboardLayoutSetElementId <= KeyboardId.ELEMENT_SYMBOLS_SHIFTED;
+         final KeyboardId id = new KeyboardId(keyboardLayoutSetElementId, mParams);
+         try {
+@@ -214,11 +216,11 @@
+         }
+     }
+ 
+-    private Context getSplitLayoutContext() {
+-        if (mSplitLayoutContext == null) {
+-            mSplitLayoutContext = SplitKeyboardUtils.createPhoneLayoutContext(mContext);
++    private Context getPhoneLayoutContext() {
++        if (mPhoneLayoutContext == null) {
++            mPhoneLayoutContext = SplitKeyboardUtils.createPhoneLayoutContext(mContext);
+         }
+-        return mSplitLayoutContext;
++        return mPhoneLayoutContext;
+     }
+ 
+     @Nonnull
+@@ -232,7 +234,8 @@
+             return cachedKeyboard;
+         }
+ 
+-        final Context context = id.mIsSplitLayout ? getSplitLayoutContext() : mContext;
++        final Context context =
++                (id.mIsSplitLayout || id.mIsFloating) ? getPhoneLayoutContext() : mContext;
+         final KeyboardBuilder<KeyboardParams> builder =
+                 new KeyboardBuilder<>(context, new KeyboardParams(sUniqueKeysCache));
+         sUniqueKeysCache.setEnabled(id.isAlphabetKeyboard());
+@@ -371,6 +374,11 @@
+             return this;
+         }
+ 
++        public Builder setFloatingKeyboard(final boolean floating) {
++            mParams.mIsFloating = floating;
++            return this;
++        }
++
+         // Super redux version of reading the script ID for some subtype from Xml.
+         static int readScriptId(final Resources resources, final InputMethodSubtype subtype) {
+             final String layoutSetName = KEYBOARD_LAYOUT_SET_RESOURCE_PREFIX
+diff --git a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+index a75c873..592e0be 100644
+--- a/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
++++ b/java/src/com/android/inputmethod/keyboard/KeyboardSwitcher.java
+@@ -17,8 +17,11 @@
+ package com.android.inputmethod.keyboard;
+ 
+ import android.content.Context;
++import android.content.SharedPreferences;
+ import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.graphics.Rect;
++import android.preference.PreferenceManager;
+ import android.util.Log;
+ import android.view.ContextThemeWrapper;
+ import android.view.LayoutInflater;
+@@ -40,7 +43,9 @@
+ import com.android.inputmethod.latin.WordComposer;
+ import com.android.inputmethod.latin.settings.Settings;
+ import com.android.inputmethod.latin.settings.SettingsValues;
++import com.android.inputmethod.latin.suggestions.SuggestionStripView;
+ import com.android.inputmethod.latin.utils.CapsModeUtils;
++import com.android.inputmethod.latin.utils.FloatingKeyboardUtils;
+ import com.android.inputmethod.latin.utils.LanguageOnSpacebarUtils;
+ import com.android.inputmethod.latin.utils.RecapitalizeStatus;
+ import com.android.inputmethod.latin.utils.ResourceUtils;
+@@ -56,6 +61,9 @@
+     private View mMainKeyboardFrame;
+     private MainKeyboardView mKeyboardView;
+     private EmojiPalettesView mEmojiPalettesView;
++    private FloatingKeyboardController mFloatingKeyboardController;
++    private boolean mIsFloating;
++    private int mFloatingKeyboardWidth;
+     private LatinIME mLatinIME;
+     private RichInputMethodManager mRichImm;
+     private boolean mIsHardwareAcceleratedDrawingEnabled;
+@@ -122,12 +130,31 @@
+         final KeyboardLayoutSet.Builder builder = new KeyboardLayoutSet.Builder(
+                 mThemeContext, editorInfo);
+         final Resources res = mThemeContext.getResources();
+-        final int keyboardWidth = ResourceUtils.getDefaultKeyboardWidth(mThemeContext);
+-        final int keyboardHeight = ResourceUtils.getKeyboardHeight(res, settingsValues);
+-        final boolean isSplitLayout = settingsValues.mIsSplitKeyboardEnabled
++        final boolean isFloating = settingsValues.mIsFloatingKeyboardEnabled;
++        final boolean isSplitLayout = !isFloating && settingsValues.mIsSplitKeyboardEnabled
+                 && SplitKeyboardUtils.isSplitKeyboardAvailable(res);
+-        builder.setKeyboardGeometry(keyboardWidth, SplitKeyboardUtils.isSplitKeyboardAvailable(res)
+-                ? SplitKeyboardUtils.getSplitKeyboardHeight(keyboardHeight) : keyboardHeight);
++        final int screenWidth = ResourceUtils.getDefaultKeyboardWidth(mThemeContext);
++        final int keyboardWidth;
++        final int keyboardHeight;
++        if (isFloating) {
++            final float density = res.getDisplayMetrics().density;
++            final SharedPreferences prefs =
++                    PreferenceManager.getDefaultSharedPreferences(mLatinIME);
++            final boolean isLandscape =
++                    res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
++            keyboardWidth = FloatingKeyboardUtils.loadPanelWidth(
++                    prefs, isLandscape, screenWidth, density)
++                    - 2 * FloatingKeyboardUtils.dpToPx(
++                            FloatingKeyboardUtils.PANEL_PADDING_DP, density);
++            keyboardHeight = FloatingKeyboardUtils.loadKeyboardHeight(prefs, isLandscape,
++                    keyboardWidth, res.getDisplayMetrics().heightPixels, density);
++        } else {
++            final int height = ResourceUtils.getKeyboardHeight(res, settingsValues);
++            keyboardWidth = screenWidth;
++            keyboardHeight = SplitKeyboardUtils.isSplitKeyboardAvailable(res)
++                    ? SplitKeyboardUtils.getSplitKeyboardHeight(height) : height;
++        }
++        builder.setKeyboardGeometry(keyboardWidth, keyboardHeight);
+         builder.setSubtype(mRichImm.getCurrentSubtype());
+         builder.setVoiceInputKeyEnabled(settingsValues.mShowsVoiceInputKey);
+         builder.setNumberRowEnabled(settingsValues.mShowNumberRow);
+@@ -136,7 +163,13 @@
+         builder.setEmojiKeyEnabled(settingsValues.mShowsEmojiKey);
+         builder.setSplitLayoutEnabledByUser(isSplitLayout);
+         builder.setSplitDuplicateKeysEnabled(settingsValues.mSplitKeyboardDuplicateKeys);
++        builder.setFloatingKeyboard(isFloating);
+         mKeyboardLayoutSet = builder.build();
++        mIsFloating = isFloating;
++        mFloatingKeyboardWidth = keyboardWidth;
++        if (mFloatingKeyboardController != null) {
++            mFloatingKeyboardController.setFloating(isFloating, keyboardWidth);
++        }
+         try {
+             mState.onLoadKeyboard(currentAutoCapsState, currentRecapitalizeState);
+             mKeyboardTextsSet.setLocale(mRichImm.getCurrentSubtypeLocale(), mThemeContext);
+@@ -442,6 +475,14 @@
+         return mEmojiPalettesView != null && mEmojiPalettesView.isShown();
+     }
+ 
++    public boolean isFloatingKeyboard() {
++        return mFloatingKeyboardController != null && mFloatingKeyboardController.isFloating();
++    }
++
++    public void getFloatingPanelRect(final Rect outRect) {
++        mFloatingKeyboardController.getPanelRect(outRect);
++    }
++
+     public boolean isShowingMoreKeysPanel() {
+         if (isShowingEmojiPalettes()) {
+             return false;
+@@ -490,6 +531,42 @@
+         mEmojiPalettesView.setHardwareAcceleratedDrawingEnabled(
+                 isHardwareAcceleratedDrawingEnabled);
+         mEmojiPalettesView.setKeyboardActionListener(mLatinIME);
++
++        final View dragHandle = mCurrentInputView.findViewById(R.id.floating_drag_handle);
++        if (mKeyboardView.getBackground() != null) {
++            dragHandle.setBackground(
++                    mKeyboardView.getBackground().getConstantState().newDrawable());
++        }
++        final SuggestionStripView strip =
++                mCurrentInputView.findViewById(R.id.suggestion_strip_view);
++        dragHandle.findViewById(R.id.floating_drag_handle_pill)
++                .setBackgroundTintList(strip.getToolKeyTintList());
++        mFloatingKeyboardController = new FloatingKeyboardController(mCurrentInputView,
++                mMainKeyboardFrame, mEmojiPalettesView, dragHandle, mKeyboardView.getBackground(),
++                strip.getToolKeyTintList(),
++                PreferenceManager.getDefaultSharedPreferences(mLatinIME),
++                new FloatingKeyboardController.Listener() {
++                    @Override
++                    public void onFloatingKeyboardDocked() {
++                        mLatinIME.toggleFloatingKeyboard();
++                    }
++
++                    @Override
++                    public void onFloatingKeyboardResized() {
++                        mLatinIME.reloadKeyboard();
++                    }
++
++                    @Override
++                    public void onFloatingKeyboardHideRequested() {
++                        mLatinIME.requestHideSelf(0);
++                    }
++
++                    @Override
++                    public void onFloatingKeyboardSwitchImeRequested() {
++                        mRichImm.getInputMethodManager().showInputMethodPicker();
++                    }
++                });
++        mFloatingKeyboardController.setFloating(mIsFloating, mFloatingKeyboardWidth);
+         return mCurrentInputView;
+     }
+ 
+diff --git a/java/src/com/android/inputmethod/latin/LatinIME.java b/java/src/com/android/inputmethod/latin/LatinIME.java
+index 93ecda0..656b7d1 100644
+--- a/java/src/com/android/inputmethod/latin/LatinIME.java
++++ b/java/src/com/android/inputmethod/latin/LatinIME.java
+@@ -33,6 +33,8 @@
+ import android.content.IntentFilter;
+ import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.graphics.Color;
++import android.graphics.Rect;
+ import android.graphics.drawable.ColorDrawable;
+ import android.graphics.drawable.Drawable;
+ import android.inputmethodservice.InputMethodService;
+@@ -53,6 +55,8 @@
+ import android.view.View;
+ import android.view.ViewGroup.LayoutParams;
+ import android.view.Window;
++import android.view.WindowInsets;
++import android.view.WindowInsetsController;
+ import android.view.WindowManager;
+ import android.view.inputmethod.CompletionInfo;
+ import android.view.inputmethod.EditorInfo;
+@@ -100,6 +104,7 @@
+ import com.android.inputmethod.latin.utils.JniUtils;
+ import com.android.inputmethod.latin.utils.LeakGuardHandlerWrapper;
+ import com.android.inputmethod.latin.utils.StatsUtils;
++import com.android.inputmethod.latin.utils.FloatingKeyboardUtils;
+ import com.android.inputmethod.latin.utils.SplitKeyboardUtils;
+ import com.android.inputmethod.latin.utils.StatsUtilsManager;
+ import com.android.inputmethod.latin.utils.SubtypeLocaleUtils;
+@@ -166,6 +171,7 @@
+     // TODO: Move these {@link View}s to {@link KeyboardSwitcher}.
+     private View mInputView;
+     private InsetsUpdater mInsetsUpdater;
++    private final Rect mFloatingPanelRect = new Rect();
+     private SuggestionStripView mSuggestionStripView;
+ 
+     private RichInputMethodManager mRichImm;
+@@ -1284,6 +1290,19 @@
+             mInsetsUpdater.setInsets(outInsets);
+             return;
+         }
++        if (mKeyboardSwitcher.isFloatingKeyboard()) {
++            outInsets.contentTopInsets = inputHeight;
++            outInsets.visibleTopInsets = inputHeight;
++            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_REGION;
++            if (mKeyboardSwitcher.isShowingMoreKeysPanel()) {
++                outInsets.touchableRegion.set(0, 0, mInputView.getWidth(), inputHeight);
++            } else {
++                mKeyboardSwitcher.getFloatingPanelRect(mFloatingPanelRect);
++                outInsets.touchableRegion.set(mFloatingPanelRect);
++            }
++            mInsetsUpdater.setInsets(outInsets);
++            return;
++        }
+         final int suggestionsHeight = (!mKeyboardSwitcher.isShowingEmojiPalettes()
+                 && mSuggestionStripView.getVisibility() == View.VISIBLE)
+                 ? mSuggestionStripView.getHeight() : 0;
+@@ -1341,6 +1360,9 @@
+             // If there is a hardware keyboard, disable full screen mode.
+             return false;
+         }
++        if (settingsValues.mIsFloatingKeyboardEnabled) {
++            return false;
++        }
+         // Reread resource value here, because this method is called by the framework as needed.
+         final boolean isFullscreenModeAllowed = Settings.readUseFullscreenMode(getResources());
+         if (super.onEvaluateFullscreenMode() && isFullscreenModeAllowed) {
+@@ -1413,6 +1435,31 @@
+                 null /* activity */, permission.READ_CONTACTS);
+     }
+ 
++    public void reloadKeyboard() {
++        if (mKeyboardSwitcher.getMainKeyboardView() != null) {
++            mKeyboardSwitcher.loadKeyboard(getCurrentInputEditorInfo(), mSettings.getCurrent(),
++                    getCurrentAutoCapsState(), getCurrentRecapitalizeState());
++        }
++    }
++
++    @Override
++    public void toggleFloatingKeyboard() {
++        FloatingKeyboardUtils.toggleFloatingKeyboard(
++                PreferenceManager.getDefaultSharedPreferences(this));
++        loadSettings();
++        updateFullscreenMode();
++        updateNavigationBarColor();
++        if (mKeyboardSwitcher.getMainKeyboardView() != null) {
++            mKeyboardSwitcher.loadKeyboard(getCurrentInputEditorInfo(), mSettings.getCurrent(),
++                    getCurrentAutoCapsState(), getCurrentRecapitalizeState());
++        }
++        if (hasSuggestionStripView()) {
++            mSuggestionStripView.updateVisibility(
++                    !mSettings.getCurrent().mInputAttributes.mIsPasswordField,
++                    isFullscreenMode());
++        }
++    }
++
+     @Override
+     public void toggleSplitKeyboard() {
+         SplitKeyboardUtils.toggleSplitKeyboard(PreferenceManager.getDefaultSharedPreferences(this));
+@@ -1702,13 +1749,8 @@
+         final boolean shouldShowSuggestionCandidates =
+                 currentSettingsValues.mInputAttributes.mShouldShowSuggestions
+                 && currentSettingsValues.isSuggestionsEnabledPerUserSettings();
+-        final boolean shouldShowSuggestionsStripUnlessPassword = shouldShowImportantNotice
+-                || currentSettingsValues.mShowsVoiceInputKey
+-                || SplitKeyboardUtils.isSplitKeyboardAvailable(getResources())
+-                || shouldShowSuggestionCandidates
+-                || currentSettingsValues.isApplicationSpecifiedCompletionsOn();
+-        final boolean shouldShowSuggestionsStrip = shouldShowSuggestionsStripUnlessPassword
+-                && !currentSettingsValues.mInputAttributes.mIsPasswordField;
++        final boolean shouldShowSuggestionsStrip =
++                !currentSettingsValues.mInputAttributes.mIsPasswordField;
+         mSuggestionStripView.updateVisibility(shouldShowSuggestionsStrip, isFullscreenMode());
+         if (!shouldShowSuggestionsStrip) {
+             return;
+@@ -2139,9 +2181,20 @@
+         if (BuildCompatUtils.EFFECTIVE_SDK_INT > Build.VERSION_CODES.R) {
+             Drawable bg = mInputView.findViewById(R.id.keyboard_view).getBackground();
+             Window w = getWindow().getWindow();
+-            if (bg instanceof ColorDrawable) {
++            final boolean isFloating = mSettings.getCurrent().mIsFloatingKeyboardEnabled;
++            if (isFloating) {
++                w.setNavigationBarColor(Color.TRANSPARENT);
++            } else if (bg instanceof ColorDrawable) {
+                 w.setNavigationBarColor(((ColorDrawable) bg).getColor());
+             }
++            final WindowInsetsController insetsController = w.getInsetsController();
++            if (insetsController != null) {
++                if (isFloating) {
++                    insetsController.hide(WindowInsets.Type.captionBar());
++                } else {
++                    insetsController.show(WindowInsets.Type.captionBar());
++                }
++            }
+ 
+             int nightModeFlags = mDisplayContext.getResources().getConfiguration().uiMode &
+                     Configuration.UI_MODE_NIGHT_MASK;
+diff --git a/java/src/com/android/inputmethod/latin/settings/Settings.java b/java/src/com/android/inputmethod/latin/settings/Settings.java
+index d75bd04..9308c92 100644
+--- a/java/src/com/android/inputmethod/latin/settings/Settings.java
++++ b/java/src/com/android/inputmethod/latin/settings/Settings.java
+@@ -84,6 +84,7 @@
+             "pref_include_other_imes_in_language_switch_list";
+     public static final String PREF_CUSTOM_INPUT_STYLES = "custom_input_styles";
+     public static final String PREF_ENABLE_SPLIT_KEYBOARD = "pref_split_keyboard";
++    public static final String PREF_FLOATING_KEYBOARD = "pref_floating_keyboard";
+     public static final String PREF_SPLIT_KEYBOARD_DUPLICATE_KEYS =
+             "pref_split_keyboard_duplicate_keys";
+     // TODO: consolidate key preview dismiss delay with the key preview animation parameters.
+diff --git a/java/src/com/android/inputmethod/latin/settings/SettingsValues.java b/java/src/com/android/inputmethod/latin/settings/SettingsValues.java
+index 7801160..ec385e8 100644
+--- a/java/src/com/android/inputmethod/latin/settings/SettingsValues.java
++++ b/java/src/com/android/inputmethod/latin/settings/SettingsValues.java
+@@ -94,6 +94,7 @@
+     public final boolean mShouldShowLxxSuggestionUi;
+     // Use split layout for keyboard.
+     public final boolean mIsSplitKeyboardEnabled;
++    public final boolean mIsFloatingKeyboardEnabled;
+     public final boolean mSplitKeyboardDuplicateKeys;
+     public final int mScreenMetrics;
+ 
+@@ -169,6 +170,7 @@
+         mHasHardwareKeyboard = Settings.readHasHardwareKeyboard(res.getConfiguration());
+         mEnableMetricsLogging = prefs.getBoolean(Settings.PREF_ENABLE_METRICS_LOGGING, true);
+         mIsSplitKeyboardEnabled = prefs.getBoolean(Settings.PREF_ENABLE_SPLIT_KEYBOARD, false);
++        mIsFloatingKeyboardEnabled = prefs.getBoolean(Settings.PREF_FLOATING_KEYBOARD, false);
+         mSplitKeyboardDuplicateKeys = prefs.getBoolean(
+                 Settings.PREF_SPLIT_KEYBOARD_DUPLICATE_KEYS, true);
+         mScreenMetrics = Settings.readScreenMetrics(res);
+diff --git a/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java b/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java
+index f30f604..80ffaa2 100644
+--- a/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java
++++ b/java/src/com/android/inputmethod/latin/suggestions/SuggestionStripView.java
+@@ -17,6 +17,7 @@
+ package com.android.inputmethod.latin.suggestions;
+ 
+ import android.content.Context;
++import android.content.res.ColorStateList;
+ import android.content.res.Resources;
+ import android.content.res.TypedArray;
+ import android.graphics.Color;
+@@ -63,16 +64,19 @@
+         public void pickSuggestionManually(SuggestedWordInfo word);
+         public void onCodeInput(int primaryCode, int x, int y, boolean isKeyRepeat);
+         public void toggleSplitKeyboard();
++        public void toggleFloatingKeyboard();
+     }
+ 
+     static final boolean DBG = DebugFlags.DEBUG_ENABLED;
+     private static final float DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.0f;
+-    private static final int SPLIT_KEY_ALPHA_ON = 255;
+-    private static final int SPLIT_KEY_ALPHA_OFF = 128;
++    private static final int TOOL_KEY_ALPHA_ON = 255;
++    private static final int TOOL_KEY_ALPHA_OFF = 128;
+ 
+     private final ViewGroup mSuggestionsStrip;
+     private final ImageButton mVoiceKey;
+     private final ImageButton mSplitKey;
++    private final ImageButton mFloatKey;
++    private final int mDockedStripMargin;
+     private final View mImportantNoticeStrip;
+     MainKeyboardView mMainKeyboardView;
+ 
+@@ -146,6 +150,9 @@
+         mSuggestionsStrip = (ViewGroup)findViewById(R.id.suggestions_strip);
+         mVoiceKey = (ImageButton)findViewById(R.id.suggestions_strip_voice_key);
+         mSplitKey = (ImageButton)findViewById(R.id.suggestions_strip_split_key);
++        mFloatKey = (ImageButton)findViewById(R.id.suggestions_strip_float_key);
++        mDockedStripMargin =
++                ((MarginLayoutParams) mSuggestionsStrip.getLayoutParams()).getMarginStart();
+         mImportantNoticeStrip = findViewById(R.id.important_notice_strip);
+         mStripVisibilityGroup = new StripVisibilityGroup(this, mSuggestionsStrip,
+                 mImportantNoticeStrip);
+@@ -184,8 +191,10 @@
+         keyboardAttr.recycle();
+         mVoiceKey.setImageDrawable(iconVoice);
+         mVoiceKey.setOnClickListener(this);
+-        mSplitKey.setImageTintList(mWordViews.get(0).getTextColors());
++        mSplitKey.setImageTintList(getToolKeyTintList());
+         mSplitKey.setOnClickListener(this);
++        mFloatKey.setImageTintList(getToolKeyTintList());
++        mFloatKey.setOnClickListener(this);
+     }
+ 
+     /**
+@@ -203,17 +212,49 @@
+         final SettingsValues currentSettingsValues = Settings.getInstance().getCurrent();
+         mVoiceKey.setVisibility(currentSettingsValues.mShowsVoiceInputKey ? VISIBLE : INVISIBLE);
+         updateSplitKey();
++        updateFloatKey();
++    }
++
++    public ColorStateList getToolKeyTintList() {
++        return mWordViews.get(0).getTextColors();
++    }
++
++    private void updateFloatKey() {
++        final boolean isFloating = Settings.getInstance().getCurrent().mIsFloatingKeyboardEnabled;
++        mFloatKey.setActivated(isFloating);
++        mFloatKey.setImageAlpha(isFloating ? TOOL_KEY_ALPHA_ON : TOOL_KEY_ALPHA_OFF);
++        mFloatKey.setContentDescription(getResources().getString(isFloating
++                ? R.string.spoken_description_dock_keyboard
++                : R.string.spoken_description_float_keyboard));
++        final int margin = isFloating
++                ? getResources().getDimensionPixelSize(
++                        R.dimen.config_suggestions_strip_edge_key_width)
++                : mDockedStripMargin;
++        setHorizontalMargins(mSuggestionsStrip, margin);
++        setHorizontalMargins(mImportantNoticeStrip, margin);
++    }
++
++    private static void setHorizontalMargins(final View view, final int margin) {
++        final MarginLayoutParams params = (MarginLayoutParams) view.getLayoutParams();
++        if (params.getMarginStart() == margin && params.getMarginEnd() == margin) {
++            return;
++        }
++        params.setMargins(margin, params.topMargin, margin, params.bottomMargin);
++        params.setMarginStart(margin);
++        params.setMarginEnd(margin);
++        view.setLayoutParams(params);
+     }
+ 
+     private void updateSplitKey() {
+-        if (!SplitKeyboardUtils.isSplitKeyboardAvailable(getResources())) {
+-            mSplitKey.setVisibility(INVISIBLE);
++        if (Settings.getInstance().getCurrent().mIsFloatingKeyboardEnabled
++                || !SplitKeyboardUtils.isSplitKeyboardAvailable(getResources())) {
++            mSplitKey.setVisibility(GONE);
+             return;
+         }
+         final boolean isSplit = Settings.getInstance().getCurrent().mIsSplitKeyboardEnabled;
+         mSplitKey.setVisibility(VISIBLE);
+         mSplitKey.setActivated(isSplit);
+-        mSplitKey.setImageAlpha(isSplit ? SPLIT_KEY_ALPHA_ON : SPLIT_KEY_ALPHA_OFF);
++        mSplitKey.setImageAlpha(isSplit ? TOOL_KEY_ALPHA_ON : TOOL_KEY_ALPHA_OFF);
+         mSplitKey.setContentDescription(getResources().getString(isSplit
+                 ? R.string.spoken_description_merge_keyboard
+                 : R.string.spoken_description_split_keyboard));
+@@ -476,6 +517,10 @@
+             mListener.showImportantNoticeContents();
+             return;
+         }
++        if (view == mFloatKey) {
++            mListener.toggleFloatingKeyboard();
++            return;
++        }
+         if (view == mSplitKey) {
+             mListener.toggleSplitKeyboard();
+             updateSplitKey();
+diff --git a/java/src/com/android/inputmethod/latin/utils/FloatingKeyboardUtils.java b/java/src/com/android/inputmethod/latin/utils/FloatingKeyboardUtils.java
+new file mode 100644
+index 0000000..98b4d35
+--- /dev/null
++++ b/java/src/com/android/inputmethod/latin/utils/FloatingKeyboardUtils.java
+@@ -0,0 +1,153 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.latin.utils;
++
++import android.content.SharedPreferences;
++import android.graphics.Point;
++
++import com.android.inputmethod.latin.settings.Settings;
++
++import javax.annotation.Nonnull;
++
++public final class FloatingKeyboardUtils {
++    public static final float PANEL_WIDTH_RATIO = 0.8f;
++    public static final int PANEL_MAX_WIDTH_DP = 370;
++    public static final int PANEL_MIN_WIDTH_DP = 280;
++    public static final float PANEL_MAX_SCREEN_RATIO = 0.95f;
++    public static final int KEYBOARD_MIN_HEIGHT_DP = 140;
++    public static final float KEYBOARD_MAX_SCREEN_RATIO = 0.6f;
++    public static final float KEYBOARD_HEIGHT_TO_WIDTH_RATIO = 0.6f;
++    public static final int DOCK_THRESHOLD_DP = 48;
++    public static final int PANEL_PADDING_DP = 8;
++    public static final int PANEL_CORNER_RADIUS_DP = 16;
++    private static final float DEFAULT_X_FRACTION = 0.5f;
++    private static final float DEFAULT_Y_FRACTION = 0.85f;
++    private static final String PREF_POSITION_X = "pref_floating_keyboard_x_";
++    private static final String PREF_POSITION_Y = "pref_floating_keyboard_y_";
++    private static final String PREF_WIDTH_DP = "pref_floating_keyboard_width_dp_";
++    private static final String PREF_HEIGHT_DP = "pref_floating_keyboard_height_dp_";
++    private static final String LANDSCAPE = "land";
++    private static final String PORTRAIT = "port";
++
++    private FloatingKeyboardUtils() {
++    }
++
++    public static int getPanelWidth(final int screenWidth, final float density) {
++        return Math.min(Math.round(screenWidth * PANEL_WIDTH_RATIO),
++                Math.round(PANEL_MAX_WIDTH_DP * density));
++    }
++
++    public static int clampPanelWidth(final int width, final int screenWidth,
++            final float density) {
++        return Math.max(dpToPx(PANEL_MIN_WIDTH_DP, density),
++                Math.min(width, Math.round(screenWidth * PANEL_MAX_SCREEN_RATIO)));
++    }
++
++    public static int loadPanelWidth(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape, final int screenWidth, final float density) {
++        final String key = PREF_WIDTH_DP + (isLandscape ? LANDSCAPE : PORTRAIT);
++        if (!prefs.contains(key)) {
++            return getPanelWidth(screenWidth, density);
++        }
++        return clampPanelWidth(Math.round(prefs.getFloat(key, 0) * density), screenWidth,
++                density);
++    }
++
++    public static void savePanelWidth(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape, final int width, final float density) {
++        prefs.edit().putFloat(PREF_WIDTH_DP + (isLandscape ? LANDSCAPE : PORTRAIT),
++                width / density).apply();
++    }
++
++    public static int clampKeyboardHeight(final int height, final int screenHeight,
++            final float density) {
++        return Math.max(dpToPx(KEYBOARD_MIN_HEIGHT_DP, density),
++                Math.min(height, Math.round(screenHeight * KEYBOARD_MAX_SCREEN_RATIO)));
++    }
++
++    public static int loadKeyboardHeight(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape, final int keyboardWidth, final int screenHeight,
++            final float density) {
++        final String key = PREF_HEIGHT_DP + (isLandscape ? LANDSCAPE : PORTRAIT);
++        if (!prefs.contains(key)) {
++            return getKeyboardHeight(keyboardWidth);
++        }
++        return clampKeyboardHeight(Math.round(prefs.getFloat(key, 0) * density), screenHeight,
++                density);
++    }
++
++    public static void saveKeyboardHeight(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape, final int height, final float density) {
++        prefs.edit().putFloat(PREF_HEIGHT_DP + (isLandscape ? LANDSCAPE : PORTRAIT),
++                height / density).apply();
++    }
++
++    public static int dpToPx(final int dp, final float density) {
++        return Math.round(dp * density);
++    }
++
++    public static int getKeyboardHeight(final int keyboardWidth) {
++        return Math.round(keyboardWidth * KEYBOARD_HEIGHT_TO_WIDTH_RATIO);
++    }
++
++    @Nonnull
++    public static Point clampPosition(final int x, final int y, final int panelWidth,
++            final int panelHeight, final int areaWidth, final int areaHeight) {
++        return new Point(clamp(x, areaWidth - panelWidth), clamp(y, areaHeight - panelHeight));
++    }
++
++    public static boolean shouldDock(final int panelBottom, final int areaHeight,
++            final float density) {
++        return areaHeight - panelBottom <= Math.round(DOCK_THRESHOLD_DP * density);
++    }
++
++    @Nonnull
++    public static Point loadPosition(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape, final int panelWidth, final int panelHeight,
++            final int areaWidth, final int areaHeight) {
++        final String orientation = isLandscape ? LANDSCAPE : PORTRAIT;
++        final float xFraction = prefs.getFloat(PREF_POSITION_X + orientation, DEFAULT_X_FRACTION);
++        final float yFraction = prefs.getFloat(PREF_POSITION_Y + orientation, DEFAULT_Y_FRACTION);
++        return clampPosition(Math.round(xFraction * (areaWidth - panelWidth)),
++                Math.round(yFraction * (areaHeight - panelHeight)),
++                panelWidth, panelHeight, areaWidth, areaHeight);
++    }
++
++    public static void savePosition(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape, final int x, final int y, final int panelWidth,
++            final int panelHeight, final int areaWidth, final int areaHeight) {
++        final String orientation = isLandscape ? LANDSCAPE : PORTRAIT;
++        prefs.edit()
++                .putFloat(PREF_POSITION_X + orientation, fraction(x, areaWidth - panelWidth))
++                .putFloat(PREF_POSITION_Y + orientation, fraction(y, areaHeight - panelHeight))
++                .apply();
++    }
++
++    public static void resetPanel(@Nonnull final SharedPreferences prefs,
++            final boolean isLandscape) {
++        final String orientation = isLandscape ? LANDSCAPE : PORTRAIT;
++        prefs.edit()
++                .remove(PREF_POSITION_X + orientation)
++                .remove(PREF_POSITION_Y + orientation)
++                .remove(PREF_WIDTH_DP + orientation)
++                .remove(PREF_HEIGHT_DP + orientation)
++                .apply();
++    }
++
++    public static boolean toggleFloatingKeyboard(@Nonnull final SharedPreferences prefs) {
++        final boolean enabled = !prefs.getBoolean(Settings.PREF_FLOATING_KEYBOARD, false);
++        prefs.edit().putBoolean(Settings.PREF_FLOATING_KEYBOARD, enabled).apply();
++        return enabled;
++    }
++
++    private static int clamp(final int value, final int max) {
++        return Math.max(0, Math.min(value, Math.max(0, max)));
++    }
++
++    private static float fraction(final int value, final int range) {
++        return range <= 0 ? 0f : (float) value / range;
++    }
++}
+diff --git a/tests/src/com/android/inputmethod/keyboard/FloatingKeyboardLayoutTests.java b/tests/src/com/android/inputmethod/keyboard/FloatingKeyboardLayoutTests.java
+new file mode 100644
+index 0000000..72c4299
+--- /dev/null
++++ b/tests/src/com/android/inputmethod/keyboard/FloatingKeyboardLayoutTests.java
+@@ -0,0 +1,62 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.keyboard;
++
++import android.view.inputmethod.EditorInfo;
++
++import androidx.test.filters.SmallTest;
++
++import com.android.inputmethod.latin.RichInputMethodSubtype;
++import com.android.inputmethod.latin.common.Constants;
++import com.android.inputmethod.latin.utils.ResourceUtils;
++
++import java.util.Locale;
++
++@SmallTest
++public class FloatingKeyboardLayoutTests extends KeyboardLayoutSetTestsBase {
++    private static final int PANEL_WIDTH = 800;
++
++    @Override
++    protected int getKeyboardThemeForTests() {
++        return KeyboardTheme.THEME_ID_LXX_LIGHT;
++    }
++
++    private Keyboard buildFloating(final boolean splitLayoutEnabled) {
++        final KeyboardLayoutSet.Builder builder =
++                new KeyboardLayoutSet.Builder(getContext(), new EditorInfo());
++        builder.setKeyboardGeometry(PANEL_WIDTH,
++                        ResourceUtils.getDefaultKeyboardHeight(getContext().getResources()))
++                .setSubtype(RichInputMethodSubtype.getRichInputMethodSubtype(
++                        getSubtype(Locale.US, "qwerty")))
++                .setSplitLayoutEnabledByUser(splitLayoutEnabled)
++                .setFloatingKeyboard(true);
++        return builder.build().getKeyboard(KeyboardId.ELEMENT_ALPHABET);
++    }
++
++    public void testFloatingKeyboardUsesPanelWidth() {
++        final Keyboard keyboard = buildFloating(false);
++        assertTrue(keyboard.mId.mIsFloating);
++        assertEquals(PANEL_WIDTH, keyboard.mOccupiedWidth);
++    }
++
++    public void testFloatingKeyboardUsesPhoneLayout() {
++        final Keyboard keyboard = buildFloating(false);
++        int topRow = -1;
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.getCode() == 'q') topRow = key.getY();
++        }
++        for (final Key key : keyboard.getSortedKeys()) {
++            if (key.getY() == topRow) {
++                assertTrue("top row " + key, key.getCode() != Constants.CODE_DELETE);
++            }
++        }
++    }
++
++    public void testFloatingKeyboardIsNeverSplit() {
++        final Keyboard keyboard = buildFloating(true);
++        assertFalse(keyboard.mId.mIsSplitLayout);
++    }
++}
+diff --git a/tests/src/com/android/inputmethod/latin/utils/FloatingKeyboardUtilsTests.java b/tests/src/com/android/inputmethod/latin/utils/FloatingKeyboardUtilsTests.java
+new file mode 100644
+index 0000000..912e39d
+--- /dev/null
++++ b/tests/src/com/android/inputmethod/latin/utils/FloatingKeyboardUtilsTests.java
+@@ -0,0 +1,155 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.latin.utils;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertFalse;
++import static org.junit.Assert.assertTrue;
++
++import android.content.Context;
++import android.content.SharedPreferences;
++import android.graphics.Point;
++
++import androidx.test.InstrumentationRegistry;
++import androidx.test.filters.SmallTest;
++import androidx.test.runner.AndroidJUnit4;
++
++import com.android.inputmethod.latin.settings.Settings;
++
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++
++@SmallTest
++@RunWith(AndroidJUnit4.class)
++public class FloatingKeyboardUtilsTests {
++    private SharedPreferences mPrefs;
++
++    @Before
++    public void setUp() {
++        mPrefs = InstrumentationRegistry.getTargetContext().getSharedPreferences(
++                "floating_keyboard_utils_tests", Context.MODE_PRIVATE);
++        mPrefs.edit().clear().commit();
++    }
++
++    @Test
++    public void testPanelWidthIsCappedOnLargeScreens() {
++        assertEquals(740, FloatingKeyboardUtils.getPanelWidth(2000, 2.0f));
++    }
++
++    @Test
++    public void testPanelWidthIsFractionOfSmallScreens() {
++        assertEquals(720, FloatingKeyboardUtils.getPanelWidth(900, 2.625f));
++    }
++
++    @Test
++    public void testKeyboardHeightFollowsPanelWidth() {
++        assertEquals(600, FloatingKeyboardUtils.getKeyboardHeight(1000));
++    }
++
++    @Test
++    public void testClampKeepsPanelOnScreen() {
++        assertEquals(new Point(0, 0),
++                FloatingKeyboardUtils.clampPosition(-50, -20, 800, 400, 2000, 1000));
++        assertEquals(new Point(1200, 600),
++                FloatingKeyboardUtils.clampPosition(1900, 900, 800, 400, 2000, 1000));
++        assertEquals(new Point(300, 200),
++                FloatingKeyboardUtils.clampPosition(300, 200, 800, 400, 2000, 1000));
++    }
++
++    @Test
++    public void testDocksOnlyNearBottomEdge() {
++        assertTrue(FloatingKeyboardUtils.shouldDock(950, 1000, 2.0f));
++        assertFalse(FloatingKeyboardUtils.shouldDock(800, 1000, 2.0f));
++    }
++
++    @Test
++    public void testDefaultPositionIsCenteredNearBottom() {
++        final Point position =
++                FloatingKeyboardUtils.loadPosition(mPrefs, true, 800, 400, 2000, 1000);
++        assertEquals(600, position.x);
++        assertEquals(510, position.y);
++    }
++
++    @Test
++    public void testPositionRoundTripsAndScalesWithScreen() {
++        FloatingKeyboardUtils.savePosition(mPrefs, true, 300, 200, 800, 400, 2000, 1000);
++        assertEquals(new Point(300, 200),
++                FloatingKeyboardUtils.loadPosition(mPrefs, true, 800, 400, 2000, 1000));
++        assertEquals(new Point(250, 200),
++                FloatingKeyboardUtils.loadPosition(mPrefs, true, 800, 400, 1800, 1000));
++    }
++
++    @Test
++    public void testPositionsArePerOrientation() {
++        FloatingKeyboardUtils.savePosition(mPrefs, true, 0, 0, 800, 400, 2000, 1000);
++        final Point portrait =
++                FloatingKeyboardUtils.loadPosition(mPrefs, false, 800, 400, 2000, 1000);
++        assertEquals(600, portrait.x);
++        assertEquals(510, portrait.y);
++    }
++
++    @Test
++    public void testPanelWidthDefaultsWhenNotResized() {
++        assertEquals(740, FloatingKeyboardUtils.loadPanelWidth(mPrefs, true, 2000, 2.0f));
++    }
++
++    @Test
++    public void testResizedPanelWidthIsRestoredPerOrientation() {
++        FloatingKeyboardUtils.savePanelWidth(mPrefs, true, 1000, 2.0f);
++        assertEquals(1000, FloatingKeyboardUtils.loadPanelWidth(mPrefs, true, 2000, 2.0f));
++        assertEquals(740, FloatingKeyboardUtils.loadPanelWidth(mPrefs, false, 2000, 2.0f));
++    }
++
++    @Test
++    public void testPanelWidthIsClampedToScreen() {
++        assertEquals(560, FloatingKeyboardUtils.clampPanelWidth(100, 2000, 2.0f));
++        assertEquals(1900, FloatingKeyboardUtils.clampPanelWidth(5000, 2000, 2.0f));
++        FloatingKeyboardUtils.savePanelWidth(mPrefs, true, 1800, 2.0f);
++        assertEquals(1520, FloatingKeyboardUtils.loadPanelWidth(mPrefs, true, 1600, 2.0f));
++    }
++
++    @Test
++    public void testKeyboardHeightDefaultsToWidthRatio() {
++        assertEquals(600, FloatingKeyboardUtils.loadKeyboardHeight(mPrefs, true, 1000, 1600, 2.0f));
++    }
++
++    @Test
++    public void testResizedKeyboardHeightIsRestoredPerOrientation() {
++        FloatingKeyboardUtils.saveKeyboardHeight(mPrefs, true, 500, 2.0f);
++        assertEquals(500, FloatingKeyboardUtils.loadKeyboardHeight(mPrefs, true, 1000, 1600, 2.0f));
++        assertEquals(600,
++                FloatingKeyboardUtils.loadKeyboardHeight(mPrefs, false, 1000, 1600, 2.0f));
++    }
++
++    @Test
++    public void testKeyboardHeightIsClamped() {
++        assertEquals(280, FloatingKeyboardUtils.clampKeyboardHeight(100, 1600, 2.0f));
++        assertEquals(960, FloatingKeyboardUtils.clampKeyboardHeight(2000, 1600, 2.0f));
++    }
++
++    @Test
++    public void testResetRestoresDefaultsForOrientationOnly() {
++        FloatingKeyboardUtils.savePanelWidth(mPrefs, true, 1000, 2.0f);
++        FloatingKeyboardUtils.saveKeyboardHeight(mPrefs, true, 500, 2.0f);
++        FloatingKeyboardUtils.savePosition(mPrefs, true, 0, 0, 800, 400, 2000, 1000);
++        FloatingKeyboardUtils.savePanelWidth(mPrefs, false, 1000, 2.0f);
++        FloatingKeyboardUtils.resetPanel(mPrefs, true);
++        assertEquals(740, FloatingKeyboardUtils.loadPanelWidth(mPrefs, true, 2000, 2.0f));
++        assertEquals(600, FloatingKeyboardUtils.loadKeyboardHeight(mPrefs, true, 1000, 1600, 2.0f));
++        assertEquals(new Point(600, 510),
++                FloatingKeyboardUtils.loadPosition(mPrefs, true, 800, 400, 2000, 1000));
++        assertEquals(1000, FloatingKeyboardUtils.loadPanelWidth(mPrefs, false, 2000, 2.0f));
++    }
++
++    @Test
++    public void testToggleFlipsFloatingPreference() {
++        assertTrue(FloatingKeyboardUtils.toggleFloatingKeyboard(mPrefs));
++        assertTrue(mPrefs.getBoolean(Settings.PREF_FLOATING_KEYBOARD, false));
++        assertFalse(FloatingKeyboardUtils.toggleFloatingKeyboard(mPrefs));
++        assertFalse(mPrefs.getBoolean(Settings.PREF_FLOATING_KEYBOARD, true));
++    }
++}

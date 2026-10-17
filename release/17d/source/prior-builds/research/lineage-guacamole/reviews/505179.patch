@@ -1,0 +1,20 @@
+From a5b91be37a0ba6ab71f0aa954ccc4b2517cf7b5d Mon Sep 17 00:00:00 2001
+From: NullCode1337 <contact.nullcode@proton.me>
+Date: Sat, 19 Sep 2026 16:27:30 +0000
+Subject: [PATCH] sepolicy: qti: Label ktm wakeup node
+
+Change-Id: Ie5da587b31a71ed050c4c6fefa3494d0f974cc70
+---
+
+diff --git a/sepolicy/qti/vendor/genfs_contexts b/sepolicy/qti/vendor/genfs_contexts
+index b089f12..9b9cbd5 100644
+--- a/sepolicy/qti/vendor/genfs_contexts
++++ b/sepolicy/qti/vendor/genfs_contexts
+@@ -124,6 +124,7 @@
+ genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_1_geni_se/884000.i2c/i2c-8/8-0028/wakeup u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_1_geni_se/884000.i2c/i2c-9/9-0028/wakeup u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/880000.qcom,qup_uart/wakeup u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/88c000.qcom,qup_uart/wakeup u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/884000.i2c/i2c-7/7-0010/wakeup u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/884000.i2c/i2c-8/8-0010/wakeup u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc/8c0000.qcom,qupv3_2_geni_se/884000.i2c/i2c-9/9-0010/wakeup u:object_r:sysfs_wakeup:s0

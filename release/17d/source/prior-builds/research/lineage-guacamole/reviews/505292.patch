@@ -1,0 +1,210 @@
+From f5c91ed5f9cda73c17427d1fae3077b80d9f34d7 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sat, 28 Feb 2026 08:23:24 +0200
+Subject: [PATCH] overlay: Update DocumentsUIOverlay
+
+* Enable material3 theme & disable all caps on buttons
+* Enable search bar
+* Import material3 icons that were reverted in DocumentsUI
+  commit 7a0213d95ba08fbe5a3761c48468ea954329a8aa
+* Use system fonts instead of hardcoding sans-serif{,-medium}
+* Switch to SPDX headers while we are at it
+
+Change-Id: Iae0300c50c08f05163c167cd1ab7d9fe80cc99bc
+---
+
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/Android.bp b/overlay/rro_packages/DocumentsUIOverlay/Android.bp
+index 44345b9..d90452d 100644
+--- a/overlay/rro_packages/DocumentsUIOverlay/Android.bp
++++ b/overlay/rro_packages/DocumentsUIOverlay/Android.bp
+@@ -1,5 +1,5 @@
+ //
+-// Copyright (C) 2023 The LineageOS Project
++// SPDX-FileCopyrightText: The LineageOS Project
+ // SPDX-License-Identifier: Apache-2.0
+ //
+ 
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/AndroidManifest.xml b/overlay/rro_packages/DocumentsUIOverlay/AndroidManifest.xml
+index 7f54fd3..496fccc 100644
+--- a/overlay/rro_packages/DocumentsUIOverlay/AndroidManifest.xml
++++ b/overlay/rro_packages/DocumentsUIOverlay/AndroidManifest.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <!--
+-     Copyright (C) 2023 The LineageOS Project
++     SPDX-FileCopyrightText: The LineageOS Project
+      SPDX-License-Identifier: Apache-2.0
+ -->
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_advanced_shortcut.xml b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_advanced_shortcut.xml
+new file mode 100644
+index 0000000..cc11062
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_advanced_shortcut.xml
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: 2024 The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
++    <background android:drawable="@color/shortcut_background_m3" />
++    <foreground>
++        <inset android:inset="33%">
++            <!-- from ic_root_smartphone.xml -->
++            <vector
++                android:width="24dp"
++                android:height="24dp"
++                android:viewportWidth="960"
++                android:viewportHeight="960">
++                <path
++                    android:fillColor="@color/shortcut_foreground_m3"
++                    android:pathData="M280,920Q247,920 223.5,896.5Q200,873 200,840L200,120Q200,87 223.5,63.5Q247,40 280,40L680,40Q713,40 736.5,63.5Q760,87 760,120L760,840Q760,873 736.5,896.5Q713,920 680,920L280,920ZM280,800L280,840Q280,840 280,840Q280,840 280,840L680,840Q680,840 680,840Q680,840 680,840L680,800L280,800ZM280,720L680,720L680,240L280,240L280,720ZM280,160L680,160L680,120Q680,120 680,120Q680,120 680,120L280,120Q280,120 280,120Q280,120 280,120L280,160ZM280,160L280,120Q280,120 280,120Q280,120 280,120L280,120Q280,120 280,120Q280,120 280,120L280,160ZM280,800L280,800L280,840Q280,840 280,840Q280,840 280,840L280,840Q280,840 280,840Q280,840 280,840L280,800Z"/>
++            </vector>
++        </inset>
++    </foreground>
++</adaptive-icon>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_eject.xml b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_eject.xml
+new file mode 100644
+index 0000000..e11fc95
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_eject.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: 2024 The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++    <!-- fillColor will be set by tint color in the code. -->
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M200,760L200,680L760,680L760,760L200,760ZM214,600L480,200L746,600L214,600ZM480,520L480,520L480,520ZM362,520L598,520L480,344L362,520Z"/>
++</vector>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_root_download.xml b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_root_download.xml
+new file mode 100644
+index 0000000..08deff8
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_root_download.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: 2024 The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++    <!-- fillColor will be set by tint color in the code. -->
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M480,640L280,440L336,382L440,486L440,160L520,160L520,486L624,382L680,440L480,640ZM240,800Q207,800 183.5,776.5Q160,753 160,720L160,600L240,600L240,720Q240,720 240,720Q240,720 240,720L720,720Q720,720 720,720Q720,720 720,720L720,600L800,600L800,720Q800,753 776.5,776.5Q753,800 720,800L240,800Z"/>
++</vector>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_root_smartphone.xml b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_root_smartphone.xml
+new file mode 100644
+index 0000000..88f3d9f
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_root_smartphone.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: 2024 The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++    <!-- fillColor will be set by tint color in the code. -->
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M280,920Q247,920 223.5,896.5Q200,873 200,840L200,120Q200,87 223.5,63.5Q247,40 280,40L680,40Q713,40 736.5,63.5Q760,87 760,120L760,840Q760,873 736.5,896.5Q713,920 680,920L280,920ZM280,800L280,840Q280,840 280,840Q280,840 280,840L680,840Q680,840 680,840Q680,840 680,840L680,800L280,800ZM280,720L680,720L680,240L280,240L280,720ZM280,160L680,160L680,120Q680,120 680,120Q680,120 680,120L280,120Q280,120 280,120Q280,120 280,120L280,160ZM280,160L280,120Q280,120 280,120Q280,120 280,120L280,120Q280,120 280,120Q280,120 280,120L280,160ZM280,800L280,800L280,840Q280,840 280,840Q280,840 280,840L280,840Q280,840 280,840Q280,840 280,840L280,800Z"/>
++</vector>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_sd_storage.xml b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_sd_storage.xml
+new file mode 100644
+index 0000000..bcb43e1
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/drawable/ic_sd_storage.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: 2024 The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="960"
++    android:viewportHeight="960">
++    <!-- fillColor will be set by tint color in the code. -->
++    <path
++        android:fillColor="@android:color/white"
++        android:pathData="M360,440L440,440L440,280L360,280L360,440ZM480,440L560,440L560,280L480,280L480,440ZM600,440L680,440L680,280L600,280L600,440ZM240,880Q207,880 183.5,856.5Q160,833 160,800L160,320L400,80L720,80Q753,80 776.5,103.5Q800,127 800,160L800,800Q800,833 776.5,856.5Q753,880 720,880L240,880ZM240,800L720,800Q720,800 720,800Q720,800 720,800L720,160Q720,160 720,160Q720,160 720,160L434,160L240,354L240,800Q240,800 240,800Q240,800 240,800ZM240,800Q240,800 240,800Q240,800 240,800L240,800L434,800L720,800Q720,800 720,800Q720,800 720,800L720,800Q720,800 720,800Q720,800 720,800L240,800Z"/>
++</vector>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/values/colors_m3.xml b/overlay/rro_packages/DocumentsUIOverlay/res/values/colors_m3.xml
+new file mode 100644
+index 0000000..e1d3294
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/values/colors_m3.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: 2024 The Android Open Source Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <!-- static color, used in the shortcut icons (triggered by long pressing the launcher icon) -->
++    <color name="shortcut_foreground_m3">#ff3367d6</color>
++    <color name="shortcut_background_m3">#fff5f5f5</color>
++</resources>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/values/config.xml b/overlay/rro_packages/DocumentsUIOverlay/res/values/config.xml
+index a7556d6..f6e0f8e 100644
+--- a/overlay/rro_packages/DocumentsUIOverlay/res/values/config.xml
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/values/config.xml
+@@ -1,10 +1,17 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <!--
+-     Copyright (C) 2023 The LineageOS Project
++     SPDX-FileCopyrightText: The LineageOS Project
+      SPDX-License-Identifier: Apache-2.0
+ -->
+ <resources>
++    <!-- Indicates if showing as search bar design -->
++    <bool name="show_search_bar">true</bool>
+ 
+     <string name="default_root_uri" translatable="false">content://com.android.externalstorage.documents/root/primary</string>
+ 
++    <!-- Whether to show capitalize string on Button -->
++    <bool name="config_button_all_caps">false</bool>
++
++    <!-- The Material3 theme is only enabled IFF this config is true AND the flag `use_material3` is enabled. -->
++    <bool name="force_material3">true</bool>
+ </resources>
+diff --git a/overlay/rro_packages/DocumentsUIOverlay/res/values/strings_font.xml b/overlay/rro_packages/DocumentsUIOverlay/res/values/strings_font.xml
+new file mode 100644
+index 0000000..1de007d
+--- /dev/null
++++ b/overlay/rro_packages/DocumentsUIOverlay/res/values/strings_font.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <!-- Name of the body font family. If empty, falls back to platform default -->
++    <string name="config_fontFamily" translatable="false">@*android:string/config_bodyFontFamily</string>
++    <!-- Name of the body font family medium. -->
++    <string name="config_fontFamilyMedium" translatable="false">@*android:string/config_bodyFontFamilyMedium</string>
++    <!-- Name of the header font family. If empty, falls back to platform default -->
++    <string name="config_headerFontFamily" translatable="false">@*android:string/config_headlineFontFamily</string>
++    <!-- Name of the header font family medium. -->
++    <string name="config_headerFontFamilyMedium" translatable="false">@*android:string/config_headlineFontFamilyMedium</string>
++</resources>

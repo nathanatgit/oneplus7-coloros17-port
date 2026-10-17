@@ -1,0 +1,44 @@
+From 77d1da4d0e18543dd12bde6a603324a1ec130946 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Mon, 07 Sep 2026 10:44:30 +0530
+Subject: [PATCH] SUW: Swallow onbackPressed
+
+Change-Id: I3ee46cd07b7e24250fba6be51316a42fcd097285
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+index 0894f3c..45b162a 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+@@ -11,6 +11,7 @@
+ import android.util.TypedValue
+ import android.view.View
+ import android.widget.TextView
++import androidx.activity.OnBackPressedCallback
+ import com.google.android.material.button.MaterialButton
+ import com.google.android.setupcompat.util.SystemBarHelper
+ import com.google.android.setupdesign.R as SudR
+@@ -30,6 +31,13 @@
+         onSetupStart()
+         SystemBarHelper.setBackButtonVisible(window, false)
+ 
++        onBackPressedDispatcher.addCallback(
++            this,
++            object : OnBackPressedCallback(true) {
++                override fun handleOnBackPressed() = Unit
++            },
++        )
++
+         setupEmergencyCallButton()
+         setupSkipButton()
+ 
+@@ -93,8 +101,6 @@
+         }
+     }
+ 
+-    override fun onBackPressed() {}
+-
+     override val layoutResId = R.layout.welcome_activity
+ 
+     override val titleResId = -1

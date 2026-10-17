@@ -1,0 +1,133 @@
+From 372fca15b5a515d233ff780ee910c6a01d7fbdd2 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 18:39:31 +0530
+Subject: [PATCH] sepolicy: qti: Add Dolby Vision DVS service policy
+
+dvs-aidl-service reads the panel backlight and the ambient light sensor,
+stores its mode in persist.vendor.dolbyv.* and serves
+vendor.dolby.dvs.IDvs/default. The composer's libdolbyclstc queries it
+during Dolby Vision playback.
+
+Rules mirror the stock vendor policy.
+
+Assisted-by: LLM
+Change-Id: Ia86417543bfd971644ef838aef75392842390878
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/sepolicy/qti/public/attributes b/sepolicy/qti/public/attributes
+index 4d304bb..4af6401 100644
+--- a/sepolicy/qti/public/attributes
++++ b/sepolicy/qti/public/attributes
+@@ -1,4 +1,5 @@
+ vendor_hal_attribute(cameraMDM)
++vendor_hal_attribute(dolby_dvs)
+ vendor_hal_attribute(fingerprintpay)
+ vendor_hal_attribute(oplus_cammidasservice)
+ vendor_hal_attribute(oplus_charger)
+diff --git a/sepolicy/qti/vendor/file_contexts b/sepolicy/qti/vendor/file_contexts
+index 6c8b14e..f0a98ac 100644
+--- a/sepolicy/qti/vendor/file_contexts
++++ b/sepolicy/qti/vendor/file_contexts
+@@ -38,6 +38,9 @@
+ /(odm|vendor/odm)/bin/hw/vendor\.pixelworks\.hardware\.feature\.irisfeature-service    u:object_r:hal_graphics_composer_default_exec:s0
+ /(odm|vendor/odm)/bin/hw/vendor\.pixelworks\.hardware\.feature-service                 u:object_r:hal_feature_irisfeature_default_exec:s0
+ 
++# Dolby Vision
++/(odm|vendor/odm)/bin/hw/dvs-aidl-service    u:object_r:hal_dolby_dvs_aidl_exec:s0
++
+ # Engineering
+ /mnt/vendor/persist/engineermode(/.*)?    u:object_r:vendor_persist_engineer_file:s0
+ 
+diff --git a/sepolicy/qti/vendor/hal_dolby_dvs_aidl.te b/sepolicy/qti/vendor/hal_dolby_dvs_aidl.te
+new file mode 100644
+index 0000000..f2e3fcb
+--- /dev/null
++++ b/sepolicy/qti/vendor/hal_dolby_dvs_aidl.te
+@@ -0,0 +1,20 @@
++type hal_dolby_dvs_aidl, domain;
++binder_use(hal_dolby_dvs_aidl)
++
++type hal_dolby_dvs_aidl_exec, exec_type, vendor_file_type, file_type;
++init_daemon_domain(hal_dolby_dvs_aidl)
++
++binder_call(hal_dolby_dvs_aidl, system_server)
++binder_call(vendor_hal_dolby_dvs_client, vendor_hal_dolby_dvs_server)
++binder_call(vendor_hal_dolby_dvs_server, vendor_hal_dolby_dvs_client)
++
++hal_server_domain(hal_dolby_dvs_aidl, vendor_hal_dolby_dvs)
++
++hal_attribute_service(vendor_hal_dolby_dvs, hal_dolby_dvs_aidl_service)
++
++allow hal_dolby_dvs_aidl fwk_sensor_hwservice:hwservice_manager find;
++allow hal_dolby_dvs_aidl fwk_sensor_service:service_manager find;
++
++r_dir_file(hal_dolby_dvs_aidl, vendor_sysfs_graphics)
++
++set_prop(hal_dolby_dvs_aidl, vendor_dolby_vision_prop)
+diff --git a/sepolicy/qti/vendor/hal_graphics_composer_default.te b/sepolicy/qti/vendor/hal_graphics_composer_default.te
+index 9323d3d..6e9b482 100644
+--- a/sepolicy/qti/vendor/hal_graphics_composer_default.te
++++ b/sepolicy/qti/vendor/hal_graphics_composer_default.te
+@@ -1,5 +1,7 @@
+ binder_call(hal_graphics_composer_default, hal_graphics_composer_default)
+ 
++hal_client_domain(hal_graphics_composer_default, vendor_hal_dolby_dvs)
++
+ add_service(hal_graphics_composer_default, hal_display_iris_aidl_service)
+ add_service(hal_graphics_composer_default, hal_oplus_cwb_aidl_service)
+ add_service(hal_graphics_composer_default, hal_oplus_display_mixlut3d_service)
+diff --git a/sepolicy/qti/vendor/property.te b/sepolicy/qti/vendor/property.te
+index aa929fa..0d87039 100644
+--- a/sepolicy/qti/vendor/property.te
++++ b/sepolicy/qti/vendor/property.te
+@@ -1,3 +1,6 @@
++# Dolby Vision
++vendor_internal_prop(vendor_dolby_vision_prop)
++
+ # eSIM
+ vendor_internal_prop(vendor_oplus_esim_prop)
+ 
+diff --git a/sepolicy/qti/vendor/property_contexts b/sepolicy/qti/vendor/property_contexts
+index 4185cb0..c0b7727 100644
+--- a/sepolicy/qti/vendor/property_contexts
++++ b/sepolicy/qti/vendor/property_contexts
+@@ -12,6 +12,10 @@
+ # Display
+ vendor.dps.dump.composerpid    u:object_r:vendor_display_prop:s0
+ 
++# Dolby Vision
++persist.vendor.dolbyv.    u:object_r:vendor_dolby_vision_prop:s0
++vendor.dolbyv.            u:object_r:vendor_dolby_vision_prop:s0
++
+ # eSIM
+ ro.vendor.oplus.esim.support    u:object_r:vendor_oplus_esim_prop:s0
+ 
+diff --git a/sepolicy/qti/vendor/service.te b/sepolicy/qti/vendor/service.te
+index 00752da..c54487c 100644
+--- a/sepolicy/qti/vendor/service.te
++++ b/sepolicy/qti/vendor/service.te
+@@ -22,6 +22,9 @@
+ # Display (Pixelworks)
+ type hal_display_iris_aidl_service, hal_service_type, service_manager_type;
+ 
++# Dolby Vision
++type hal_dolby_dvs_aidl_service, hal_service_type, service_manager_type;
++
+ # EID
+ type hal_oplus_eid_service, hal_service_type, service_manager_type;
+ 
+diff --git a/sepolicy/qti/vendor/service_contexts b/sepolicy/qti/vendor/service_contexts
+index 8a005fa..01553d2 100644
+--- a/sepolicy/qti/vendor/service_contexts
++++ b/sepolicy/qti/vendor/service_contexts
+@@ -25,6 +25,9 @@
+ # Display (Pixelworks)
+ vendor.pixelworks.hardware.display.IIris/default    u:object_r:hal_display_iris_aidl_service:s0
+ 
++# Dolby Vision
++vendor.dolby.dvs.IDvs/default    u:object_r:hal_dolby_dvs_aidl_service:s0
++
+ # EID
+ vendor.oplus.hardware.eid.IEidDevice/default    u:object_r:hal_oplus_eid_service:s0
+ 

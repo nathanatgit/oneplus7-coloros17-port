@@ -1,0 +1,134 @@
+From f3b3f62fd72831f2572126492db35111da9b4702 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sun, 11 Oct 2026 14:14:20 +0100
+Subject: [PATCH] eSimSwitcher: Update vendor modem state before switching GPIO
+
+Notify the Oplus subsystem radio of the requested eSIM state before
+changing the hardware GPIO, matching the stock framework sequence.
+Without this update, dodge reports an absent card with no ATR or EID.
+
+Enable the Java subsystem interfaces and allow the switcher to access
+the vendor HAL. Check interface availability and version, and log
+submission failures without blocking the existing switch sequence.
+
+Tested on dodge: the eUICC now reports an ATR and EID, reaches
+APPSTATE_READY, and its subscription reaches LOADED after switching
+to eSIM.
+
+Assisted-by: LLM
+Change-Id: Icc18c8571ea8ae4882fd15bcc8f1757a358632b6
+---
+
+diff --git a/interfaces/Android.bp b/interfaces/Android.bp
+index 1bea676..cc808b4 100644
+--- a/interfaces/Android.bp
++++ b/interfaces/Android.bp
+@@ -728,7 +728,7 @@
+             enabled: true,
+         },
+         java: {
+-            enabled: false,
++            enabled: true,
+         },
+     },
+     versions_with_info: [
+@@ -769,7 +769,7 @@
+             enabled: true,
+         },
+         java: {
+-            enabled: false,
++            enabled: true,
+         },
+     },
+     imports: [
+diff --git a/packages/eSimSwitcher/Android.bp b/packages/eSimSwitcher/Android.bp
+index c3adb49..11af1b0 100644
+--- a/packages/eSimSwitcher/Android.bp
++++ b/packages/eSimSwitcher/Android.bp
+@@ -22,6 +22,7 @@
+         "androidx.preference_preference",
+         "org.lineageos.settings.resources",
+         "vendor.oplus.hardware.esim-V1-java",
++        "vendor.oplus.hardware.subsys_radio-V5-java",
+     ],
+ 
+     optimize: {
+diff --git a/packages/eSimSwitcher/src/org/lineageos/settings/esimswitcher/EsimController.kt b/packages/eSimSwitcher/src/org/lineageos/settings/esimswitcher/EsimController.kt
+index 7f1e946..9e8f9c8 100644
+--- a/packages/eSimSwitcher/src/org/lineageos/settings/esimswitcher/EsimController.kt
++++ b/packages/eSimSwitcher/src/org/lineageos/settings/esimswitcher/EsimController.kt
+@@ -12,9 +12,11 @@
+ import android.telephony.TelephonyManager
+ import android.telephony.UiccSlotMapping
+ import android.util.Log
++import java.util.concurrent.atomic.AtomicInteger
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.asExecutor
+ import vendor.oplus.hardware.esim.IOplusEsim
++import vendor.oplus.hardware.subsys_interface.subsys_radio.ISubsysRadio
+ 
+ class EsimController(private val context: Context) {
+     private val hasSN220Chipset = SystemProperties.get(NFC_CONFIG_FILE_NAME_PROP).contains("SN220")
+@@ -47,6 +49,7 @@
+                 specialSetEsimGpio(state, slotMapping, complete)
+                 /* oplusEsimService?.setUimPower(1) done via SEService.OnConnectedListener */
+             } else {
++                updateModemFeature(state)
+                 oplusEsimService?.setEsimGpio(state)
+                 oplusEsimService?.setUimPower(1)
+                 complete(currentGpioState() == state)
+@@ -81,6 +84,7 @@
+                         val session = reader?.openSession()
+                         val channel = session?.openLogicalChannel(null)
+ 
++                        updateModemFeature(state)
+                         updateSimType(state, slotMapping)
+                         oplusEsimService?.setEsimGpio(state)
+                         oplusEsimService?.setUimPower(1)
+@@ -135,6 +139,25 @@
+         }
+     }
+ 
++    private fun updateModemFeature(state: Int) {
++        try {
++            val radio =
++                ISubsysRadio.Stub.asInterface(
++                    ServiceManager.checkService("${ISubsysRadio.DESCRIPTOR}/slot1")
++                )
++            if (radio == null || radio.interfaceVersion < 5) {
++                Log.w(TAG, "Vendor modem eSIM status API is unavailable")
++                return
++            }
++            val serial = modemRequestSerial.incrementAndGet()
++            // Stock sends this asynchronous feature update before changing the GPIO.
++            radio.setEsimStatus(serial, state)
++            Log.i(TAG, "Submitted modem eSIM status: state=$state serial=$serial")
++        } catch (e: Exception) {
++            Log.e(TAG, "Failed to submit modem eSIM status", e)
++        }
++    }
++
+     private fun updateSimType(state: Int, slotMapping: List<UiccSlotMapping>?) {
+         if (slotMapping == null) return
+         try {
+@@ -179,6 +202,8 @@
+     companion object {
+         private const val TAG = "OplusEsimController"
+ 
++        private val modemRequestSerial = AtomicInteger(0x45530000)
++
+         private const val NFC_CONFIG_FILE_NAME_PROP = "persist.vendor.nfc.config_file_name"
+     }
+ }
+diff --git a/sepolicy/qti/private/esim_switcher_app.te b/sepolicy/qti/private/esim_switcher_app.te
+index fa7fc81..0014ff0 100644
+--- a/sepolicy/qti/private/esim_switcher_app.te
++++ b/sepolicy/qti/private/esim_switcher_app.te
+@@ -3,6 +3,7 @@
+ app_domain(esim_switcher_app)
+ hal_client_domain(esim_switcher_app, vendor_hal_oplus_esim)
+ hal_client_domain(esim_switcher_app, vendor_hal_qspmhal)
++hal_client_domain(esim_switcher_app, vendor_hal_subsys)
+ 
+ binder_call(esim_switcher_app, radio)
+ 

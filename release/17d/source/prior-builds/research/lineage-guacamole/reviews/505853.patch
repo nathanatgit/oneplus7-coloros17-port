@@ -1,0 +1,54 @@
+From a0d98cb1b48de8382799488c6e279c70cd244e54 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Wed, 02 Sep 2026 22:46:59 -0400
+Subject: [PATCH] Revert "Remove InputManager.getInstance()"
+
+This reverts commit 1502b687cc6b74c183e65ade1630a9db50771563.
+
+Reason for revert: QCOM's WFD service relies on this API, and even
+in QSSI 17 it has not been removed from their framework. Bring it
+back to maintain compatibility.
+
+Change-Id: Iaa71ada1875be3f93f18ccf2481528f41013dbea
+---
+
+diff --git a/core/java/android/hardware/input/InputManager.java b/core/java/android/hardware/input/InputManager.java
+index aeb9b59..3bcfac39 100644
+--- a/core/java/android/hardware/input/InputManager.java
++++ b/core/java/android/hardware/input/InputManager.java
+@@ -36,6 +36,7 @@
+ import android.annotation.TestApi;
+ import android.annotation.UserHandleAware;
+ import android.annotation.UserIdInt;
++import android.app.ActivityThread;
+ import android.compat.annotation.ChangeId;
+ import android.compat.annotation.UnsupportedAppUsage;
+ import android.content.Context;
+@@ -377,6 +378,27 @@
+     }
+ 
+     /**
++     * Gets an instance of the input manager.
++     *
++     *  Warning: The usage of this method is not supported!
++     *
++     *  @return The input manager instance.
++     *  Use {@link Context#getSystemService(Class)}
++     *  to obtain the InputManager instance.
++     *
++     * TODO (b/277717573): Soft remove this API in version V.
++     * TODO (b/277039664): Migrate app usage off this API.
++     *
++     * @hide
++     */
++    @Deprecated
++    @UnsupportedAppUsage
++    public static InputManager getInstance() {
++        return Objects.requireNonNull(ActivityThread.currentApplication())
++                .getSystemService(InputManager.class);
++    }
++
++    /**
+      * Get the current VelocityTracker strategy.
+      * @hide
+      */

@@ -1,0 +1,29 @@
+From 12f7d57754fb6355a8864d266d272120929f3cfa Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Tue, 29 Sep 2026 22:19:53 +0000
+Subject: [PATCH] Revert "overlay: Default to navBar gesture"
+
+This reverts commit b5020bb489ed5f7be705300377fb6b1cf0f17c65.
+
+Reason for revert: This affects existing installs
+
+Change-Id: I361883a103f5289e48163a6e3ff2b09106bd355e
+---
+
+diff --git a/overlay/common/frameworks/base/core/res/res/values/config.xml b/overlay/common/frameworks/base/core/res/res/values/config.xml
+index 1f9c68e..b34eb8f 100644
+--- a/overlay/common/frameworks/base/core/res/res/values/config.xml
++++ b/overlay/common/frameworks/base/core/res/res/values/config.xml
+@@ -179,12 +179,6 @@
+     <!-- Whether glanceable hub is enabled by default. -->
+     <bool name="config_glanceableHubEnabledByDefault">true</bool>
+ 
+-    <!-- Controls the navigation bar interaction mode:
+-         0: 3 button mode (back, home, overview buttons)
+-         1: 2 button mode (back, home buttons + swipe up for overview)
+-         2: gestures only for back, home and overview -->
+-    <integer name="config_navBarInteractionMode">2</integer>
+-
+     <!-- The default list of possible CMF Names|Style|ColorSource. This array can be
+          overridden device-specific resources. A wildcard (fallback) must be supplied.
+          Name   - Read from `ro.boot.hardware.color` sysprop. Fallback (*) required.

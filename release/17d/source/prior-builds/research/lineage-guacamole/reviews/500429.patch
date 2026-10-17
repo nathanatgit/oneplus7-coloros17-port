@@ -1,0 +1,35 @@
+From 72d98ef01c40c26e0fbac23ec64086a97a187654 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Mon, 31 Aug 2026 23:22:56 +0530
+Subject: [PATCH] SUW: Switch to glif_expressive
+
+Change-Id: I7fe9f098e7f2d0ec126eab885f1cc2bab261fc16
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+index 75585e4..e45fdd1 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/base/BaseSetupWizardActivity.kt
+@@ -192,7 +192,7 @@
+         intent
+             .putExtra(WizardManagerHelper.EXTRA_IS_FIRST_RUN, isFirstRun())
+             .putExtra(WizardManagerHelper.EXTRA_IS_SETUP_FLOW, true)
+-            .putExtra(WizardManagerHelper.EXTRA_THEME, ThemeHelper.THEME_GLIF_V4)
++            .putExtra(WizardManagerHelper.EXTRA_THEME, ThemeHelper.THEME_GLIF_EXPRESSIVE)
+ 
+     override fun startActivity(intent: Intent) {
+         super.startActivity(decorateIntent(intent))
+diff --git a/app/src/main/res/values/styles.xml b/app/src/main/res/values/styles.xml
+index e3bcf1e..1c6cb35 100644
+--- a/app/src/main/res/values/styles.xml
++++ b/app/src/main/res/values/styles.xml
+@@ -5,7 +5,7 @@
+      SPDX-License-Identifier: Apache-2.0
+ -->
+ <resources>
+-    <style name="Theme.Setup" parent="@style/SudFullDynamicColorThemeGlifV3.DayNight">
++    <style name="Theme.Setup" parent="@style/SudThemeGlifExpressive.DayNight">
+         <item name="sucUsePartnerResource">true</item>
+         <item name="sudUsePartnerHeavyTheme">true</item>
+     </style>

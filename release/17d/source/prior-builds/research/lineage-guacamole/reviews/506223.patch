@@ -1,0 +1,65 @@
+From 1dbb988c34e6020793fd730edeaf43f1247fa51e Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 04 Oct 2026 12:39:20 +0200
+Subject: [PATCH] Canvas: Enforce supported editable images via manifest
+
+Change-Id: I61ba7f1f5ca088e2ffe49f5de58306a93a581a6a
+---
+
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 9ceb2da..6cd9075 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -20,7 +20,9 @@
+             <intent-filter>
+                 <action android:name="android.intent.action.EDIT" />
+                 <category android:name="android.intent.category.DEFAULT" />
+-                <data android:mimeType="image/*" />
++                <data android:mimeType="image/jpeg" />
++                <data android:mimeType="image/png" />
++                <data android:mimeType="image/webp" />
+             </intent-filter>
+         </activity>
+         <provider
+diff --git a/app/src/main/java/org/lineageos/canvas/MainActivity.kt b/app/src/main/java/org/lineageos/canvas/MainActivity.kt
+index fbc177b..5e44471 100644
+--- a/app/src/main/java/org/lineageos/canvas/MainActivity.kt
++++ b/app/src/main/java/org/lineageos/canvas/MainActivity.kt
+@@ -37,14 +37,7 @@
+             return@Consumer
+         }
+ 
+-        val mimeType = contentResolver.getType(uri)
+-        val supportedMimeTypes = listOf(
+-            ImageFormat.JPEG.mimeType,
+-            ImageFormat.PNG.mimeType,
+-            ImageFormat.WEBP.mimeType,
+-        )
+-
+-        if (supportedMimeTypes.none { it == mimeType }) {
++        if (ImageFormat.fromMimeTypeOrNull(contentResolver.getType(uri)) == null) {
+             finish()
+             return@Consumer
+         }
+diff --git a/app/src/main/java/org/lineageos/canvas/models/ImageFormat.kt b/app/src/main/java/org/lineageos/canvas/models/ImageFormat.kt
+index 1ccf953..2f66f7b 100644
+--- a/app/src/main/java/org/lineageos/canvas/models/ImageFormat.kt
++++ b/app/src/main/java/org/lineageos/canvas/models/ImageFormat.kt
+@@ -32,12 +32,15 @@
+             Bitmap.CompressFormat.WEBP_LOSSLESS,
+         )
+ 
+-        fun fromMimeType(mimeType: String) = when (mimeType) {
++        fun fromMimeTypeOrNull(mimeType: String?) = when (mimeType) {
+             JPEG.mimeType -> JPEG
+             PNG.mimeType -> PNG
+             WEBP.mimeType -> WEBP
+-            else -> error("Unsupported image type")
++            else -> null
+         }
++
++        fun fromMimeType(mimeType: String) =
++            fromMimeTypeOrNull(mimeType) ?: error("Unsupported image type: $mimeType")
+     }
+ }
+ 

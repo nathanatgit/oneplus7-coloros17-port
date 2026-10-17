@@ -1,0 +1,91 @@
+From 1fde1f77510c2e50457ee98a9ec65099b56b5289 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 15 Sep 2026 12:10:50 +0530
+Subject: [PATCH] Settings: Setup upscale icons in SUW Accesibility
+
+Change-Id: Id80a214d3f4048b5ab8be09ff575577c7b56fd7d
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/res/layout/accessibility_service_suw_screen.xml b/res/layout/accessibility_service_suw_screen.xml
+index 2f15a4a..e875615 100644
+--- a/res/layout/accessibility_service_suw_screen.xml
++++ b/res/layout/accessibility_service_suw_screen.xml
+@@ -23,4 +23,5 @@
+     android:layout_height="match_parent"
+     android:entries="@xml/accessibility_service_suw_screen_items"
+     android:icon="@drawable/ic_accessibility_visibility"
++    app:sudUpscaleIcon="true"
+     app:sudAnimationIcon="@raw/icon_visibility"/>
+\ No newline at end of file
+diff --git a/res/layout/accessibility_suw_screen.xml b/res/layout/accessibility_suw_screen.xml
+index 527538b..80f497d 100644
+--- a/res/layout/accessibility_suw_screen.xml
++++ b/res/layout/accessibility_suw_screen.xml
+@@ -23,6 +23,7 @@
+     android:layout_height="match_parent"
+     android:entries="@xml/accessibility_suw_screen_items"
+     android:icon="@drawable/ic_accessibility_visibility"
++    app:sudUpscaleIcon="true"
+     app:sudAnimationIcon="@raw/icon_visibility"
+     app:sucHeaderText="@string/vision_settings_title"
+     app:sudDescriptionText="@string/vision_settings_description"/>
+\ No newline at end of file
+diff --git a/res/layout/color_inversion_suw_screen.xml b/res/layout/color_inversion_suw_screen.xml
+index ec60e7d..496cf53 100644
+--- a/res/layout/color_inversion_suw_screen.xml
++++ b/res/layout/color_inversion_suw_screen.xml
+@@ -23,6 +23,7 @@
+     android:layout_height="match_parent"
+     android:entries="@xml/color_inversion_suw_screen_items"
+     android:icon="@drawable/ic_accessibility_visibility"
++    app:sudUpscaleIcon="true"
+     app:sudAnimationIcon="@raw/icon_visibility"
+     app:sudIsAnimatedIconDelayed="false"
+     app:sucHeaderText="@string/accessibility_display_inversion_preference_title"/>
+\ No newline at end of file
+diff --git a/res/layout/edit_shortcut_suw_screen.xml b/res/layout/edit_shortcut_suw_screen.xml
+index 18b5bc8..3fd8652 100644
+--- a/res/layout/edit_shortcut_suw_screen.xml
++++ b/res/layout/edit_shortcut_suw_screen.xml
+@@ -23,4 +23,5 @@
+     android:layout_height="match_parent"
+     android:entries="@xml/edit_shortcut_suw_screen_items"
+     android:icon="@drawable/ic_accessibility_visibility"
++    app:sudUpscaleIcon="true"
+     app:sudAnimationIcon="@raw/icon_visibility"/>
+\ No newline at end of file
+diff --git a/res/layout/magnification_suw_screen.xml b/res/layout/magnification_suw_screen.xml
+index 55b7582..49c495a 100644
+--- a/res/layout/magnification_suw_screen.xml
++++ b/res/layout/magnification_suw_screen.xml
+@@ -23,6 +23,7 @@
+     android:layout_height="match_parent"
+     android:entries="@xml/magnification_suw_screen_items"
+     android:icon="@drawable/ic_accessibility_visibility"
++    app:sudUpscaleIcon="true"
+     app:sudAnimationIcon="@raw/icon_visibility"
+     app:sudIsAnimatedIconDelayed="false"
+     app:sucHeaderText="@string/accessibility_screen_magnification_title"
+diff --git a/res/layout/text_reading_suw_screen.xml b/res/layout/text_reading_suw_screen.xml
+index 5e92021..32a559c 100644
+--- a/res/layout/text_reading_suw_screen.xml
++++ b/res/layout/text_reading_suw_screen.xml
+@@ -23,5 +23,6 @@
+     android:layout_height="match_parent"
+     android:entries="@xml/text_reading_suw_screen_items"
+     android:icon="@drawable/ic_accessibility_visibility"
++    app:sudUpscaleIcon="true"
+     app:sudAnimationIcon="@raw/icon_visibility"
+     app:sucHeaderText="@string/accessibility_text_reading_options_title"/>
+\ No newline at end of file
+diff --git a/res/values/dimens.xml b/res/values/dimens.xml
+index e2333d6..a933095 100644
+--- a/res/values/dimens.xml
++++ b/res/values/dimens.xml
+@@ -604,4 +604,5 @@
+     <dimen name="bluetooth_battery_indicator_charging_icon_height">16dp</dimen>
+ 
+     <dimen name="setup_compat_footer_button_radius">@dimen/sud_glif_expressive_footer_button_radius</dimen>
++    <dimen name="setup_design_items_group_corner_radius">20dp</dimen>
+ </resources>

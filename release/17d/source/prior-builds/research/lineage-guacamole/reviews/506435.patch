@@ -1,0 +1,48 @@
+From 4c2b21dee806d5df1ff36384f72e8b6c84e59a1e Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 22:53:58 +0530
+Subject: [PATCH] LatinIME: Update Android Gradle plugin to 8.7.3
+
+Newer AndroidX releases require Android Gradle plugin 8.6.0 or higher.
+Bump the plugin and the Gradle wrapper to match, and pin the NDK to the
+release the previous plugin defaulted to, since newer NDKs reject the
+variable length arrays used by the native dictionary code.
+
+Assisted-by: LLM
+Change-Id: Iaee693623d74d924f31a9d3a4bee29973d5141db
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/build.gradle b/build.gradle
+index 78ecd02..fca6043 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -4,7 +4,7 @@
+         jcenter()
+     }
+     dependencies {
+-        classpath 'com.android.tools.build:gradle:8.1.2'
++        classpath 'com.android.tools.build:gradle:8.7.3'
+     }
+ }
+ 
+@@ -12,6 +12,7 @@
+ 
+ android {
+     compileSdk 35
++    ndkVersion '25.1.8937393'
+ 
+     namespace 'com.android.inputmethod.latin'
+ 
+diff --git a/gradle/wrapper/gradle-wrapper.properties b/gradle/wrapper/gradle-wrapper.properties
+index 3fa8f86..09523c0 100644
+--- a/gradle/wrapper/gradle-wrapper.properties
++++ b/gradle/wrapper/gradle-wrapper.properties
+@@ -1,6 +1,6 @@
+ distributionBase=GRADLE_USER_HOME
+ distributionPath=wrapper/dists
+-distributionUrl=https\://services.gradle.org/distributions/gradle-8.4-bin.zip
++distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-bin.zip
+ networkTimeout=10000
+ validateDistributionUrl=true
+ zipStoreBase=GRADLE_USER_HOME

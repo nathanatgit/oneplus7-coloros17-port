@@ -1,0 +1,45 @@
+From b630283223987e5e2adea34f4a72f2539c6286d9 Mon Sep 17 00:00:00 2001
+From: Ajender Reddy <quic_ajender@quicinc.com>
+Date: Tue, 18 Feb 2025 16:40:28 +0530
+Subject: [PATCH] core: update device manifest IModule/* and IConfig/default
+
+update IModule/[default|usb|r_submix] to 3
+update IConfig/default to 3
+
+Change-Id: I776340153fdd98c1992c15507d45a496cacb4730
+---
+
+diff --git a/hal/default/manifest_audiocorehal_default.xml b/hal/default/manifest_audiocorehal_default.xml
+index 28abe4c..aae199f 100644
+--- a/hal/default/manifest_audiocorehal_default.xml
++++ b/hal/default/manifest_audiocorehal_default.xml
+@@ -6,25 +6,25 @@
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>2</version>
++    <version>3</version>
+     <fqname>IConfig/default</fqname>
+   </hal>
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>2</version>
++    <version>3</version>
+     <fqname>IModule/default</fqname>
+   </hal>
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>2</version>
++    <version>3</version>
+     <fqname>IModule/r_submix</fqname>
+   </hal>
+ 
+   <hal format="aidl">
+     <name>android.hardware.audio.core</name>
+-    <version>2</version>
++    <version>3</version>
+     <fqname>IModule/usb</fqname>
+   </hal>
+ </manifest>

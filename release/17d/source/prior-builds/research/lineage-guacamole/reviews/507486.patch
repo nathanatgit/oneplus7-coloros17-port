@@ -1,0 +1,27 @@
+From 1a56aa443b0b6263d68845e6eb3be28366d593ae Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sun, 11 Oct 2026 23:14:19 +0100
+Subject: [PATCH] vintf: Add Dolby Vision HIDL instance
+
+Change-Id: I2eaa64293b1df98effd75fc6c519d5cb0ac67263
+---
+
+diff --git a/vintf/device_framework_matrix.xml b/vintf/device_framework_matrix.xml
+index 58af140..29529df 100644
+--- a/vintf/device_framework_matrix.xml
++++ b/vintf/device_framework_matrix.xml
+@@ -7,6 +7,14 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="hidl" optional="true">
++        <name>vendor.dolby.dvs</name>
++        <version>1.0</version>
++        <interface>
++            <name>IDvs</name>
++            <instance>dvs-hal-service</instance>
++        </interface>
++    </hal>
+     <hal format="aidl" optional="true">
+         <name>vendor.oplus.hardware.appradioaidl</name>
+         <version>1</version>

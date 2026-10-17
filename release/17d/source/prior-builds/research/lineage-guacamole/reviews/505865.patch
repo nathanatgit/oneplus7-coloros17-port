@@ -1,0 +1,62 @@
+From 6590d254b0ad33cae4d84d36b2ca6422d1c7a282 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Fri, 12 Jun 2026 23:54:26 -0400
+Subject: [PATCH] generated_kernel_includes: sanitize linux/eventpoll.h
+
+Run clean_header.py on linux/eventpoll.h so the kernel's epoll_event
+stops colliding with bionic's <sys/epoll.h>.
+
+Also add clean_headers.sh to tool_files so edits result in headers
+being regenerated.
+
+Change-Id: Ib37b16f7562b518fb90c6fae63a21d01441878f7
+---
+
+diff --git a/build/soong/Android.bp b/build/soong/Android.bp
+index e295a56..237f7aa 100644
+--- a/build/soong/Android.bp
++++ b/build/soong/Android.bp
+@@ -52,6 +52,8 @@
+         "arch/$(KERNEL_ARCH)/include/**/*",
+         "techpack/audio/include/**/*",
+     ],
++
++    tool_files: [":clean_headers.sh"],
+ }
+ 
+ lineage_generator {
+@@ -70,6 +72,8 @@
+         "usr/include/audio/include/uapi",
+         "usr/techpack/audio/include",
+     ],
++
++    tool_files: [":clean_headers.sh"],
+ }
+ 
+ bootstrap_go_package {
+diff --git a/tools/Android.bp b/tools/Android.bp
+new file mode 100644
+index 0000000..0de96b3
+--- /dev/null
++++ b/tools/Android.bp
+@@ -0,0 +1,9 @@
++//
++// SPDX-FileCopyrightText: The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++filegroup {
++    name: "clean_headers.sh",
++    srcs: ["clean_headers.sh"],
++}
+diff --git a/tools/clean_headers.sh b/tools/clean_headers.sh
+index 44053a3..3a12160 100755
+--- a/tools/clean_headers.sh
++++ b/tools/clean_headers.sh
+@@ -5,4 +5,5 @@
+ 
+ ./bionic/libc/kernel/tools/clean_header.py -u \
+     "$1/usr/include/asm/signal.h" \
+-    "$1/usr/include/asm-generic/signal.h"
++    "$1/usr/include/asm-generic/signal.h" \
++    "$1/usr/include/linux/eventpoll.h"

@@ -1,0 +1,22 @@
+From b423c65bb5ea7b0641b42031c30be2acfc380aa6 Mon Sep 17 00:00:00 2001
+From: Akash Suresh <akashsrocks1234@gmail.com>
+Date: Sun, 27 Sep 2026 11:08:15 +0530
+Subject: [PATCH] lineage_generic_car_target: Remove redundant artifact path entry
+
+* android.software.credentials.xml is installed by the "android.software.credentials.prebuilt.xml" module.
+* This module is added to the product via generic_system.mk, which makes whitelisting redundant.
+
+Change-Id: I36bf9247f303087896e89b0effc7773aa68edc68
+---
+
+diff --git a/build/target/product/lineage_generic_car_target.mk b/build/target/product/lineage_generic_car_target.mk
+index 9387819..fe1ea29 100644
+--- a/build/target/product/lineage_generic_car_target.mk
++++ b/build/target/product/lineage_generic_car_target.mk
+@@ -22,6 +22,3 @@
+ 
+ # Disable soong defined system image for now
+ USE_SOONG_DEFINED_SYSTEM_IMAGE := false
+-
+-PRODUCT_ARTIFACT_PATH_REQUIREMENT_ALLOWED_LIST += \
+-    system/etc/permissions/android.software.credentials.xml

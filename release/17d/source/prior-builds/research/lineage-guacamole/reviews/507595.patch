@@ -1,0 +1,318 @@
+From 86370d78423114b56bafce24f4e68e2ecb126e99 Mon Sep 17 00:00:00 2001
+From: pjgowtham <pjgowtham@gmail.com>
+Date: Sun, 29 Dec 2024 22:55:45 +0530
+Subject: [PATCH] hal: Add LVACFS microphone feature
+
+This feature is only used by newer oplus and nothing devices and is
+necessary for the microphone output to not be awfully low in all
+situations except calls.
+
+Change-Id: I3ae4e8b3a99765fcb052a07d1dd3082b035d62ad
+---
+
+diff --git a/hal/Android.bp b/hal/Android.bp
+index b62d281..2488488 100644
+--- a/hal/Android.bp
++++ b/hal/Android.bp
+@@ -86,6 +86,7 @@
+         "AudioDevice.cpp",
+         "AudioStream.cpp",
+         "AudioVoice.cpp",
++        "Lvacfs.cpp",
+         "audio_extn/AudioExtn.cpp",
+         "audio_extn/Gain.cpp",
+         "audio_extn/Gef.cpp",
+diff --git a/hal/AudioDevice.cpp b/hal/AudioDevice.cpp
+index 7c1b2e2..677e1c8 100644
+--- a/hal/AudioDevice.cpp
++++ b/hal/AudioDevice.cpp
+@@ -358,6 +358,9 @@
+ }
+ 
+ AudioDevice::~AudioDevice() {
++    if (Lvacfs::isLvacfsEnabled()) {
++        Lvacfs::getInstance().deinit();
++    }
+     audio_extn_gef_deinit(adev_);
+     audio_extn_sound_trigger_deinit(adev_);
+     AudioExtn::battery_properties_listener_deinit();
+@@ -1217,6 +1220,9 @@
+ 
+     FillAndroidDeviceMap();
+     audio_extn_gef_init(adev_);
++    if (Lvacfs::isLvacfsEnabled()) {
++        Lvacfs::getInstance().init();
++    }
+     adev_init_ref_count += 1;
+ 
+     memset(&microphones, 0, sizeof(microphone_characteristics_t));
+diff --git a/hal/AudioStream.cpp b/hal/AudioStream.cpp
+index 065f6cb..ce1575f 100644
+--- a/hal/AudioStream.cpp
++++ b/hal/AudioStream.cpp
+@@ -4189,6 +4189,10 @@
+     if (ret)
+         ret = -EINVAL;
+ 
++    if (lvacfs.getWrapperOps() && lvacfs_handle) {
++        lvacfs.stopInputStream(this);
++    }
++
+     stream_mutex_.unlock();
+     AHAL_DBG("Exit ret: %d", ret);
+     return ret;
+@@ -4866,6 +4870,10 @@
+         }
+     }
+ 
++    if (lvacfs.getWrapperOps() && !lvacfs_handle) {
++        lvacfs.startInputStream(this);
++    }
++
+ set_buff_size:
+     if (usecase_ == USECASE_AUDIO_RECORD_MMAP) {
+         inBufSize = MMAP_PERIOD_SIZE * audio_bytes_per_frame(
+@@ -5144,6 +5152,10 @@
+         memset(palBuffer.buffer, 0, palBuffer.size);
+     }
+ 
++    if (lvacfs.getWrapperOps() && lvacfs_handle) {
++        lvacfs.processInputStream(this, palBuffer.buffer, palBuffer.size);
++    }
++
+ exit:
+     if (mBytesRead <= UINT64_MAX - bytes) {
+         mBytesRead += bytes;
+@@ -5197,6 +5209,7 @@
+     audio_source_t source) :
+     StreamPrimary(handle, devices, config),
+     mAndroidInDevices(devices),
++    lvacfs(Lvacfs::getInstance()),
+     flags_(flags),
+     btSinkMetadata{0, nullptr}
+ {
+diff --git a/hal/Lvacfs.cpp b/hal/Lvacfs.cpp
+new file mode 100644
+index 0000000..8926372
+--- /dev/null
++++ b/hal/Lvacfs.cpp
+@@ -0,0 +1,139 @@
++/*
++ * SPDX-FileCopyrightText: 2025 The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#define LOG_TAG "AHAL: Lvacfs"
++
++#include <AudioStream.h>
++#include <Lvacfs.h>
++#include <dlfcn.h>
++#include <log/log.h>
++
++#ifdef __LP64__
++#define VENDOR_LIBS "/vendor/lib64/"
++#define ODM_LIBS "/odm/lib64/"
++#else
++#define VENDOR_LIBS "/vendor/lib/"
++#define ODM_LIBS "/odm/lib/"
++#endif
++#define LVACFS_WRAPPER_LIB_NAME "liblvacfs_wrapper.so"
++#define VENDOR_LIB_PATH VENDOR_LIBS LVACFS_WRAPPER_LIB_NAME
++#define ODM_LIB_PATH ODM_LIBS LVACFS_WRAPPER_LIB_NAME
++
++#define ODM_PARAMS_DIR_PATH "/odm/etc/lvacfs_params"
++#define VENDOR_PARAMS_DIR_PATH "/vendor/etc/lvacfs_params"
++
++#define LOAD_SYMBOL(handle, symbol_ptr, symbol_name)                           \
++    do {                                                                       \
++        (symbol_ptr) = (decltype(symbol_ptr))dlsym((handle), (symbol_name));   \
++        if (!(symbol_ptr)) {                                                   \
++            ALOGE("Failed to load symbol '%s': %s", (symbol_name), dlerror()); \
++            deinit();                                                          \
++            return;                                                            \
++        }                                                                      \
++    } while (0)
++
++bool Lvacfs::isLvacfsEnabled() {
++    bool isEnabled = false;
++    bool* payload_lvacfs = &isEnabled;
++    size_t param_size = 0;
++
++    int ret = pal_get_param(PAL_PARAM_ID_LVACFS, (void**)&payload_lvacfs, &param_size, nullptr);
++
++    return (!ret && isEnabled);
++}
++
++void Lvacfs::init() {
++    if (access(ODM_PARAMS_DIR_PATH, F_OK) == 0) {
++        params_file_path_ = ODM_PARAMS_DIR_PATH;
++    } else if (access(VENDOR_PARAMS_DIR_PATH, F_OK) == 0) {
++        params_file_path_ = VENDOR_PARAMS_DIR_PATH;
++    } else {
++        ALOGE("No params directory found");
++        return;
++    }
++
++    wrapper_ops_ = std::make_unique<struct lvacfs_wrapper_ops>();
++    if (!wrapper_ops_) {
++        ALOGE("Failed to allocate lvacfs_wrapper_ops");
++        return;
++    }
++
++    wrapper_ops_->lib_handle = dlopen(ODM_LIB_PATH, RTLD_NOW);
++    if (!wrapper_ops_->lib_handle) {
++        wrapper_ops_->lib_handle = dlopen(VENDOR_LIB_PATH, RTLD_NOW);
++        if (!wrapper_ops_->lib_handle) {
++            ALOGE("dlopen failed for %s and %s: %s", ODM_LIB_PATH, VENDOR_LIB_PATH, dlerror());
++            return;
++        }
++    }
++
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->create_instance,
++                "lvacfs_wrapper_CreateLibraryInstance");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->destroy_instance,
++                "lvacfs_wrapper_DestroyLibraryInstance");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->process, "lvacfs_wrapper_Process");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->update_zoom_info,
++                "lvacfs_wrapper_UpdateZoomInfo");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->update_angle_info,
++                "lvacfs_wrapper_UpdateAngleInfo");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->set_params_file_path,
++                "lvacfs_SetParamsFilePath");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->set_profile, "lvacfs_wrapper_SetProfile");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->set_audio_direction,
++                "lvacfs_wrapper_SetAudioDirection");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->set_device_orientation,
++                "lvacfs_wrapper_SetDeviceOrientation");
++    LOAD_SYMBOL(wrapper_ops_->lib_handle, wrapper_ops_->get_versions, "lvacfs_wrapper_GetVersions");
++
++    ALOGI("LVACFS initialized successfully");
++}
++
++void Lvacfs::deinit() {
++    if (wrapper_ops_ && wrapper_ops_->lib_handle) {
++        dlclose(wrapper_ops_->lib_handle);
++    }
++    wrapper_ops_.reset();
++    ALOGI("LVACFS deinitialized");
++}
++
++void Lvacfs::startInputStream(StreamInPrimary* in) {
++    in->lvacfs_handle = (void**)calloc(1, sizeof(void*));
++    if (!in->lvacfs_handle) {
++        ALOGE("Failed to allocate lvacfs_handle");
++        return;
++    }
++    wrapper_ops_->set_params_file_path(params_file_path_);
++    int channel_count = audio_channel_count_from_in_mask(in->config_.channel_mask);
++    uint32_t channels = ((channel_count & 0xFFFF) << 16) | (channel_count & 0xFFFF);
++    // Set format to false (0) since lvacfs does not support pal audio format
++    uint64_t sample_rate_and_format = ((uint64_t)0 << 32) | in->config_.sample_rate;
++    int ret = wrapper_ops_->create_instance(in->lvacfs_handle, in->source_, sample_rate_and_format,
++                                            channels);
++    if (ret < 0) {
++        ALOGE("create instance failed: %d", ret);
++        stopInputStream(in);
++    }
++}
++
++void Lvacfs::processInputStream(StreamInPrimary* in, void* buffer, size_t bytes) {
++    std::lock_guard<std::mutex> lock(in->lvacfs_lock);
++    int channel_count = audio_channel_count_from_in_mask(in->config_.channel_mask);
++    uint32_t num_frames = bytes / (channel_count * audio_bytes_per_sample(in->config_.format));
++    uint8_t status_buffer[0x160] = {0};
++    int ret = wrapper_ops_->process(in->lvacfs_handle, buffer, buffer, num_frames, status_buffer);
++    if (ret < 0) {
++        ALOGE("process failed: %d", ret);
++        stopInputStream(in);
++    }
++}
++
++void Lvacfs::stopInputStream(StreamInPrimary* in) {
++    int ret = wrapper_ops_->destroy_instance(in->lvacfs_handle);
++    if (ret < 0) {
++        ALOGE("destroy instance failed: %d", ret);
++    }
++    free(in->lvacfs_handle);
++    in->lvacfs_handle = nullptr;
++}
+diff --git a/hal/inc/AudioStream.h b/hal/inc/AudioStream.h
+index 3b0bc66..85cdda7 100644
+--- a/hal/inc/AudioStream.h
++++ b/hal/inc/AudioStream.h
+@@ -47,6 +47,7 @@
+ 
+ #include "PalDefs.h"
+ #include <AudioExtn.h>
++#include <Lvacfs.h>
+ #include <mutex>
+ #include <map>
+ #include <unordered_map>
+@@ -605,6 +606,10 @@
+      bool mInitialized;
+     //Helper method to standby streams upon read failures and sleep for buffer duration.
+     ssize_t onReadError(size_t bytes, size_t ret);
++    friend class Lvacfs;
++    void** lvacfs_handle;
++    std::mutex lvacfs_lock;
++    Lvacfs& lvacfs;
+ public:
+     StreamInPrimary(audio_io_handle_t handle,
+                     const std::set<audio_devices_t> &devices,
+diff --git a/hal/inc/Lvacfs.h b/hal/inc/Lvacfs.h
+new file mode 100644
+index 0000000..418c23b
+--- /dev/null
++++ b/hal/inc/Lvacfs.h
+@@ -0,0 +1,51 @@
++/*
++ * SPDX-FileCopyrightText: 2025 The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#pragma once
++
++#include "PalApi.h"
++#include "PalDefs.h"
++
++class StreamInPrimary;
++
++struct lvacfs_wrapper_ops {
++    void* lib_handle;
++    int (*create_instance)(void**, uint32_t, uint64_t, uint32_t);
++    int (*destroy_instance)(void*);
++    int (*process)(void*, void*, void*, int32_t, void*);
++    void (*update_zoom_info)(void*, float);
++    void (*update_angle_info)(void*, float);
++    void (*set_params_file_path)(const char*);
++    void (*set_profile)(void*, uint32_t);
++    void (*set_audio_direction)(void*, uint32_t);
++    void (*set_device_orientation)(void*, uint32_t);
++    void (*get_versions)(char*, size_t);
++};
++
++class Lvacfs {
++  public:
++    static Lvacfs& getInstance() {
++        static Lvacfs instance;
++        return instance;
++    }
++
++    static bool isLvacfsEnabled();
++    void init();
++    void deinit();
++    void startInputStream(StreamInPrimary* in);
++    void processInputStream(StreamInPrimary* in, void* buffer, size_t bytes);
++    void stopInputStream(StreamInPrimary* in);
++
++    const struct lvacfs_wrapper_ops* getWrapperOps() const { return wrapper_ops_.get(); }
++
++  private:
++    Lvacfs() : wrapper_ops_(nullptr), params_file_path_(nullptr) {}
++
++    Lvacfs(const Lvacfs&) = delete;
++    Lvacfs& operator=(const Lvacfs&) = delete;
++
++    std::unique_ptr<struct lvacfs_wrapper_ops> wrapper_ops_;
++    const char* params_file_path_;
++};

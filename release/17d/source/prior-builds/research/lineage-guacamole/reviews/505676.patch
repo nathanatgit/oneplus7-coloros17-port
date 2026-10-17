@@ -1,0 +1,111 @@
+From ef4400005fd24c2f51b8c92ffe3d83e7fb5fd972 Mon Sep 17 00:00:00 2001
+From: Benjamin Wiegand <benjamin.lineageos@wiegand.pw>
+Date: Fri, 25 Sep 2026 18:43:25 -0700
+Subject: [PATCH] Launcher3: Use correct nav bar orientation on default landscape displays
+
+On displays with a default landscape orientation (like smith's outer
+display) the 3 button navigation bar is on the bottom of the screen,
+but was previously assumed to be vertical.
+
+This is based on f55cf58, properly adapted for phones.
+
+Change-Id: I7abb317975b6fbf45ae1884d664f5772c85d73dc
+---
+
+diff --git a/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java b/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java
+index b4e2f6b..3a56f95 100644
+--- a/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java
++++ b/quickstep/src/com/android/launcher3/taskbar/TaskbarActivityContext.java
+@@ -1604,7 +1604,8 @@
+         // because this is the only case in which the nav bar is not on the display bottom.
+         boolean landscapePhoneButtonNav = isPhoneButtonNavMode()
+                 && mDeviceProfile.getDeviceProperties().getCanNavBarMove()
+-                && mDeviceProfile.getDeviceProperties().isLandscape();
++                && (mDeviceProfile.getDeviceProperties().isLandscape() !=
++                        mDeviceProfile.getDeviceProperties().isDefaultLandscape());
+         if ((landscapePhoneButtonNav ? mWindowLayoutParams.width : mWindowLayoutParams.height)
+                 == size || mIsDestroyed) {
+             return;
+diff --git a/quickstep/src/com/android/launcher3/taskbar/navbutton/NavButtonLayoutFactory.kt b/quickstep/src/com/android/launcher3/taskbar/navbutton/NavButtonLayoutFactory.kt
+index 5e1f78c..13a9e6d 100644
+--- a/quickstep/src/com/android/launcher3/taskbar/navbutton/NavButtonLayoutFactory.kt
++++ b/quickstep/src/com/android/launcher3/taskbar/navbutton/NavButtonLayoutFactory.kt
+@@ -98,8 +98,9 @@
+                 }
+                 isPhoneNavMode -> {
+                     if (
+-                        !deviceProfile.deviceProperties.isLandscape ||
+-                            !deviceProfile.deviceProperties.canNavBarMove
++                        deviceProfile.deviceProperties.isLandscape ==
++                                deviceProfile.deviceProperties.isDefaultLandscape
++                        || !deviceProfile.deviceProperties.canNavBarMove
+                     ) {
+                         navButtonsView.setIsVertical(false)
+                         PhonePortraitNavLayoutter(
+diff --git a/src/com/android/launcher3/DeviceProfile.java b/src/com/android/launcher3/DeviceProfile.java
+index c4da9c4..a23122e 100644
+--- a/src/com/android/launcher3/DeviceProfile.java
++++ b/src/com/android/launcher3/DeviceProfile.java
+@@ -164,7 +164,8 @@
+                         false
+                 ),
+                 new TaskbarConfiguration(false),
+-                0
++                0,
++                false
+         );
+         mBottomSheetProfile = new BottomSheetProfile(0, 0, 0, 0f, 0f);
+         overviewProfile = new OverviewProfile(
+diff --git a/src/com/android/launcher3/deviceprofile/DeviceProperties.kt b/src/com/android/launcher3/deviceprofile/DeviceProperties.kt
+index 9a1f444..d3f71be 100644
+--- a/src/com/android/launcher3/deviceprofile/DeviceProperties.kt
++++ b/src/com/android/launcher3/deviceprofile/DeviceProperties.kt
+@@ -49,7 +49,8 @@
+     val insets: Rect,
+     val deviceConfiguration: DeviceConfiguration,
+     val taskbarConfiguration: TaskbarConfiguration,
+-    val densityDpi: Int
++    val densityDpi: Int,
++    val isDefaultLandscape: Boolean
+ ) {
+ 
+     /**
+@@ -104,6 +105,7 @@
+                                     deviceConfiguration.isGestureMode)) && isTaskbarDrawnInProcess
+                     ),
+                 densityDpi = windowBounds.densityDpi,
++                isDefaultLandscape = info.isDefaultLandscape,
+             )
+         }
+     }
+diff --git a/src/com/android/launcher3/display/LauncherDisplayInfo.kt b/src/com/android/launcher3/display/LauncherDisplayInfo.kt
+index ccf9e2f..6f569c0 100644
+--- a/src/com/android/launcher3/display/LauncherDisplayInfo.kt
++++ b/src/com/android/launcher3/display/LauncherDisplayInfo.kt
+@@ -94,6 +94,12 @@
+ 
+     @JvmField val isNightModeActive: Boolean = config.isNightModeActive
+ 
++    /**
++     * Returns whether the display is landscape at ROTATION_0
++     */
++    val isDefaultLandscape: Boolean =
++        normalizedDisplayInfo.size.x > normalizedDisplayInfo.size.y
++
+     // Used for testing
+     init {
+ 
+diff --git a/src/com/android/launcher3/util/DimensionUtils.kt b/src/com/android/launcher3/util/DimensionUtils.kt
+index 58520b6..9b3ccc0 100644
+--- a/src/com/android/launcher3/util/DimensionUtils.kt
++++ b/src/com/android/launcher3/util/DimensionUtils.kt
+@@ -50,7 +50,8 @@
+         }
+ 
+         // Taskbar on phone, portrait, or on any device whose nav bar stays at the bottom
+-        if (!deviceProfile.deviceProperties.isLandscape ||
++        if (deviceProfile.deviceProperties.isLandscape ==
++            deviceProfile.deviceProperties.isDefaultLandscape ||
+             !deviceProfile.deviceProperties.canNavBarMove) {
+             p.x = ViewGroup.LayoutParams.MATCH_PARENT
+             p.y = res.getDimensionPixelSize(R.dimen.taskbar_phone_size)

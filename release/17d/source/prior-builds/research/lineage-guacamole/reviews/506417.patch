@@ -1,0 +1,32 @@
+From 35a907fbe396f378982e5a4c2dfd9fd08d400c76 Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Mon, 05 Oct 2026 18:39:30 +0530
+Subject: [PATCH] vintf: Add vendor.dolby.dvs to framework matrix
+
+Dolby Vision DVS (vendor.dolby.dvs.IDvs/default) feeds panel
+brightness and ambient light into Dolby Vision display management.
+Declare it so devices shipping the odm service pass VINTF checks.
+
+Assisted-by: LLM
+Change-Id: I12efb40a59351140f93b86b44cd33621f1ad7188
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/vintf/device_framework_matrix.xml b/vintf/device_framework_matrix.xml
+index 0e93fc7..58af140 100644
+--- a/vintf/device_framework_matrix.xml
++++ b/vintf/device_framework_matrix.xml
+@@ -1,5 +1,13 @@
+ <compatibility-matrix version="4.0" type="framework">
+     <hal format="aidl" optional="true">
++        <name>vendor.dolby.dvs</name>
++        <version>1</version>
++        <interface>
++            <name>IDvs</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="aidl" optional="true">
+         <name>vendor.oplus.hardware.appradioaidl</name>
+         <version>1</version>
+         <interface>

@@ -1,0 +1,25 @@
+From 4f323bff6b3c971f98773e0b6490334fcf6a2176 Mon Sep 17 00:00:00 2001
+From: Akash Suresh <akashsrocks1234@gmail.com>
+Date: Sun, 27 Sep 2026 01:25:06 +0530
+Subject: [PATCH] car-frameworks-service: Fix dependency cycle with "services"
+
+* Soong docs explicitly mention that all applications of "trace_references_from" must involve a proxy lib and no direct dependency.
+* Using "services.impl" instead of "services" implements this.
+* This is relevant when SYSTEM_OPTIMIZE_JAVA is set (see "services_java_defaults").
+
+Change-Id: Ief7370690b5a62a0d77abeb447020b2841732abb
+---
+
+diff --git a/builtInServices/Android.bp b/builtInServices/Android.bp
+index 26a1345..374333c 100644
+--- a/builtInServices/Android.bp
++++ b/builtInServices/Android.bp
+@@ -6,7 +6,7 @@
+ java_sdk_library {
+     name: "car-frameworks-service",
+     libs: [
+-        "services",
++        "services.impl",
+         "android.car",
+         "android.car.builtin.stubs.module_lib", // Will remove once split is complete
+         "android.hardware.automotive.vehicle-V2.0-java",

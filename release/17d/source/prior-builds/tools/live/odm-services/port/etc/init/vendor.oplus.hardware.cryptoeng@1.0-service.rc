@@ -1,0 +1,20 @@
+# OnePlus7Port: stock H.40 odm rc (vendor.oplus.hardware.cryptoeng@1.0-service_FDE.rc), adapted:
+# setenv LD_PRELOAD: the stock binary links against older libbase/jsoncpp exports (android::base::Trim(const std::string&), Json::Value::operator=(Json::Value)); compat/portcompat.S forwards them to the LOS24 equivalents (build 17 failed with CANNOT LINK).
+#  - only the leaf directory is created: ColorOS 17 init.rc creates /data/vendor_de (0551 root) and vold creates
+#    /data/vendor_de/0 (init_user0 runs before the odm rc post-fs-data commands), so the stock mkdirs of those two with
+#    system:system 0770 would re-own directories other services use. encryption=None: the parent already carries the policy.
+#  - the Widevine licence copy is dropped (persist.vendor.oplus.widevine.licenses is never set, the .pfm is absent).
+# Find My Device keeps its SSOID/device id in RPMB through vendor.oplus.hardware.cryptoeng@1.0::ICryptoeng/default
+# (app error "RPMB hardware channel: CryptoEng service is null"). QSEE TA: odm/vendor/firmware/cryptoeng.*
+
+on post-fs-data
+    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None
+
+service hal_cryptoeng_oplus /odm/bin/hw/vendor.oplus.hardware.cryptoeng@1.0-service
+    class hal
+    user system
+    group system input sdcard_rw sdcard_r
+    setenv LD_PRELOAD /odm/lib64/libportcompat.so
+
+on property:sys.boot_completed=1
+    setprop vendor.oplus.cryptoeng.need_init 1

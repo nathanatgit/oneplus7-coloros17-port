@@ -30,3 +30,9 @@ Included snapshot files:
 - `source/research/ese-p73/phone.config`
 
 The release-only WSL build helper and comparison helper are in `scripts/`.
+
+
+## Cumulative prior-build archive
+
+This 17d first release is intended to carry the port's fixes and source history accumulated through builds 1-17, not only the delta from the previous numbered build. The initial source snapshot only included the direct 17d builder/eSE inputs; the broader source archive is now in source/prior-builds/ with the related build handoffs in source/history/. It preserves prior helper scripts and patch files while excluding donor ROM contents, generated binaries, external tool executables, and signing keys. See source/prior-builds/README.md and its file/checksum manifests for exact scope.
+

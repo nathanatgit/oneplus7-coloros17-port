@@ -1,0 +1,24 @@
+From 692023c723e25844dc69362e534c1ba6f47139dc Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Wed, 19 Aug 2026 21:39:45 -0400
+Subject: [PATCH] display: init: Update cape MSM/APQ/4G display properties
+
+Palima does not have any UBWCP hardware so should disable this, and
+switch to snapalloc so we are not using Gralloc4 which is deprecated.
+
+Change-Id: I6dc45294a2ff99c5a8ee958d441ef8ddf8cfc1b6
+---
+
+diff --git a/init/init.qti.display_boot.sh b/init/init.qti.display_boot.sh
+index 0f77b53..8c0c16b 100644
+--- a/init/init.qti.display_boot.sh
++++ b/init/init.qti.display_boot.sh
+@@ -118,6 +118,8 @@
+         setprop vendor.display.target.version 2
+         setprop vendor.display.enable_qsync_idle 1
+         setprop vendor.display.disable_cwb_idle_fallback 1
++        setprop vendor.gralloc.hw_supports_ubwcp 0
++        setprop vendor.gralloc.enable_snapalloc 1
+         ;;
+         506|547)
+         # Set property for Diwali

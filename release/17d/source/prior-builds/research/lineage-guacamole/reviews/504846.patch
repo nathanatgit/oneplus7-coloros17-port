@@ -1,0 +1,36 @@
+From 5ebbcc98528ef34292bf051413233f36ec7a3f0a Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 21:53:23 +0530
+Subject: [PATCH] SUW: Use Pure Black background for Glif screens on ATV
+
+Change-Id: I59b00e0c29c1d766049183f4f8ef0b92f65b997c
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/res/values-television/styles.xml b/app/src/main/res/values-television/styles.xml
+new file mode 100644
+index 0000000..b590030
+--- /dev/null
++++ b/app/src/main/res/values-television/styles.xml
+@@ -0,0 +1,21 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <style name="Theme.Setup" parent="@style/SudThemeGlifExpressive.DayNight">
++        <item name="sucUsePartnerResource">true</item>
++        <item name="sudUsePartnerHeavyTheme">true</item>
++        <item name="android:windowBackground">@color/tv_background</item>
++        <item name="android:colorBackground">@color/tv_background</item>
++
++        <item name="sudMarginStart">@dimen/tv_overscan_horizontal</item>
++        <item name="sudMarginEnd">@dimen/tv_overscan_horizontal</item>
++        <item name="sucGlifIconMarginTop">@dimen/tv_overscan_vertical</item>
++        <item name="sucFooterBarPaddingStart">@dimen/tv_overscan_horizontal</item>
++        <item name="sucFooterBarPaddingEnd">@dimen/tv_overscan_horizontal</item>
++        <item name="sucFooterBarPaddingTop">@dimen/tv_overscan_vertical</item>
++        <item name="sucFooterBarPaddingBottom">@dimen/tv_overscan_vertical</item>
++    </style>
++</resources>

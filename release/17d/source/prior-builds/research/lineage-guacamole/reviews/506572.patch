@@ -1,0 +1,25 @@
+From 3e770e2c415f267decd2558682b2a829b847eee0 Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Wed, 07 Oct 2026 07:15:57 +0300
+Subject: [PATCH] SetupWizard: Set some strings as untranslatable
+
+Change-Id: I8d2d995861dc58bdfa127e01475a9793ddbe2e6b
+---
+
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index 2fd2d2a..2e5dc45 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -29,9 +29,9 @@
+     <string name="accessibility_settings">Accessibility settings</string>
+     <string name="device_info">Device info</string>
+     <string name="device_information">Device information</string>
+-    <string name="device_info_imei">IMEI</string>
+-    <string name="device_info_imei_slot">IMEI <xliff:g id="slot" example="1">%1$d</xliff:g></string>
+-    <string name="device_info_eid">EID</string>
++    <string name="device_info_imei" translatable="false">IMEI</string>
++    <string name="device_info_imei_slot" translatable="false">IMEI <xliff:g id="slot" example="1">%1$d</xliff:g></string>
++    <string name="device_info_eid" translatable="false">EID</string>
+     <string name="device_info_serial">Serial number</string>
+ 
+     <!-- Locale page -->

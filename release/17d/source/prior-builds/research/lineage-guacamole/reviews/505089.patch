@@ -1,0 +1,96 @@
+From 44593c76e204899f0ff9f7fe4fa8736b0463110b Mon Sep 17 00:00:00 2001
+From: Michael Bestas <mkbestas@lineageos.org>
+Date: Sun, 27 Sep 2026 15:38:42 +0300
+Subject: [PATCH] Merge tag 'LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0' into staging/lineage-24.0_merge-LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0
+
+LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0
+
+* tag 'LA.VENDOR.15.4.1.r1-11800-WAIPIO.QSSI16.0':
+  dataipa: Fix to validate the NAT table entries during NAT table init
+  dataipa: update conditional check for tx napi
+  msm: ipa: Wait for interrupt mode before teardown
+  msm:ipa Fix a race condition
+
+Change-Id: I713300b38aeffc5449088829a821e230a3ecc848
+---
+
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c b/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+index 6786acd..38a57d9 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_dp.c
+@@ -2048,20 +2048,11 @@
+ 		}
+ 	}
+ 
+-	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) {
+-		napi_disable(&ep->sys->napi_rx);
+-		netif_napi_del(&ep->sys->napi_rx);
+-	}
+-
+-	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_CONS && ep->sys)
+-		tasklet_kill(&ep->sys->tasklet);
+-
+ 	if ( ep->client == IPA_CLIENT_APPS_WAN_COAL_CONS ) {
+ 		stop_coalescing();
+ 		ipa3_force_close_coal(false, true);
+ 	}
+ 
+-
+ 	/* channel stop might fail on timeout if IPA is busy */
+ 	for (i = 0; i < IPA_GSI_CHANNEL_STOP_MAX_RETRY; i++) {
+ 		result = ipa_stop_gsi_channel(clnt_hdl);
+@@ -2094,6 +2085,14 @@
+ 	if (IPA_CLIENT_IS_PROD(ep->client))
+ 		atomic_set(&ep->sys->workqueue_flushed, 1);
+ 
++	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_DATA_CONS) {
++		napi_disable(&ep->sys->napi_rx);
++		netif_napi_del(&ep->sys->napi_rx);
++	}
++
++	if (ep->client == IPA_CLIENT_APPS_WAN_LOW_LAT_CONS && ep->sys)
++		tasklet_kill(&ep->sys->tasklet);
++
+ 	/*
+ 	 * Tear down the default pipe before we reset the channel
+ 	 */
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c b/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
+index 03589d0..0649a8d 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_nat.c
+@@ -2,7 +2,7 @@
+ /*
+  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+  *
+- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
++ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+  */
+ 
+ #include <linux/device.h>
+@@ -1618,8 +1618,9 @@
+ 		return -EPERM;
+ 	}
+ 
+-	if (init->table_entries == 0) {
+-		IPAERR_RL("Table entries is zero\n");
++	if (init->table_entries == 0 ||
++		init->table_entries == U16_MAX) {
++		IPAERR_RL("Table entries is %d\n", init->table_entries);
+ 		return -EPERM;
+ 	}
+ 
+diff --git a/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c b/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
+index 0a4a95d..5631550 100644
+--- a/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
++++ b/drivers/platform/msm/ipa/ipa_v3/ipa_qmi_service.c
+@@ -2094,8 +2094,9 @@
+ 	/* Initialize modem IPA-driver */
+ 	IPAWANDBG("send ipa3_qmi_init_modem_send_sync_msg to modem\n");
+ 	rc = ipa3_qmi_init_modem_send_sync_msg();
++	IPAWANERR("send ipa3_qmi_init_modem_send_sync_msg to modem rc:%d\n", rc);
+ 	if ((rc == -ENETRESET) || (rc == -ENODEV) || (rc == -ECONNRESET) ||
+-		(rc == -EIO) || atomic_read(&ipa3_ctx->is_ssr)) {
++		(rc == -EIO) ||  ((rc != 0) && (atomic_read(&ipa3_ctx->is_ssr)))) {
+ 		IPAWANERR(
+ 		"ipa3_qmi_init_modem_send_sync_msg failed due to SSR!\n");
+ 		/* Cleanup when ipa3_wwan_remove is called */

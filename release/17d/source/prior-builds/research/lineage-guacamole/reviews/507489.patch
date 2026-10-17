@@ -1,0 +1,40 @@
+From 1278cdd5cbdf8eb5f892d50f5286720277a2decd Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sun, 11 Oct 2026 23:39:32 +0100
+Subject: [PATCH] extract-utils-ext: Support default thermal policy layout
+
+Fall back to default/common_config when globalPolicy/globalPolicy
+is absent, as observed on sm8550 based targets.
+
+Assisted-by: LLM
+Change-Id: I052667d31c5d5ee7b50cf4a3ebfa15bd92dc4643
+---
+
+diff --git a/extract-utils-ext/extract_utils_oplus/thermal_engine.py b/extract-utils-ext/extract_utils_oplus/thermal_engine.py
+index a3938d1..8d9e312 100644
+--- a/extract-utils-ext/extract_utils_oplus/thermal_engine.py
++++ b/extract-utils-ext/extract_utils_oplus/thermal_engine.py
+@@ -212,9 +212,9 @@
+                         level.get('maxGpuFreq')
+                     )
+ 
+-    policy = root
+-    for tag in ['thermalPolicyConfigItem', 'globalPolicy', 'globalPolicy']:
+-        policy = policy.find(tag) if policy is not None else None
++    policy = root.find('thermalPolicyConfigItem/globalPolicy/globalPolicy')
++    if policy is None:
++        policy = root.find('thermalPolicyConfigItem/default/common_config')
+ 
+     for gear in policy.iterfind('gear_config') if policy is not None else []:
+         config.gears[parse_int(gear.get('tempGear'))] = (
+@@ -223,7 +223,9 @@
+         )
+ 
+     if not config.gears:
+-        raise ValueError(f'No globalPolicy in {control_config_path}')
++        raise ValueError(
++            f'No global or default thermal policy in {control_config_path}'
++        )
+ 
+     return config._replace(clusters=clusters)
+ 

@@ -1,0 +1,24 @@
+From fbee06dff8740f64ba28ee05ee6250aafaff2799 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sun, 11 Oct 2026 08:47:38 +0200
+Subject: [PATCH] releasetools: Add os.path.exists() check to IsErofsImage()
+
+Matches IsSparseImage() and fixes signing builds with symlinks to
+firmware files ending with .img.
+
+Change-Id: I4921c69f15fbe2913a4af99594b236ee8c389e96
+---
+
+diff --git a/tools/releasetools/sign_target_files_apks.py b/tools/releasetools/sign_target_files_apks.py
+index eded4c9..fdc3f68 100755
+--- a/tools/releasetools/sign_target_files_apks.py
++++ b/tools/releasetools/sign_target_files_apks.py
+@@ -1740,6 +1740,8 @@
+     Checks if the given file is an EROFS image by verifying its magic number.
+     """
+ 
++    if not os.path.exists(filepath):
++      return False
+     if os.path.getsize(filename) < 4096:
+       return False
+     EROFS_SUPER_MAGIC = 0xe0f5e1e2

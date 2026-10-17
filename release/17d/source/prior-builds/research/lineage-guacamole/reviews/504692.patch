@@ -1,0 +1,555 @@
+From 51054325d2ca770a1e72a7aca9247485a84906df Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Wed, 09 Sep 2026 11:23:47 +0530
+Subject: [PATCH] SUW: Port and setup deviceinfo screen
+
+Change-Id: I9ff9015d798f0c62fbbebc8a3913fa45ea6c5ed5
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/Android.bp b/app/Android.bp
+index 0c802c1..d6269e0 100644
+--- a/app/Android.bp
++++ b/app/Android.bp
+@@ -29,6 +29,7 @@
+         "setupdesign",
+         "setupdesign-lottie-animation-view",
+         "SystemUISharedLib",
++        "zxing-core",
+         "org.lineageos.platform.internal",
+     ],
+ 
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 2eaebca..50d76f9 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -180,6 +180,12 @@
+         </activity>
+ 
+         <activity
++            android:name=".system.DeviceInfoActivity"
++            android:configChanges="mcc|mnc"
++            android:exported="false"
++            android:windowSoftInputMode="stateAlwaysHidden" />
++
++        <activity
+             android:name=".system.UpdateRecoveryActivity"
+             android:label="@string/activity_label_empty"
+             android:configChanges="mcc|mnc"
+diff --git a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+index 45b162a..1bc6709 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/WelcomeActivity.kt
+@@ -10,18 +10,25 @@
+ import android.os.Bundle
+ import android.util.TypedValue
+ import android.view.View
++import android.view.ViewGroup
++import android.view.ViewGroup.MarginLayoutParams
+ import android.widget.TextView
+ import androidx.activity.OnBackPressedCallback
++import androidx.core.view.updateLayoutParams
+ import com.google.android.material.button.MaterialButton
+ import com.google.android.setupcompat.util.SystemBarHelper
+ import com.google.android.setupdesign.R as SudR
+ import com.google.android.setupdesign.template.FloatingActionButtonMixin
+ import com.google.android.setupdesign.template.FloatingBackButtonMixin
+ import org.lineageos.setupwizard.base.SubBaseActivity
++import org.lineageos.setupwizard.system.DeviceInfoActivity
+ import org.lineageos.setupwizard.util.SetupWizardUtils
+ 
+ class WelcomeActivity : SubBaseActivity() {
+ 
++    private val isSkipAvailable: Boolean
++        get() = Build.TYPE == "eng"
++
+     override fun onStartSubactivity() {
+         // no-op
+     }
+@@ -39,6 +46,7 @@
+         )
+ 
+         setupEmergencyCallButton()
++        setupDeviceInfoButton()
+         setupSkipButton()
+ 
+         findViewById<View>(R.id.start).setOnClickListener { onNextPressed() }
+@@ -69,9 +77,41 @@
+         setPadding(horizontalPadding, paddingTop, horizontalPadding, paddingBottom)
+     }
+ 
++    private fun setupDeviceInfoButton() {
++        val actionButtonContainer =
++            glifLayout.findManagedViewById<View>(
++                SudR.id.sud_layout_floating_action_button_container
++            )
++        val row = actionButtonContainer?.parent as? ViewGroup ?: return
++        val infoButton = layoutInflater.inflate(R.layout.welcome_info_button, row, false)
++        row.addView(infoButton, 0)
++        infoButton.setOnClickListener {
++            startActivity(Intent(this, DeviceInfoActivity::class.java))
++        }
++
++        val edgeMargin = backButtonMarginStart()
++        actionButtonContainer.updateLayoutParams<MarginLayoutParams> { marginEnd = edgeMargin }
++        infoButton.updateLayoutParams<MarginLayoutParams> {
++            marginEnd =
++                if (isSkipAvailable) {
++                    resources.getDimensionPixelSize(R.dimen.welcome_top_button_spacing)
++                } else {
++                    edgeMargin
++                }
++        }
++    }
++
++    private fun backButtonMarginStart(): Int {
++        val attributes =
++            theme.obtainStyledAttributes(intArrayOf(SudR.attr.sudBackButtonMarginStart))
++        val margin = attributes.getDimensionPixelSize(0, 0)
++        attributes.recycle()
++        return margin
++    }
++
+     private fun setupSkipButton() {
+         val mixin = glifLayout.getMixin(FloatingActionButtonMixin::class.java)
+-        if (Build.TYPE != "eng") {
++        if (!isSkipAvailable) {
+             mixin.visibility = View.GONE
+             return
+         }
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt b/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt
+new file mode 100644
+index 0000000..9cf8fbd
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoActivity.kt
+@@ -0,0 +1,88 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.system
++
++import android.os.Build
++import android.os.Bundle
++import android.telephony.TelephonyManager
++import android.telephony.euicc.EuiccManager
++import android.util.Log
++import com.google.android.setupdesign.GlifRecyclerLayout
++import com.google.android.setupdesign.items.ItemGroup
++import com.google.android.setupdesign.items.RecyclerItemAdapter
++import org.lineageos.setupwizard.R
++import org.lineageos.setupwizard.base.BaseSetupWizardActivity
++
++class DeviceInfoActivity : BaseSetupWizardActivity() {
++
++    override fun onCreate(savedInstanceState: Bundle?) {
++        super.onCreate(savedInstanceState)
++        setNextText(R.string.ok)
++
++        val itemGroup = ItemGroup()
++        for ((label, value) in deviceIdentifiers()) {
++            itemGroup.addChild(DeviceInfoItem(label, value))
++        }
++
++        val adapter = RecyclerItemAdapter(itemGroup)
++        adapter.setOnItemSelectedListener { (it as? DeviceInfoItem)?.toggle() }
++        (glifLayout as GlifRecyclerLayout).adapter = adapter
++    }
++
++    private fun deviceIdentifiers(): List<Pair<String, String>> {
++        val identifiers = mutableListOf<Pair<String, String>>()
++
++        val telephonyManager = getSystemService(TelephonyManager::class.java)
++        if (telephonyManager != null) {
++            val slotCount = telephonyManager.activeModemCount
++            for (slot in 0 until slotCount) {
++                val imei = runCatching { telephonyManager.getImei(slot) }.getOrNull()
++                if (!imei.isNullOrEmpty()) {
++                    val label =
++                        if (slotCount > 1) {
++                            getString(R.string.device_info_imei_slot, slot + 1)
++                        } else {
++                            getString(R.string.device_info_imei)
++                        }
++                    identifiers += label to imei
++                }
++            }
++        }
++
++        val eid = runCatching { getSystemService(EuiccManager::class.java)?.eid }.getOrNull()
++        if (!eid.isNullOrEmpty()) {
++            identifiers += getString(R.string.device_info_eid) to eid
++        }
++
++        val serial = runCatching { Build.getSerial() }.getOrNull()
++        if (!serial.isNullOrEmpty() && serial != Build.UNKNOWN) {
++            identifiers += getString(R.string.device_info_serial) to serial
++        }
++
++        if (identifiers.isEmpty()) {
++            Log.w(TAG, "No device identifiers to show")
++        }
++        return identifiers
++    }
++
++    override fun onNextPressed() {
++        finish()
++    }
++
++    override fun onSkipPressed() {
++        finish()
++    }
++
++    override val layoutResId = R.layout.device_info_activity
++
++    override val titleResId = R.string.device_information
++
++    override val iconResId = R.drawable.ic_info
++
++    companion object {
++        private const val TAG = "DeviceInfoActivity"
++    }
++}
+diff --git a/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoItem.kt b/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoItem.kt
+new file mode 100644
+index 0000000..a7973d6
+--- /dev/null
++++ b/app/src/main/java/org/lineageos/setupwizard/system/DeviceInfoItem.kt
+@@ -0,0 +1,83 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.setupwizard.system
++
++import android.graphics.Bitmap
++import android.graphics.Color
++import android.util.Log
++import android.view.View
++import android.widget.ImageView
++import com.google.android.setupdesign.R as SudR
++import com.google.android.setupdesign.items.Item
++import com.google.zxing.BarcodeFormat
++import com.google.zxing.oned.Code128Writer
++import org.lineageos.setupwizard.R
++
++class DeviceInfoItem(label: CharSequence, private val value: String) : Item() {
++
++    private var expanded = false
++
++    private val barcode: Bitmap? by lazy { encodeBarcode(value) }
++
++    init {
++        title = label
++        summary = value
++        setLayoutResource(R.layout.device_info_item)
++    }
++
++    override fun onBindView(view: View) {
++        super.onBindView(view)
++
++        val barcodeView = view.findViewById<ImageView>(R.id.device_info_barcode)
++        val expandButton = view.findViewById<ImageView>(R.id.device_info_expand)
++        val barcode = barcode
++
++        if (barcode == null) {
++            barcodeView.visibility = View.GONE
++            expandButton.visibility = View.GONE
++            return
++        }
++
++        expandButton.visibility = View.VISIBLE
++        expandButton.setImageResource(
++            if (expanded) {
++                SudR.drawable.sud_items_collapse_button_icon
++            } else {
++                SudR.drawable.sud_items_expand_button_icon
++            }
++        )
++        expandButton.setOnClickListener { toggle() }
++
++        barcodeView.setImageBitmap(barcode)
++        barcodeView.visibility = if (expanded) View.VISIBLE else View.GONE
++    }
++
++    fun toggle() {
++        if (barcode == null) {
++            return
++        }
++        expanded = !expanded
++        notifyItemChanged()
++    }
++
++    private fun encodeBarcode(value: String): Bitmap? =
++        runCatching {
++                val matrix = Code128Writer().encode(value, BarcodeFormat.CODE_128, BARCODE_WIDTH, 1)
++                val pixels =
++                    IntArray(BARCODE_WIDTH) { x ->
++                        if (matrix.get(x, 0)) Color.BLACK else Color.WHITE
++                    }
++                Bitmap.createBitmap(pixels, BARCODE_WIDTH, 1, Bitmap.Config.ARGB_8888)
++            }
++            .onFailure { Log.w(TAG, "Could not encode $value", it) }
++            .getOrNull()
++
++    companion object {
++        private const val TAG = "DeviceInfoItem"
++
++        private const val BARCODE_WIDTH = 1024
++    }
++}
+diff --git a/app/src/main/res/drawable/ic_info.xml b/app/src/main/res/drawable/ic_info.xml
+new file mode 100644
+index 0000000..43c4fcf
+--- /dev/null
++++ b/app/src/main/res/drawable/ic_info.xml
+@@ -0,0 +1,15 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: Material Design Authors / Google LLC
++     SPDX-License-Identifier: Apache-2.0
++-->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++
++    <path
++        android:fillColor="?android:colorControlNormal"
++        android:pathData="M11,7h2v2h-2zM11,11h2v6h-2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z" />
++</vector>
+diff --git a/app/src/main/res/layout/device_info_activity.xml b/app/src/main/res/layout/device_info_activity.xml
+new file mode 100644
+index 0000000..cf67ce7
+--- /dev/null
++++ b/app/src/main/res/layout/device_info_activity.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<com.google.android.setupdesign.GlifRecyclerLayout
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@+id/setup_wizard_layout"
++    android:layout_width="match_parent"
++    android:layout_height="match_parent" />
+diff --git a/app/src/main/res/layout/device_info_item.xml b/app/src/main/res/layout/device_info_item.xml
+new file mode 100644
+index 0000000..e5c8bdc
+--- /dev/null
++++ b/app/src/main/res/layout/device_info_item.xml
+@@ -0,0 +1,76 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    style="?attr/sudItemContainerStyle"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:baselineAligned="false"
++    android:orientation="vertical">
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:baselineAligned="false"
++        android:gravity="center_vertical"
++        android:orientation="horizontal">
++
++        <FrameLayout
++            android:id="@id/sud_items_icon_container"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:visibility="gone">
++
++            <ImageView
++                android:id="@id/sud_items_icon"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content" />
++
++        </FrameLayout>
++
++        <LinearLayout
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_weight="1"
++            android:orientation="vertical">
++
++            <com.google.android.setupdesign.view.RichTextView
++                android:id="@id/sud_items_title"
++                style="?attr/sudItemTitleStyle"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:gravity="start"
++                android:textAlignment="viewStart" />
++
++            <com.google.android.setupdesign.view.RichTextView
++                android:id="@id/sud_items_summary"
++                style="?attr/sudItemSummaryStyle"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:gravity="start"
++                android:textAlignment="viewStart"
++                android:visibility="gone" />
++
++        </LinearLayout>
++
++        <ImageView
++            android:id="@+id/device_info_expand"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_gravity="center_vertical"
++            android:contentDescription="@null" />
++
++    </LinearLayout>
++
++    <ImageView
++        android:id="@+id/device_info_barcode"
++        android:layout_width="match_parent"
++        android:layout_height="@dimen/device_info_barcode_height"
++        android:layout_marginTop="@dimen/device_info_barcode_margin_top"
++        android:contentDescription="@null"
++        android:scaleType="fitXY"
++        android:visibility="gone" />
++
++</LinearLayout>
+diff --git a/app/src/main/res/layout/welcome_activity.xml b/app/src/main/res/layout/welcome_activity.xml
+index 9fd05a0..79fc9d7 100644
+--- a/app/src/main/res/layout/welcome_activity.xml
++++ b/app/src/main/res/layout/welcome_activity.xml
+@@ -41,23 +41,23 @@
+             android:layout_height="wrap_content"
+             android:orientation="vertical"
+             android:paddingStart="@dimen/welcome_content_container_padding_start"
+-            android:paddingEnd="@dimen/welcome_content_container_padding_end">
++            android:paddingEnd="@dimen/welcome_content_container_padding_end"
++            android:paddingBottom="0dp">
+ 
+             <TextView
+                 android:id="@+id/welcome_title"
+                 style="@style/WelcomeTitle"
+                 android:layout_width="match_parent"
+                 android:layout_height="wrap_content"
+-                android:hyphenationFrequency="none"
+-                android:paddingBottom="@dimen/welcome_content_container_padding_bottom" />
++                android:hyphenationFrequency="none" />
+         </LinearLayout>
+ 
+         <LinearLayout
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+             android:orientation="horizontal"
+-            android:paddingStart="?attr/sucFooterBarPaddingStart"
+-            android:paddingEnd="?attr/sucFooterBarPaddingEnd"
++            android:paddingStart="?attr/sudMarginStart"
++            android:paddingEnd="?attr/sudMarginEnd"
+             android:paddingTop="?attr/sucFooterBarPaddingTop"
+             android:paddingBottom="?attr/sucFooterBarPaddingBottom">
+ 
+@@ -88,7 +88,7 @@
+                 android:insetTop="0dp"
+                 android:insetBottom="0dp"
+                 android:text="@string/start"
+-                android:textSize="@dimen/welcome_start_button_text_size"
++                android:textAppearance="?attr/textAppearanceTitleLarge"
+                 app:icon="@drawable/ic_arrow_forward"
+                 app:iconGravity="textStart"
+                 app:iconPadding="@dimen/welcome_start_button_icon_padding"
+diff --git a/app/src/main/res/layout/welcome_info_button.xml b/app/src/main/res/layout/welcome_info_button.xml
+new file mode 100644
+index 0000000..5253208
+--- /dev/null
++++ b/app/src/main/res/layout/welcome_info_button.xml
+@@ -0,0 +1,20 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++     SPDX-FileCopyrightText: The LineageOS Project
++     SPDX-License-Identifier: Apache-2.0
++-->
++<com.google.android.material.button.MaterialButton
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto"
++    android:id="@+id/device_info"
++    style="?attr/materialIconButtonFilledStyle"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
++    android:layout_marginTop="@dimen/sud_glif_expressive_back_button_margin_top"
++    android:layout_marginEnd="@dimen/welcome_top_button_spacing"
++    android:contentDescription="@string/device_info"
++    android:minWidth="@dimen/sud_glif_expressive_back_button_min_size"
++    android:minHeight="@dimen/sud_glif_expressive_back_button_min_size"
++    app:backgroundTint="?attr/colorSurfaceContainerHigh"
++    app:icon="@drawable/ic_info"
++    app:iconTint="?attr/colorOnSurface" />
+diff --git a/app/src/main/res/values/dimens.xml b/app/src/main/res/values/dimens.xml
+index 509d105..88c9bbf 100644
+--- a/app/src/main/res/values/dimens.xml
++++ b/app/src/main/res/values/dimens.xml
+@@ -11,25 +11,24 @@
+     <dimen name="location_text_margin_right">30dp</dimen>
+     <dimen name="base_margin_top">0dp</dimen>
+ 
+-    <dimen name="welcome_content_container_padding_bottom">30dp</dimen>
+     <dimen name="welcome_content_container_padding_end">24dp</dimen>
+-    <dimen name="welcome_content_container_padding_start">40dp</dimen>
+-    <dimen name="welcome_title_text_size">56sp</dimen>
++    <dimen name="welcome_content_container_padding_start">24dp</dimen>
++    <dimen name="welcome_title_text_size">48sp</dimen>
+     <dimen name="welcome_title_padding_bottom">16dp</dimen>
+-    <dimen name="welcome_title_line_height">64dp</dimen>
++    <dimen name="welcome_title_line_height">44dp</dimen>
+ 
++    <dimen name="welcome_top_button_spacing">8dp</dimen>
+     <dimen name="welcome_chip_text_size">14sp</dimen>
+     <dimen name="welcome_chip_padding_horizontal">16dp</dimen>
+     <dimen name="welcome_emergency_icon_padding">8dp</dimen>
+     <dimen name="welcome_emergency_icon_size">18dp</dimen>
+-    <dimen name="welcome_footer_button_size">72dp</dimen>
+-    <dimen name="welcome_footer_button_radius">36dp</dimen>
++    <dimen name="welcome_footer_button_size">96dp</dimen>
++    <dimen name="welcome_footer_button_radius">48dp</dimen>
+     <dimen name="welcome_footer_button_spacing">16dp</dimen>
+-    <item name="welcome_start_button_inset_weight" format="float" type="dimen">0.25</item>
+-    <dimen name="welcome_start_button_text_size">18sp</dimen>
+-    <dimen name="welcome_start_button_icon_size">24dp</dimen>
++    <item name="welcome_start_button_inset_weight" format="float" type="dimen">0</item>
++    <dimen name="welcome_start_button_icon_size">32dp</dimen>
+     <dimen name="welcome_start_button_icon_padding">12dp</dimen>
+-    <dimen name="welcome_accessibility_icon_size">28dp</dimen>
++    <dimen name="welcome_accessibility_icon_size">32dp</dimen>
+ 
+     <dimen name="setup_compat_footer_button_radius">@dimen/sud_glif_expressive_footer_button_radius</dimen>
+     <dimen name="setup_design_items_group_corner_radius">20dp</dimen>
+@@ -43,6 +42,9 @@
+ 
+     <dimen name="time_zone_item_padding_vertical">8dp</dimen>
+ 
++    <dimen name="device_info_barcode_height">44dp</dimen>
++    <dimen name="device_info_barcode_margin_top">12dp</dimen>
++
+     <dimen name="connected_button_height">56dp</dimen>
+ 
+     <dimen name="preview_margin_top">24dp</dimen>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index e61c89a..a12e21e 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -27,6 +27,12 @@
+     <string name="setup_managed_profile_welcome_message">Set up your work profile</string>
+     <string name="emergency_call">Emergency call</string>
+     <string name="accessibility_settings">Accessibility settings</string>
++    <string name="device_info">Device info</string>
++    <string name="device_information">Device information</string>
++    <string name="device_info_imei">IMEI</string>
++    <string name="device_info_imei_slot">IMEI <xliff:g id="slot" example="1">%1$d</xliff:g></string>
++    <string name="device_info_eid">EID</string>
++    <string name="device_info_serial">Serial number</string>
+ 
+     <!-- Locale page -->
+     <string name="setup_locale">Language</string>

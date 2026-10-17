@@ -1,0 +1,159 @@
+From 8d1f79edefa48fd848b3e306fc7361fb944041b3 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sun, 11 Oct 2026 08:12:26 +0100
+Subject: [PATCH] compat: Share Bluetooth audio configuration conversion logic
+
+Move parcel conversion and error handling into a template shared by the
+V3 and V4 adapters. Keep each native entry point, legacy return type and
+supported-tag limit unchanged.
+
+Assisted-by: LLM
+Change-Id: I542a8dd61f8ddbf19f35ee75e59d7bfe14d53984
+---
+
+diff --git a/libbluetooth_audio_session_aidl/AudioConfiguration.h b/libbluetooth_audio_session_aidl/AudioConfiguration.h
+new file mode 100644
+index 0000000..7786f21
+--- /dev/null
++++ b/libbluetooth_audio_session_aidl/AudioConfiguration.h
+@@ -0,0 +1,42 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++#pragma once
++
++#include <aidl/android/hardware/bluetooth/audio/AudioConfiguration.h>
++#include <android/binder_parcel.h>
++#include <log/log.h>
++#include <memory>
++
++namespace bluetooth_audio_compat {
++
++// Avoid depending on the private session object's layout.
++extern const aidl::android::hardware::bluetooth::audio::AudioConfiguration
++getCurrentAudioConfig(void* session) asm(
++        "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfigEv");
++
++template <typename LegacyConfig>
++LegacyConfig getAudioConfig(void* session, typename LegacyConfig::Tag maxTag, int version) {
++    const auto config = getCurrentAudioConfig(session);
++    LegacyConfig result;
++    // New union alternatives have no legacy representation. A zero-rate PCM
++    // configuration makes the legacy software audio path reject the format.
++    if (static_cast<int>(config.getTag()) > static_cast<int>(maxTag)) {
++        ALOGE("Bluetooth audio configuration has no V%d representation", version);
++        return result;
++    }
++    // Stable AIDL parcel encoding provides field conversion without sharing
++    // the incompatible std::variant layout across the native ABI boundary.
++    std::unique_ptr<AParcel, decltype(&AParcel_delete)> parcel(AParcel_create(), AParcel_delete);
++    if (!parcel || config.writeToParcel(parcel.get()) != STATUS_OK ||
++        AParcel_setDataPosition(parcel.get(), 0) != STATUS_OK ||
++        result.readFromParcel(parcel.get()) != STATUS_OK) {
++        ALOGE("Failed to convert Bluetooth audio configuration to V%d", version);
++        return LegacyConfig{};
++    }
++    return result;
++}
++
++}  // namespace bluetooth_audio_compat
+diff --git a/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp b/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp
+index f73d689..cc220d5 100644
+--- a/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp
++++ b/libbluetooth_audio_session_aidl/AudioConfigurationV3.cpp
+@@ -3,40 +3,16 @@
+  * SPDX-License-Identifier: Apache-2.0
+  */
+ 
+-#include <aidl/android/hardware/bluetooth/audio/AudioConfiguration.h>
+ #include <aidl/lineage/compat/bluetooth/audio/v3/AudioConfiguration.h>
+-#include <android/binder_parcel.h>
+-#include <log/log.h>
+-#include <memory>
+ 
+-namespace current = aidl::android::hardware::bluetooth::audio;
++#include "AudioConfiguration.h"
++
+ namespace legacy = aidl::lineage::compat::bluetooth::audio::v3;
+ 
+-// Avoid depending on the private session object's layout.
+-extern const current::AudioConfiguration getCurrentAudioConfig(void* session) asm(
+-        "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfigEv");
+-
+ extern const legacy::AudioConfiguration getLegacyAudioConfig(void* session) asm(
+         "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfV3Ev");
+ 
+ const legacy::AudioConfiguration getLegacyAudioConfig(void* session) {
+-    const auto config = getCurrentAudioConfig(session);
+-    legacy::AudioConfiguration result;
+-    // New union alternatives have no V3 representation. A zero-rate PCM
+-    // configuration makes the legacy software audio path reject the format.
+-    if (static_cast<int>(config.getTag()) >
+-        static_cast<int>(legacy::AudioConfiguration::Tag::leAudioBroadcastConfig)) {
+-        ALOGE("Bluetooth audio configuration has no V3 representation");
+-        return result;
+-    }
+-    // Stable AIDL parcel encoding provides field conversion without sharing
+-    // the incompatible std::variant layout across the native ABI boundary.
+-    std::unique_ptr<AParcel, decltype(&AParcel_delete)> parcel(AParcel_create(), AParcel_delete);
+-    if (!parcel || config.writeToParcel(parcel.get()) != STATUS_OK ||
+-        AParcel_setDataPosition(parcel.get(), 0) != STATUS_OK ||
+-        result.readFromParcel(parcel.get()) != STATUS_OK) {
+-        ALOGE("Failed to convert Bluetooth audio configuration to V3");
+-        return legacy::AudioConfiguration{};
+-    }
+-    return result;
++    return bluetooth_audio_compat::getAudioConfig<legacy::AudioConfiguration>(
++            session, legacy::AudioConfiguration::Tag::leAudioBroadcastConfig, 3);
+ }
+diff --git a/libbluetooth_audio_session_aidl/AudioConfigurationV4.cpp b/libbluetooth_audio_session_aidl/AudioConfigurationV4.cpp
+index 512f6fb..32250cc 100644
+--- a/libbluetooth_audio_session_aidl/AudioConfigurationV4.cpp
++++ b/libbluetooth_audio_session_aidl/AudioConfigurationV4.cpp
+@@ -3,40 +3,16 @@
+  * SPDX-License-Identifier: Apache-2.0
+  */
+ 
+-#include <aidl/android/hardware/bluetooth/audio/AudioConfiguration.h>
+ #include <aidl/lineage/compat/bluetooth/audio/v4/AudioConfiguration.h>
+-#include <android/binder_parcel.h>
+-#include <log/log.h>
+-#include <memory>
+ 
+-namespace current = aidl::android::hardware::bluetooth::audio;
++#include "AudioConfiguration.h"
++
+ namespace legacy = aidl::lineage::compat::bluetooth::audio::v4;
+ 
+-// Avoid depending on the private session object's layout.
+-extern const current::AudioConfiguration getCurrentAudioConfig(void* session) asm(
+-        "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfigEv");
+-
+ extern const legacy::AudioConfiguration getLegacyAudioConfigV4(void* session) asm(
+         "_ZN4aidl7android8hardware9bluetooth5audio21BluetoothAudioSession14GetAudioConfV4Ev");
+ 
+ const legacy::AudioConfiguration getLegacyAudioConfigV4(void* session) {
+-    const auto config = getCurrentAudioConfig(session);
+-    legacy::AudioConfiguration result;
+-    // New union alternatives have no V4 representation. A zero-rate PCM
+-    // configuration makes the legacy software audio path reject the format.
+-    if (static_cast<int>(config.getTag()) >
+-        static_cast<int>(legacy::AudioConfiguration::Tag::a2dp)) {
+-        ALOGE("Bluetooth audio configuration has no V4 representation");
+-        return result;
+-    }
+-    // Stable AIDL parcel encoding provides field conversion without sharing
+-    // the incompatible std::variant layout across the native ABI boundary.
+-    std::unique_ptr<AParcel, decltype(&AParcel_delete)> parcel(AParcel_create(), AParcel_delete);
+-    if (!parcel || config.writeToParcel(parcel.get()) != STATUS_OK ||
+-        AParcel_setDataPosition(parcel.get(), 0) != STATUS_OK ||
+-        result.readFromParcel(parcel.get()) != STATUS_OK) {
+-        ALOGE("Failed to convert Bluetooth audio configuration to V4");
+-        return legacy::AudioConfiguration{};
+-    }
+-    return result;
++    return bluetooth_audio_compat::getAudioConfig<legacy::AudioConfiguration>(
++            session, legacy::AudioConfiguration::Tag::a2dp, 4);
+ }

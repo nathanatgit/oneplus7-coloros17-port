@@ -1,0 +1,27 @@
+From 04c4fbd7bbe69bfd7ad011f4dd96b7ee25094960 Mon Sep 17 00:00:00 2001
+From: Edwin Moquete <edwinmmoquete@gmail.com>
+Date: Mon, 14 Jul 2025 13:49:41 +0000
+Subject: [PATCH] qcom: Conditionally use sm8250 HALs for sdm845
+
+sdm845 devices running kernel 4.19 will use sm8250 HALs.
+
+Change-Id: I11e37df1726b5dbbe53a1463c87c8e3fabe89f64
+---
+
+diff --git a/qcom_defs.mk b/qcom_defs.mk
+index dfcf93b..66d7dbd 100644
+--- a/qcom_defs.mk
++++ b/qcom_defs.mk
+@@ -14,6 +14,12 @@
+ UM_6_1_FAMILY := pineapple volcano
+ UM_6_6_FAMILY := sun
+ 
++ifeq ($(TARGET_KERNEL_VERSION),4.19)
++# UM 4.9 upgraded to UM 4.19
++UM_4_19_FAMILY := $(UM_4_19_FAMILY) $(UM_4_9_FAMILY)
++UM_4_9_FAMILY :=
++endif
++
+ ifeq ($(TARGET_KERNEL_VERSION),6.6)
+ # UM 5.10 upgraded to UM 6.6
+ UM_6_6_FAMILY := $(UM_6_6_FAMILY) $(UM_5_10_FAMILY)

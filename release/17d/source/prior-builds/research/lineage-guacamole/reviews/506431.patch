@@ -1,0 +1,36 @@
+From 72070cf7354e7279e0da3c57b1d8fcae1c4db540 Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Sun, 06 Sep 2026 21:48:13 -0400
+Subject: [PATCH] bootanimation: Request a high priority EGL context
+
+Without a requested priority the animation's GPU context is scheduled
+low and shares a queue with other low priority clients, request high.
+
+This fixes an issue on the Fairphone 6 where the camera HAL compiling
+its noise reduction model at boot made the animation skip frames. Due
+to the boot animation being user facing, it makes sense to give prio.
+
+Change-Id: I65859c8d0f9aea669a6536c5a98bc6eaf709c8f4
+---
+
+diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
+index ea42566..eb55bbd 100644
+--- a/cmds/bootanimation/BootAnimation.cpp
++++ b/cmds/bootanimation/BootAnimation.cpp
+@@ -485,8 +485,14 @@
+     mEgl = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+     eglInitialize(mEgl, nullptr, nullptr);
+     EGLConfig config = getEglConfig(mEgl);
+-    EGLint contextAttributes[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
+-    mEglContext = eglCreateContext(mEgl, config, nullptr, contextAttributes);
++    std::vector<EGLint> contextAttributes = {EGL_CONTEXT_CLIENT_VERSION, 2};
++    const char* eglExtensions = eglQueryString(mEgl, EGL_EXTENSIONS);
++    if (eglExtensions && strstr(eglExtensions, "EGL_IMG_context_priority")) {
++        contextAttributes.push_back(EGL_CONTEXT_PRIORITY_LEVEL_IMG);
++        contextAttributes.push_back(EGL_CONTEXT_PRIORITY_HIGH_IMG);
++    }
++    contextAttributes.push_back(EGL_NONE);
++    mEglContext = eglCreateContext(mEgl, config, nullptr, contextAttributes.data());
+ 
+     mMaxWidth = android::base::GetIntProperty("ro.surface_flinger.max_graphics_width", 0);
+     mMaxHeight = android::base::GetIntProperty("ro.surface_flinger.max_graphics_height", 0);

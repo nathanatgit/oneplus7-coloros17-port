@@ -1,0 +1,535 @@
+From ac754a2b155088532bbc1903311ddcb04131d16b Mon Sep 17 00:00:00 2001
+From: Jis G Jacob <studiokeys@blissroms.org>
+Date: Sun, 04 Oct 2026 23:11:03 +0530
+Subject: [PATCH] LatinIME: Add split keyboard geometry transformer
+
+Add a transformer that moves the keys of a built keyboard into two
+halves pushed against the edges, leaving an empty gap in the middle.
+The space key spans the gap, and keys straddling the midline go to the
+side holding most of them or, optionally, to both sides.
+
+Assisted-by: LLM
+Change-Id: Ifa6919abef71a3c484757e9544f399deefa64c7b
+Signed-off-by: Jis G Jacob <studiokeys@blissroms.org>
+---
+
+diff --git a/java/src/com/android/inputmethod/keyboard/Key.java b/java/src/com/android/inputmethod/keyboard/Key.java
+index d030543..ca0ea3d 100644
+--- a/java/src/com/android/inputmethod/keyboard/Key.java
++++ b/java/src/com/android/inputmethod/keyboard/Key.java
+@@ -458,6 +458,37 @@
+         return (filteredMoreKeys == moreKeys) ? key : new Key(key, filteredMoreKeys);
+     }
+ 
++    @Nonnull
++    public static Key copyWithGeometry(@Nonnull final Key key, final int slotLeft,
++            final int slotRight, @Nonnull final Rect hitBox) {
++        return new Key(key, slotLeft, slotRight, hitBox);
++    }
++
++    private Key(@Nonnull final Key key, final int slotLeft, final int slotRight,
++            @Nonnull final Rect hitBox) {
++        mCode = key.mCode;
++        mLabel = key.mLabel;
++        mHintLabel = key.mHintLabel;
++        mLabelFlags = key.mLabelFlags;
++        mIconId = key.mIconId;
++        mHorizontalGap = key.mHorizontalGap;
++        mWidth = slotRight - slotLeft - mHorizontalGap;
++        mHeight = key.mHeight;
++        mVerticalGap = key.mVerticalGap;
++        mX = slotLeft + mHorizontalGap / 2;
++        mY = key.mY;
++        mHitBox.set(hitBox);
++        mMoreKeys = key.mMoreKeys;
++        mMoreKeysColumnAndFlags = key.mMoreKeysColumnAndFlags;
++        mBackgroundType = key.mBackgroundType;
++        mActionFlags = key.mActionFlags;
++        mKeyVisualAttributes = key.mKeyVisualAttributes;
++        mOptionalAttributes = key.mOptionalAttributes;
++        mHashCode = computeHashCode(this);
++        mPressed = key.mPressed;
++        mEnabled = key.mEnabled;
++    }
++
+     private static boolean needsToUpcase(final int labelFlags, final int keyboardElementId) {
+         if ((labelFlags & LABEL_FLAGS_PRESERVE_CASE) != 0) return false;
+         switch (keyboardElementId) {
+diff --git a/java/src/com/android/inputmethod/keyboard/internal/SplitKeyboardTransformer.java b/java/src/com/android/inputmethod/keyboard/internal/SplitKeyboardTransformer.java
+new file mode 100644
+index 0000000..56f76db
+--- /dev/null
++++ b/java/src/com/android/inputmethod/keyboard/internal/SplitKeyboardTransformer.java
+@@ -0,0 +1,222 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.keyboard.internal;
++
++import android.graphics.Rect;
++
++import com.android.inputmethod.keyboard.Key;
++import com.android.inputmethod.latin.common.Constants;
++
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++import javax.annotation.Nonnull;
++
++public final class SplitKeyboardTransformer {
++    public static final float SPLIT_HALF_WIDTH_RATIO = 0.26f;
++    public static final float SPLIT_OUTER_MARGIN_RATIO = 0.02f;
++    private static final int MIN_KEYS_FOR_ROW_MIDDLE = 4;
++
++    private static final int SIDE_LEFT = 0;
++    private static final int SIDE_RIGHT = 1;
++    private static final int SIDE_SPACE = 2;
++
++    private final int mLeft;
++    private final int mRight;
++    private final float mMid;
++    private final float mHalfWidth;
++    private final float mOuterLeft;
++    private final float mOuterRight;
++    private final float mInnerLeft;
++    private final float mInnerRight;
++    private final float mMaxScale;
++    private final boolean mDuplicateCenterKeys;
++
++    public SplitKeyboardTransformer(final int left, final int right,
++            final boolean duplicateCenterKeys) {
++        mLeft = left;
++        mRight = right;
++        mMid = (left + right) / 2.0f;
++        mHalfWidth = (right - left) * SPLIT_HALF_WIDTH_RATIO;
++        final float margin = (right - left) * SPLIT_OUTER_MARGIN_RATIO;
++        mOuterLeft = left + margin;
++        mOuterRight = right - margin;
++        mInnerLeft = mOuterLeft + mHalfWidth;
++        mInnerRight = mOuterRight - mHalfWidth;
++        mMaxScale = mHalfWidth / (mMid - mOuterLeft);
++        mDuplicateCenterKeys = duplicateCenterKeys;
++    }
++
++    @Nonnull
++    public List<Key> transform(@Nonnull final Collection<Key> keys) {
++        final Map<Integer, Float> rowMiddles = computeRowMiddles(keys);
++        final Map<Integer, RowHalves> rows = new HashMap<>();
++        final ArrayList<Placement> placements = new ArrayList<>(keys.size());
++        for (final Key key : keys) {
++            if (key.isSpacer()) {
++                continue;
++            }
++            final float slotLeft = getSlotLeft(key);
++            final float slotRight = getSlotRight(key);
++            RowHalves row = rows.get(key.getY());
++            if (row == null) {
++                row = new RowHalves();
++                rows.put(key.getY(), row);
++            }
++            if (key.getCode() == Constants.CODE_SPACE && slotLeft < mMid && slotRight > mMid) {
++                placements.add(new Placement(key, SIDE_SPACE));
++                row.mIsSpaceRow = true;
++                continue;
++            }
++            final Float rowMiddle = rowMiddles.get(key.getY());
++            final float middle = (rowMiddle != null) ? rowMiddle : mMid;
++            final boolean straddles = slotLeft < middle && slotRight > middle;
++            final boolean mostlyLeft = (middle - slotLeft) >= (slotRight - middle);
++            final boolean duplicate = straddles && mDuplicateCenterKeys;
++            if (mostlyLeft || duplicate) {
++                placements.add(new Placement(key, SIDE_LEFT));
++                row.addLeft(slotLeft, slotRight);
++            }
++            if (!mostlyLeft || duplicate) {
++                placements.add(new Placement(key, SIDE_RIGHT));
++                row.addRight(slotLeft, slotRight);
++            }
++        }
++        final float scale = computeScale(rows.values());
++        final ArrayList<Key> result = new ArrayList<>(placements.size());
++        for (final Placement placement : placements) {
++            final Key key = placement.mKey;
++            final float slotLeft = getSlotLeft(key);
++            final float slotRight = getSlotRight(key);
++            final RowHalves row = rows.get(key.getY());
++            switch (placement.mSide) {
++            case SIDE_LEFT:
++                result.add(copy(key, toLeftHalf(row, slotLeft, scale),
++                        toLeftHalf(row, slotRight, scale)));
++                break;
++            case SIDE_RIGHT:
++                result.add(copy(key, toRightHalf(row, slotLeft, scale),
++                        toRightHalf(row, slotRight, scale)));
++                break;
++            default:
++                result.add(copy(key, toLeftHalf(row, slotLeft, scale),
++                        toRightHalf(row, slotRight, scale)));
++                break;
++            }
++        }
++        return result;
++    }
++
++    private float toLeftHalf(final RowHalves row, final float x, final float scale) {
++        if (row.mIsSpaceRow || !row.hasLeft()) {
++            return mOuterLeft + (x - mLeft) * scale;
++        }
++        return mInnerLeft - (row.mLeftAnchor - x) * scale;
++    }
++
++    private float toRightHalf(final RowHalves row, final float x, final float scale) {
++        if (row.mIsSpaceRow || !row.hasRight()) {
++            return mOuterRight - (mRight - x) * scale;
++        }
++        return mInnerRight + (x - row.mRightAnchor) * scale;
++    }
++
++    private float computeScale(@Nonnull final Collection<RowHalves> rows) {
++        float widestHalf = 0;
++        for (final RowHalves row : rows) {
++            if (row.hasLeft()) {
++                widestHalf = Math.max(widestHalf, row.mLeftAnchor - row.mLeftMin);
++            }
++            if (row.hasRight()) {
++                widestHalf = Math.max(widestHalf, row.mRightMax - row.mRightAnchor);
++            }
++        }
++        return widestHalf > 0 ? Math.min(mMaxScale, mHalfWidth / widestHalf) : mMaxScale;
++    }
++
++    private static final class RowHalves {
++        float mLeftMin = Float.POSITIVE_INFINITY;
++        float mLeftAnchor = Float.NEGATIVE_INFINITY;
++        float mRightAnchor = Float.POSITIVE_INFINITY;
++        float mRightMax = Float.NEGATIVE_INFINITY;
++        boolean mIsSpaceRow;
++
++        void addLeft(final float slotLeft, final float slotRight) {
++            mLeftMin = Math.min(mLeftMin, slotLeft);
++            mLeftAnchor = Math.max(mLeftAnchor, slotRight);
++        }
++
++        void addRight(final float slotLeft, final float slotRight) {
++            mRightAnchor = Math.min(mRightAnchor, slotLeft);
++            mRightMax = Math.max(mRightMax, slotRight);
++        }
++
++        boolean hasLeft() {
++            return mLeftAnchor != Float.NEGATIVE_INFINITY;
++        }
++
++        boolean hasRight() {
++            return mRightAnchor != Float.POSITIVE_INFINITY;
++        }
++    }
++
++    private static final class Placement {
++        final Key mKey;
++        final int mSide;
++
++        Placement(final Key key, final int side) {
++            mKey = key;
++            mSide = side;
++        }
++    }
++
++    @Nonnull
++    private static Map<Integer, Float> computeRowMiddles(@Nonnull final Collection<Key> keys) {
++        final Map<Integer, float[]> rows = new HashMap<>();
++        for (final Key key : keys) {
++            if (key.isSpacer() || key.getCode() <= Constants.CODE_SPACE) {
++                continue;
++            }
++            final float[] row = rows.get(key.getY());
++            if (row == null) {
++                rows.put(key.getY(), new float[] { getSlotLeft(key), getSlotRight(key), 1 });
++            } else {
++                rows.put(key.getY(), new float[] { Math.min(row[0], getSlotLeft(key)),
++                        Math.max(row[1], getSlotRight(key)), row[2] + 1 });
++            }
++        }
++        final Map<Integer, Float> middles = new HashMap<>();
++        for (final Map.Entry<Integer, float[]> entry : rows.entrySet()) {
++            final float[] row = entry.getValue();
++            if (row[2] >= MIN_KEYS_FOR_ROW_MIDDLE) {
++                middles.put(entry.getKey(), (row[0] + row[1]) / 2.0f);
++            }
++        }
++        return middles;
++    }
++
++    private static float getSlotLeft(@Nonnull final Key key) {
++        return key.getX() - key.getHorizontalGap() / 2.0f;
++    }
++
++    private static float getSlotRight(@Nonnull final Key key) {
++        return getSlotLeft(key) + key.getWidth() + key.getHorizontalGap();
++    }
++
++    @Nonnull
++    private Key copy(@Nonnull final Key key, final float left, final float right) {
++        final int slotLeft = Math.round(left);
++        final int slotRight = Math.round(right);
++        final Rect oldHitBox = key.getHitBox();
++        final int hitLeft = oldHitBox.left <= mLeft ? oldHitBox.left : slotLeft;
++        final int hitRight = oldHitBox.right >= mRight ? oldHitBox.right : slotRight + 1;
++        final Rect hitBox = new Rect(hitLeft, oldHitBox.top, hitRight, oldHitBox.bottom);
++        return Key.copyWithGeometry(key, slotLeft, slotRight, hitBox);
++    }
++}
+diff --git a/tests/src/com/android/inputmethod/keyboard/internal/SplitKeyboardTransformerTests.java b/tests/src/com/android/inputmethod/keyboard/internal/SplitKeyboardTransformerTests.java
+new file mode 100644
+index 0000000..ea9a704
+--- /dev/null
++++ b/tests/src/com/android/inputmethod/keyboard/internal/SplitKeyboardTransformerTests.java
+@@ -0,0 +1,244 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.inputmethod.keyboard.internal;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertTrue;
++
++import android.graphics.Rect;
++
++import androidx.test.filters.SmallTest;
++import androidx.test.runner.AndroidJUnit4;
++
++import com.android.inputmethod.keyboard.Key;
++import com.android.inputmethod.latin.common.Constants;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.Comparator;
++import java.util.List;
++
++@SmallTest
++@RunWith(AndroidJUnit4.class)
++public class SplitKeyboardTransformerTests {
++    private static final int LEFT = 0;
++    private static final int RIGHT = 1000;
++    private static final int Y = 0;
++    private static final int HEIGHT = 50;
++
++    private static Key key(final String label, final int code, final int x, final int width) {
++        return key(label, code, x, Y, width);
++    }
++
++    private static Key key(final String label, final int code, final int x, final int y,
++            final int width) {
++        return new Key(label, KeyboardIconsSet.ICON_UNDEFINED, code, null /* outputText */,
++                null /* hintLabel */, 0 /* labelFlags */, Key.BACKGROUND_TYPE_NORMAL, x, y,
++                width, HEIGHT, 0 /* horizontalGap */, 0 /* verticalGap */);
++    }
++
++    private static Key letter(final String label, final int x) {
++        return key(label, label.charAt(0), x, 100);
++    }
++
++    private static Key[] fullRow() {
++        final String letters = "qwertyuiop";
++        final Key[] keys = new Key[letters.length()];
++        for (int i = 0; i < letters.length(); i++) {
++            keys[i] = letter(letters.substring(i, i + 1), i * 100);
++        }
++        return keys;
++    }
++
++    private static List<Key> split(final boolean duplicate, final Key... keys) {
++        return new SplitKeyboardTransformer(LEFT, RIGHT, duplicate).transform(
++                Arrays.asList(keys));
++    }
++
++    private static Key find(final List<Key> keys, final String label) {
++        for (final Key k : keys) {
++            if (label.equals(k.getLabel())) return k;
++        }
++        throw new AssertionError("no key " + label);
++    }
++
++    private static void assertSlot(final Key key, final int left, final int right) {
++        assertEquals(key.getLabel() + " left", left, key.getX());
++        assertEquals(key.getLabel() + " right", right, key.getX() + key.getWidth());
++    }
++
++    @Test
++    public void testLeftHalfKeysAreCompressedTowardLeftEdge() {
++        final List<Key> out = split(false, fullRow());
++        assertEquals(10, out.size());
++        assertSlot(find(out, "q"), 20, 72);
++        assertSlot(find(out, "t"), 228, 280);
++    }
++
++    @Test
++    public void testRightHalfKeysAreCompressedTowardRightEdge() {
++        final List<Key> out = split(false, fullRow());
++        assertSlot(find(out, "y"), 720, 772);
++        assertSlot(find(out, "p"), 928, 980);
++    }
++
++    @Test
++    public void testSpacebarSpansTheGap() {
++        final List<Key> out = split(false, key(" ", Constants.CODE_SPACE, 200, 600));
++        assertEquals(1, out.size());
++        assertSlot(out.get(0), 128, 872);
++    }
++
++    @Test
++    public void testSpaceRowIsAlignedToOuterEdges() {
++        final List<Key> out = split(false, key("?123", Constants.CODE_SWITCH_ALPHA_SYMBOL, 0, 150),
++                key(",", ',', 150, 100), key(" ", Constants.CODE_SPACE, 250, 500),
++                key(".", '.', 750, 100), key("enter", Constants.CODE_ENTER, 850, 150));
++        assertEquals(5, out.size());
++        assertSlot(out.get(0), 20, 101);
++        assertSlot(out.get(1), 101, 155);
++        assertSlot(out.get(2), 155, 845);
++        assertSlot(out.get(3), 845, 899);
++        assertSlot(out.get(4), 899, 980);
++    }
++
++    @Test
++    public void testSpacebarIsNeverDuplicated() {
++        final List<Key> out = split(true, key(" ", Constants.CODE_SPACE, 200, 600));
++        assertEquals(1, out.size());
++    }
++
++    @Test
++    public void testStraddlerGoesToLargerOverlapSide() {
++        final List<Key> out = split(false, letter("a", 0), letter("h", 460), letter("l", 900));
++        assertEquals(3, out.size());
++        assertSlot(find(out, "h"), 720, 768);
++    }
++
++    @Test
++    public void testStraddlerTieGoesLeft() {
++        final List<Key> out = split(false, letter("a", 0), letter("g", 450), letter("l", 900));
++        assertEquals(3, out.size());
++        assertSlot(find(out, "g"), 233, 280);
++    }
++
++    @Test
++    public void testStraddlerDuplicatedOnBothSides() {
++        final List<Key> out = split(true, letter("a", 0), letter("g", 450), letter("l", 900));
++        assertEquals(4, out.size());
++        assertSlot(out.get(1), 233, 280);
++        assertSlot(out.get(2), 720, 767);
++        assertEquals("g", out.get(2).getLabel());
++    }
++
++    @Test
++    public void testDuplicatesDoNotOverlapNeighbors() {
++        final List<Key> out = new ArrayList<>(split(true, letter("a", 0), letter("f", 350),
++                letter("g", 450), letter("h", 550), letter("l", 900)));
++        Collections.sort(out, new Comparator<Key>() {
++            @Override
++            public int compare(final Key lhs, final Key rhs) {
++                return lhs.getX() - rhs.getX();
++            }
++        });
++        assertEquals(6, out.size());
++        for (int i = 1; i < out.size(); i++) {
++            final Key prev = out.get(i - 1);
++            final Key cur = out.get(i);
++            assertTrue(prev.getLabel() + "/" + cur.getLabel() + " overlap",
++                    prev.getX() + prev.getWidth() <= cur.getX());
++        }
++    }
++
++    @Test
++    public void testKeysSplitAtRowMiddleNotKeyboardMiddle() {
++        final ArrayList<Key> row = new ArrayList<>();
++        final String letters = "qwertyuiop";
++        for (int i = 0; i < letters.length(); i++) {
++            row.add(key(letters.substring(i, i + 1), letters.charAt(i), i * 90, 90));
++        }
++        row.add(key("del", Constants.CODE_DELETE, 900, 100));
++        final List<Key> out = split(false, row.toArray(new Key[0]));
++        assertEquals(11, out.size());
++        final Key t = find(out, "t");
++        final Key y = find(out, "y");
++        assertTrue("t on left: " + t, t.getX() + t.getWidth() <= 500);
++        assertTrue("y on right: " + y, y.getX() >= 500);
++    }
++
++    @Test
++    public void testInnerEdgesAlignedAcrossRows() {
++        final ArrayList<Key> keys = new ArrayList<>(Arrays.asList(fullRow()));
++        final String home = "asdfghjkl";
++        for (int i = 0; i < home.length(); i++) {
++            keys.add(key(home.substring(i, i + 1), home.charAt(i), 50 + i * 100, HEIGHT, 100));
++        }
++        final List<Key> out = split(false, keys.toArray(new Key[0]));
++        assertEquals(19, out.size());
++        for (final int y : new int[] { Y, HEIGHT }) {
++            int leftInnerEdge = Integer.MIN_VALUE;
++            int rightInnerEdge = Integer.MAX_VALUE;
++            for (final Key k : out) {
++                if (k.getY() != y) continue;
++                if (k.getX() < 500) {
++                    leftInnerEdge = Math.max(leftInnerEdge, k.getX() + k.getWidth());
++                } else {
++                    rightInnerEdge = Math.min(rightInnerEdge, k.getX());
++                }
++            }
++            assertEquals("row " + y + " left", 280, leftInnerEdge);
++            assertEquals("row " + y + " right", 720, rightInnerEdge);
++        }
++    }
++
++    @Test
++    public void testInnerHitBoxesClampedOuterPreserved() {
++        final List<Key> out = split(false, fullRow());
++        assertEquals(0, find(out, "q").getHitBox().left);
++        assertEquals(1001, find(out, "p").getHitBox().right);
++        assertEquals(281, find(out, "t").getHitBox().right);
++        assertEquals(720, find(out, "y").getHitBox().left);
++        for (final Key k : out) {
++            assertTrue(k.getLabel() + " hit in gap", !k.isOnKey(500, Y + 10));
++        }
++    }
++
++    @Test
++    public void testVerticalGeometryUnchanged() {
++        final Key q = letter("q", 0);
++        final Rect before = new Rect(q.getHitBox());
++        final Key out = split(false, q).get(0);
++        assertEquals(q.getY(), out.getY());
++        assertEquals(q.getHeight(), out.getHeight());
++        assertEquals(before.top, out.getHitBox().top);
++        assertEquals(before.bottom, out.getHitBox().bottom);
++    }
++
++    @Test
++    public void testInputKeysAreNotMutated() {
++        final Key[] row = fullRow();
++        final Key t = row[4];
++        split(true, row);
++        assertSlot(t, 400, 500);
++        assertEquals(new Rect(400, Y, 501, Y + HEIGHT), t.getHitBox());
++    }
++
++    @Test
++    public void testKeepsLabelCodeAndHorizontalGap() {
++        final Key k = new Key("a", KeyboardIconsSet.ICON_UNDEFINED, 'a', null, null, 0,
++                Key.BACKGROUND_TYPE_NORMAL, 0, Y, 100, HEIGHT, 10 /* hGap */, 0);
++        final Key out = split(false, k).get(0);
++        assertEquals("a", out.getLabel());
++        assertEquals('a', out.getCode());
++        assertEquals(10, out.getHorizontalGap());
++        assertEquals(231, out.getX());
++        assertEquals(44, out.getWidth());
++    }
++}

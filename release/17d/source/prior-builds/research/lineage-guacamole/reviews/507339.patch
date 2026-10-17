@@ -1,0 +1,748 @@
+From 0eb7b3b7346f1c15e360e47f90f7827728514d73 Mon Sep 17 00:00:00 2001
+From: LuK1337 <priv.luk@gmail.com>
+Date: Sat, 10 Oct 2026 18:43:11 +0200
+Subject: [PATCH] sensors: fusionlight: Support pre-V2.1 profiles
+
+Profiles without SupportScreenshotAlgorithm_V2_1 use the older model:
+per-segment R/G/B/W screen leakage polynomials scaled by a brightness
+linearity and HAL *_VIEW_*_MAX calibration, with lux tables selected by
+FusionLightBrightnesses segment. Previously these profiles were rejected.
+Also match stock IR band selection and read SensorModuleId from the
+profile.
+
+Assisted-by: LLM
+Change-Id: I7a1cf46125ae09f2d51906091e72427dde51b406
+---
+
+diff --git a/sensors/fusionlight/FusionLightProcessor.cpp b/sensors/fusionlight/FusionLightProcessor.cpp
+index 35a4fc5..51a6d9a 100644
+--- a/sensors/fusionlight/FusionLightProcessor.cpp
++++ b/sensors/fusionlight/FusionLightProcessor.cpp
+@@ -28,6 +28,7 @@
+     Event event;
+     Channels raw_channels = Channels::Zero();
+     int32_t brightness = 0;
++    bool dc_mode = false;
+ };
+ 
+ int FindRange(const std::vector<ValueRange>& ranges, double value) {
+@@ -47,13 +48,48 @@
+     return -1;
+ }
+ 
+-int FindIrBand(const std::vector<ValueRange>& thresholds, double ratio) {
+-    for (int level = 0; level < thresholds.size(); ++level) {
+-        if (ratio >= thresholds[level].min && ratio <= thresholds[level].max) {
++// The view model matches brightness above each lower bound, except for the
++// first IR brightness range. Unmatched brightness falls back to the first range.
++int FindViewRange(const std::vector<ValueRange>& ranges, double value, bool include_first_min) {
++    for (int level = 0; level < ranges.size(); ++level) {
++        const bool above_min = value > ranges[level].min ||
++                               (include_first_min && level == 0 && value == ranges[level].min);
++        if (above_min && value <= ranges[level].max) {
+             return level;
+         }
+     }
+-    return thresholds.empty() ? -1 : 0;
++    return 0;
++}
++
++// FusionLightBrightnesses lists the upper brightness of the default, medium and
++// low brightness segments.
++int FindViewSegment(const FusionConfig& config, int32_t brightness) {
++    if (config.segments.size() != kIrBandCount) {
++        return 0;
++    }
++    if (brightness <= config.segment_brightness[2]) {
++        return 2;
++    }
++    return brightness <= config.segment_brightness[1] ? 1 : 0;
++}
++
++// Stock compares IR ratios and lux in fixed point with 1e-7 resolution.
++int64_t ToFixedPoint(double value) {
++    constexpr double kLimit = 9.2e18;
++    return static_cast<int64_t>(std::clamp(value * 1e7, -kLimit, kLimit));
++}
++
++// The LIR band has no lower bound and the super HIR band no upper bound. Ratios
++// outside every band fall back to LIR.
++int FindIrBand(const std::vector<ValueRange>& thresholds, double ratio) {
++    const int64_t value = ToFixedPoint(ratio);
++    if (value <= ToFixedPoint(thresholds[0].max)) {
++        return 0;
++    }
++    if (value > ToFixedPoint(thresholds[1].min) && value <= ToFixedPoint(thresholds[1].max)) {
++        return 1;
++    }
++    return value > ToFixedPoint(thresholds[2].min) ? 2 : 0;
+ }
+ 
+ int FindChannelPolicy(const FusionConfig& config, const Channels& channels) {
+@@ -83,20 +119,31 @@
+     return level;
+ }
+ 
+-double IrRatio(const Channels& channels) {
+-    if (channels[3] <= 0.0) {
++bool HasAbsoluteIrRatio(int32_t sensor_module_id) {
++    constexpr int32_t kModules[] = {4, 5, 6, 8, 11};
++    return std::find(std::begin(kModules), std::end(kModules), sensor_module_id) !=
++           std::end(kModules);
++}
++
++double IrRatio(const FusionConfig& config, const Channels& channels) {
++    if (ToFixedPoint(channels[3]) <= 0) {
+         return 0.0;
+     }
+-    return std::max((channels[0] + channels[1] + channels[2] - channels[3]) / channels[3] * 0.5,
+-                    0.0);
++    double ratio = (channels[0] + channels[1] + channels[2] - channels[3]) / channels[3] * 0.5;
++    // Stock folds negative view model ratios back for these sensor modules.
++    if (!config.screenshot_v2_1_supported && HasAbsoluteIrRatio(config.sensor_module_id)) {
++        ratio = std::abs(ratio);
++    }
++    return std::max(ratio, 0.0);
++}
++
++double EvaluatePolynomial(const Polynomial& polynomial, double x) {
++    return ((polynomial[0] * x + polynomial[1]) * x + polynomial[2]) * x + polynomial[3];
+ }
+ 
+ std::optional<double> CalculateLux(const FusionConfig& config, const Channels& channels,
+                                    int32_t brightness, bool screen_off) {
+-    const int band = FindIrBand(config.ir_thresholds, IrRatio(channels));
+-    if (band < 0 || band >= kIrBandCount) {
+-        return std::nullopt;
+-    }
++    const int band = FindIrBand(config.ir_thresholds, IrRatio(config, channels));
+ 
+     const std::vector<Channels>* table;
+     int level;
+@@ -110,17 +157,28 @@
+         level = FindChannelPolicy(config, channels);
+         if (level >= 0) {
+             table = &config.channel_count_coefficients[band];
+-        } else {
++        } else if (config.screenshot_v2_1_supported) {
+             table = &config.lux_coefficients[band];
+             level = FindRange(config.ir_brightness, brightness);
++        } else {
++            const auto& segment = config.segments[FindViewSegment(config, brightness)];
++            table = &segment.lux_coefficients[band];
++            level = FindViewRange(segment.ir_brightness, brightness, true);
+         }
+     }
+ 
+     if (level < 0 || level >= table->size()) {
+         return std::nullopt;
+     }
+-    const double lux = channels.dot((*table)[level]);
+-    return std::isfinite(lux) ? std::optional(std::max(lux, 0.0)) : std::nullopt;
++    double lux = channels.dot((*table)[level]);
++    if (!std::isfinite(lux)) {
++        return std::nullopt;
++    }
++    if (!config.screenshot_v2_1_supported &&
++        ToFixedPoint(lux) < ToFixedPoint(config.low_light_accuracy)) {
++        lux = 0.0;
++    }
++    return std::max(lux, 0.0);
+ }
+ 
+ LeakageModel LeakageTerms(double linearity, double r, double g, double b) {
+@@ -165,8 +223,7 @@
+     for (int channel = 0; channel < kChannelCount; ++channel) {
+         const auto& polynomial = config.linearity[level][channel];
+         const double x = brightness;
+-        const double linearity =
+-                ((polynomial[0] * x + polynomial[1]) * x + polynomial[2]) * x + polynomial[3];
++        const double linearity = EvaluatePolynomial(polynomial, x);
+         const auto leakage_basis = LeakageTerms(linearity, sample.r, sample.g, sample.b);
+         const double parameter = config.leakage[level][channel].dot(leakage_basis);
+         const double ratio = config.leakage_ratio[level][channel].dot(ratio_basis);
+@@ -176,6 +233,55 @@
+     return CalculateLux(config, compensated, brightness, false);
+ }
+ 
++Channels CalculateViewLinearity(const FusionConfig& config, int32_t brightness, bool dc_mode) {
++    if (brightness == 0) {
++        return Channels::Zero();
++    }
++    if (dc_mode && !config.fod_linearity_segment_supported) {
++        return config.fod_linearity_constant;
++    }
++    const auto& functions = dc_mode ? config.fod_linearity : config.linearity;
++    int level = FindViewRange(config.linearity_brightness, brightness, false);
++    if (level >= functions.size()) {
++        level = 0;
++    }
++    Channels linearity;
++    for (int channel = 0; channel < kChannelCount; ++channel) {
++        linearity[channel] = EvaluatePolynomial(functions[level][channel], brightness);
++    }
++    return linearity;
++}
++
++std::optional<double> CalculateViewLux(const FusionConfig& config,
++                                       const std::vector<ViewCalibration>& calibration,
++                                       const PendingEvent& pending_event, const CwbSample& sample) {
++    const int32_t brightness = pending_event.brightness;
++    const int segment_index = FindViewSegment(config, brightness);
++    if (segment_index >= calibration.size()) {
++        return std::nullopt;
++    }
++    const auto& segment = config.segments[segment_index];
++    const Eigen::Vector3d screen(sample.r, sample.g, sample.b);
++    const Channels linearity = CalculateViewLinearity(config, brightness, pending_event.dc_mode);
++
++    Channels compensated;
++    for (int channel = 0; channel < kChannelCount; ++channel) {
++        // R, G and B views add their leakage; the white view, driven by the
++        // channel's grey level, removes the overlap between them.
++        double leakage = 0.0;
++        for (int view = 0; view < kChannelCount; ++view) {
++            const bool white = view == kChannelCount - 1;
++            const double x = white ? segment.grey_scale[channel].dot(screen) : screen[view];
++            const double term = EvaluatePolynomial(segment.leakage[channel][view], x) *
++                                calibration[segment_index](channel, view);
++            leakage += white ? -term : term;
++        }
++        leakage = std::max(leakage * linearity[channel], 0.0);
++        compensated[channel] = std::max(pending_event.raw_channels[channel] - leakage, 0.0);
++    }
++    return CalculateLux(config, compensated, brightness, false);
++}
++
+ std::optional<CwbSample> SelectScreenSample(std::chrono::nanoseconds event_time,
+                                             const std::deque<CwbSample>& samples) {
+     for (auto sample = samples.rbegin(); sample != samples.rend(); ++sample) {
+@@ -232,7 +338,10 @@
+     }
+ 
+     void calibrateWithSampleLocked(PendingEvent& pending_event, const CwbSample& sample) {
+-        const auto lux = CalculateCorrectedLux(config, calibration, pending_event, sample);
++        const auto lux =
++                config.screenshot_v2_1_supported
++                        ? CalculateCorrectedLux(config, calibration, pending_event, sample)
++                        : CalculateViewLux(config, view_calibration, pending_event, sample);
+         if (lux.has_value()) {
+             pending_event.event.u.scalar = *lux;
+         } else {
+@@ -302,6 +411,7 @@
+     EmitCallback emit;
+     FusionConfig config;
+     std::vector<Channels> calibration;
++    std::vector<ViewCalibration> view_calibration;
+     std::optional<PendingEvent> waiting_for_sample;
+     std::deque<Event> delivery;
+     std::deque<CwbSample> screen_samples;
+@@ -331,18 +441,24 @@
+ 
+     auto config = profile_sensor_name_.empty() ? std::optional<FusionConfig>{}
+                                                : LoadConfig(profile_sensor_name_);
+-    if (!config.has_value() || !config->cwb_supported || !config->fusion_rgb_supported ||
+-        !config->screenshot_v2_1_supported) {
+-        LOG(WARNING) << "FusionLight V2.1 is disabled or unavailable; passing raw lux";
++    if (!config.has_value() || !config->cwb_supported || !config->fusion_rgb_supported) {
++        LOG(WARNING) << "FusionLight is disabled or unavailable; passing raw lux";
+         return false;
+     }
+ 
+-    std::vector<Channels> calibration = LoadCalibration(*config);
++    std::vector<Channels> calibration;
++    std::vector<ViewCalibration> view_calibration;
++    if (config->screenshot_v2_1_supported) {
++        calibration = LoadCalibration(*config);
++    } else {
++        view_calibration = LoadViewCalibration(*config);
++    }
+     sampler_.setConfig(config->cwb);
+     {
+         std::lock_guard lock(state_->mutex);
+         state_->config = std::move(*config);
+         state_->calibration = std::move(calibration);
++        state_->view_calibration = std::move(view_calibration);
+         state_->available = true;
+     }
+     return true;
+@@ -439,6 +555,8 @@
+         }
+     }
+     const int32_t brightness = event.u.data[3];
++    // Bit 1 of the event flags reports DC dimming.
++    const bool dc_mode = static_cast<int32_t>(event.u.data[2]) & 0x2;
+ 
+     bool available;
+     {
+@@ -493,7 +611,8 @@
+             return;
+         }
+         state_->finishWaitingLocked();
+-        PendingEvent pending_event{std::move(fusion_light_event), raw_channels, brightness};
++        PendingEvent pending_event{std::move(fusion_light_event), raw_channels, brightness,
++                                   dc_mode};
+         if (state_->updateCalibrationLocked(pending_event)) {
+             state_->enqueueDeliveryLocked(std::move(pending_event.event));
+         } else if (state_->cwb_failed) {
+diff --git a/sensors/fusionlight/FusionLightUtils.cpp b/sensors/fusionlight/FusionLightUtils.cpp
+index ef1483b..922a60a 100644
+--- a/sensors/fusionlight/FusionLightUtils.cpp
++++ b/sensors/fusionlight/FusionLightUtils.cpp
+@@ -260,6 +260,206 @@
+     return std::all_of(seen.begin(), seen.end(), [](bool value) { return value; });
+ }
+ 
++template <typename Row, size_t Size>
++bool ParseChannelRows(const Json::Value& array, const char* index_name,
++                      const std::array<const char*, Size>& names,
++                      std::array<Row, kChannelCount>& rows) {
++    static_assert(Row::SizeAtCompileTime == Size);
++    if (!array.isArray() || array.size() != kChannelCount) {
++        return false;
++    }
++    std::array<bool, kChannelCount> seen{};
++    for (const auto& item : array) {
++        int32_t index;
++        if (!ReadRequiredInt(item, index_name, index) || index < 0 || index >= kChannelCount ||
++            seen[index]) {
++            return false;
++        }
++        for (size_t value = 0; value < Size; ++value) {
++            if (!ReadNumber(item[names[value]], rows[index][value])) {
++                return false;
++            }
++        }
++        seen[index] = true;
++    }
++    return true;
++}
++
++bool ParseLinearityFunctions(const Json::Value& array,
++                             std::vector<std::array<Polynomial, kChannelCount>>& functions) {
++    if (!array.isArray() || array.empty()) {
++        return false;
++    }
++
++    int32_t max_function = -1;
++    for (const auto& item : array) {
++        int32_t function;
++        if (!ReadRequiredInt(item, "Function", function) || function < 0) {
++            return false;
++        }
++        max_function = std::max(max_function, function);
++    }
++
++    constexpr std::array<const char*, Polynomial::SizeAtCompileTime> kNames = {
++            "Parameter0", "Parameter1", "Parameter2", "Parameter3"};
++    functions.resize(max_function + 1);
++    std::vector<bool> seen(functions.size());
++    for (const auto& item : array) {
++        int32_t function;
++        if (!ReadRequiredInt(item, "Function", function) || seen[function] ||
++            !ParseChannelRows(item["LinearityParameter"], "Channel", kNames, functions[function])) {
++            return false;
++        }
++        seen[function] = true;
++    }
++    return std::all_of(seen.begin(), seen.end(), [](bool value) { return value; });
++}
++
++bool ParseSegmentBrightness(const Json::Value& array, std::vector<int32_t>& brightness) {
++    brightness.clear();
++    if (array.isNull()) {
++        return true;
++    }
++    if (!array.isArray()) {
++        return false;
++    }
++    brightness.assign(array.size(), 0);
++    std::vector<bool> seen(array.size());
++    for (const auto& item : array) {
++        int32_t level;
++        if (!ReadRequiredInt(item, "Level", level) || level < 0 || level >= array.size() ||
++            seen[level] || !ReadRequiredInt(item, "Brightness", brightness[level])) {
++            return false;
++        }
++        seen[level] = true;
++    }
++    return true;
++}
++
++bool ParseViewSegment(const Json::Value& root, const std::string& prefix, ViewSegment& segment) {
++    constexpr std::array<const char*, kChannelCount> kGoldenNames = {"RGolden", "GGolden",
++                                                                     "BGolden", "WGolden"};
++    constexpr std::array<const char*, GreyScale::SizeAtCompileTime> kGreyNames = {
++            "RGreyscale", "GGreyscale", "BGreyscale"};
++    // Leakage polynomials list the highest-order coefficient last.
++    constexpr std::array<const char*, Polynomial::SizeAtCompileTime> kLeakageNames = {
++            "Parameter3", "Parameter2", "Parameter1", "Parameter0"};
++    constexpr std::array<const char*, kChannelCount> kLeakageTables = {
++            "RParameters", "GParameters", "BParameters", "CParameters"};
++    constexpr std::array<const char*, kIrBandCount> kLuxTables = {"LuxCoeffLIR", "LuxCoeffHIR",
++                                                                  "LuxCoeffSuperHIR"};
++
++    if (!ParseChannelRows(root[prefix + "Golden"], "Channel", kGoldenNames, segment.golden) ||
++        !ParseChannelRows(root[prefix + "GreyScale"], "Channel", kGreyNames, segment.grey_scale) ||
++        !ParseRanges(root[prefix + "IRBrightness"], "BrightnessMin", "BrightnessMax",
++                     segment.ir_brightness)) {
++        return false;
++    }
++    for (int channel = 0; channel < kChannelCount; ++channel) {
++        if (!ParseChannelRows(root[prefix + kLeakageTables[channel]], "Color", kLeakageNames,
++                              segment.leakage[channel])) {
++            return false;
++        }
++    }
++    for (int band = 0; band < kIrBandCount; ++band) {
++        if (!ParseLuxCoefficients(root[prefix + kLuxTables[band]],
++                                  segment.lux_coefficients[band]) ||
++            segment.lux_coefficients[band].size() < segment.ir_brightness.size()) {
++            return false;
++        }
++    }
++    return true;
++}
++
++bool ParseV21Model(const Json::Value& root, FusionConfig& config, std::string& error) {
++    if (!ParseRanges(root["LinearityBrightnessRange"], "BrightnessMin", "BrightnessMax",
++                     config.linearity_brightness) ||
++        !ParseRanges(root["IRBrightness_V2_1"], "BrightnessMin", "BrightnessMax",
++                     config.ir_brightness) ||
++        !ParseRanges(root["IRThreshold_V2_1"], "IR_Ratio_Min", "IR_Ratio_Max",
++                     config.ir_thresholds) ||
++        !ParseChannelModels(root["LinearityCompensation"], config.linearity) ||
++        !ParseChannelModels(root["LightLeakageCalculation"], config.leakage) ||
++        !ParseChannelModels(root["LightLeakageRatio"], config.leakage_ratio) ||
++        !ParseGolden(root["LightLeakageGolden"], config.leakage_golden)) {
++        error = "invalid V2.1 model";
++        return false;
++    }
++
++    constexpr std::array<const char*, kIrBandCount> kDefaultTables = {
++            "LuxCoeffLIR_V2_1", "LuxCoeffHIR_V2_1", "LuxCoeffSuperHIR_V2_1"};
++    for (int band = 0; band < kIrBandCount; ++band) {
++        if (!ParseLuxCoefficients(root[kDefaultTables[band]], config.lux_coefficients[band])) {
++            error = "invalid normal lux coefficient table";
++            return false;
++        }
++    }
++
++    const size_t levels = config.linearity_brightness.size();
++    if (config.linearity.size() != levels || config.leakage.size() != levels ||
++        config.leakage_ratio.size() != levels || config.leakage_golden.size() != levels ||
++        config.ir_brightness.empty()) {
++        error = "inconsistent V2.1 model dimensions";
++        return false;
++    }
++    for (int band = 0; band < kIrBandCount; ++band) {
++        if (config.lux_coefficients[band].size() < config.ir_brightness.size()) {
++            error = "coefficient table does not cover its selector";
++            return false;
++        }
++    }
++    return true;
++}
++
++bool ParseViewModel(const Json::Value& root, FusionConfig& config, std::string& error) {
++    const auto& common = root["CommonConfig"];
++    int32_t ir_ratio_formula = 0;
++    if (common.isMember("IRRatioFormulaType") &&
++        !ReadInt(common["IRRatioFormulaType"], ir_ratio_formula)) {
++        error = "invalid IRRatioFormulaType";
++        return false;
++    }
++    if (ir_ratio_formula != 0) {
++        error = "unsupported IR ratio formula " + std::to_string(ir_ratio_formula);
++        return false;
++    }
++
++    if (!ParseRanges(root["LinearityBrightnessRange"], "BrightnessMin", "BrightnessMax",
++                     config.linearity_brightness) ||
++        !ParseRanges(root["IRThreshold"], "IR_Ratio_Min", "IR_Ratio_Max", config.ir_thresholds) ||
++        !ParseLinearityFunctions(root["Linearity"], config.linearity) ||
++        (config.fod_linearity_segment_supported &&
++         !ParseLinearityFunctions(root["LinearityForFODSegment"], config.fod_linearity)) ||
++        !ParseSegmentBrightness(root["FusionLightBrightnesses"], config.segment_brightness)) {
++        error = "invalid linearity model";
++        return false;
++    }
++
++    const auto& fod = root["LinearityForFOD"];
++    constexpr const char* kFodNames[] = {"FOD_Linearity_R", "FOD_Linearity_G", "FOD_Linearity_B",
++                                         "FOD_Linearity_C"};
++    for (int channel = 0; channel < kChannelCount && !fod.isNull(); ++channel) {
++        if (!ReadNumber(fod[kFodNames[channel]], config.fod_linearity_constant[channel])) {
++            error = "invalid LinearityForFOD";
++            return false;
++        }
++    }
++
++    // The low and medium brightness models are only used with three segments.
++    const std::vector<std::string> prefixes = config.segment_brightness.size() == kIrBandCount
++                                                      ? std::vector<std::string>{"", "M_", "L_"}
++                                                      : std::vector<std::string>{""};
++    config.segments.resize(prefixes.size());
++    for (int segment = 0; segment < prefixes.size(); ++segment) {
++        if (!ParseViewSegment(root, prefixes[segment], config.segments[segment])) {
++            error = "invalid " + (prefixes[segment].empty() ? "default" : prefixes[segment]) +
++                    " screen leakage model";
++            return false;
++        }
++    }
++    return true;
++}
++
+ bool ParseConfig(std::istream& stream, FusionConfig& config, std::string& error) {
+     Json::CharReaderBuilder builder;
+     builder["collectComments"] = false;
+@@ -278,7 +478,11 @@
+         !ReadRequiredInt(crop, "RightBottomY", config.cwb.crop_bottom) ||
+         !ReadRequiredInt(resolution, "Width", config.cwb.reference_width) ||
+         !ReadRequiredInt(resolution, "Height", config.cwb.reference_height) ||
+-        !ReadRequiredDuration(common, "CWBScreenshotPeriod", config.cwb.screenshot_period)) {
++        !ReadRequiredDuration(common, "CWBScreenshotPeriod", config.cwb.screenshot_period) ||
++        (common.isMember("LowLightAccuracy") &&
++         !ReadNumber(common["LowLightAccuracy"], config.low_light_accuracy)) ||
++        (common["SensorModule"].isMember("SensorModuleId") &&
++         !ReadInt(common["SensorModule"]["SensorModuleId"], config.sensor_module_id))) {
+         error = "invalid CommonConfig";
+         return false;
+     }
+@@ -289,33 +493,19 @@
+     config.screenshot_v2_1_supported = common["SupportScreenshotAlgorithm_V2_1"].asBool();
+     config.screen_off_lux_supported = common["ScreenOffCalLuxSupported"].asBool();
+     config.channel_count_policy_supported = common["ChannelCountPolicySupported"].asBool();
++    config.fod_linearity_segment_supported = common["FODLinearityParasSegmentSupported"].asBool();
+ 
+-    if (!ParseRanges(root["LinearityBrightnessRange"], "BrightnessMin", "BrightnessMax",
+-                     config.linearity_brightness) ||
+-        !ParseRanges(root["IRBrightness_V2_1"], "BrightnessMin", "BrightnessMax",
+-                     config.ir_brightness) ||
+-        !ParseRanges(root["IRThreshold_V2_1"], "IR_Ratio_Min", "IR_Ratio_Max",
+-                     config.ir_thresholds) ||
+-        !ParseChannelModels(root["LinearityCompensation"], config.linearity) ||
+-        !ParseChannelModels(root["LightLeakageCalculation"], config.leakage) ||
+-        !ParseChannelModels(root["LightLeakageRatio"], config.leakage_ratio) ||
+-        !ParseGolden(root["LightLeakageGolden"], config.leakage_golden)) {
+-        error = "invalid V2.1 model";
++    if (config.screenshot_v2_1_supported ? !ParseV21Model(root, config, error)
++                                         : !ParseViewModel(root, config, error)) {
+         return false;
+     }
+ 
+-    constexpr std::array<const char*, kIrBandCount> kDefaultTables = {
+-            "LuxCoeffLIR_V2_1", "LuxCoeffHIR_V2_1", "LuxCoeffSuperHIR_V2_1"};
+     constexpr std::array<const char*, kIrBandCount> kCountTables = {
+             "LuxCoeffLirChCountPolicy", "LuxCoeffHirChCountPolicy",
+             "LuxCoeffSuperHirChCountPolicy"};
+     constexpr std::array<const char*, kIrBandCount> kScreenOffTables = {
+             "LuxCoeffLirScreenOff", "LuxCoeffHirScreenOff", "LuxCoeffSuperHirScreenOff"};
+     for (int band = 0; band < kIrBandCount; ++band) {
+-        if (!ParseLuxCoefficients(root[kDefaultTables[band]], config.lux_coefficients[band])) {
+-            error = "invalid normal lux coefficient table";
+-            return false;
+-        }
+         if (config.channel_count_policy_supported &&
+             !ParseLuxCoefficients(root[kCountTables[band]],
+                                   config.channel_count_coefficients[band])) {
+@@ -341,10 +531,7 @@
+         return false;
+     }
+ 
+-    const size_t levels = config.linearity_brightness.size();
+-    if (levels == 0 || config.linearity.size() != levels || config.leakage.size() != levels ||
+-        config.leakage_ratio.size() != levels || config.leakage_golden.size() != levels ||
+-        config.ir_thresholds.size() != kIrBandCount || config.ir_brightness.empty() ||
++    if (config.linearity_brightness.empty() || config.ir_thresholds.size() != kIrBandCount ||
+         config.cwb.crop_left < 0 || config.cwb.crop_top < 0 ||
+         config.cwb.crop_right <= config.cwb.crop_left ||
+         config.cwb.crop_bottom <= config.cwb.crop_top ||
+@@ -355,8 +542,7 @@
+         return false;
+     }
+     for (int band = 0; band < kIrBandCount; ++band) {
+-        if (config.lux_coefficients[band].size() < config.ir_brightness.size() ||
+-            (config.channel_count_policy_supported &&
++        if ((config.channel_count_policy_supported &&
+              config.channel_count_coefficients[band].size() < config.channel_thresholds.size()) ||
+             (config.screen_off_lux_supported &&
+              config.screen_off_coefficients[band].size() < config.c_zero_thresholds.size())) {
+@@ -582,7 +768,7 @@
+     const int32_t module_id = GetFusionSensorModuleId(sensor_name);
+     const auto path = FindProfilePath(panel->panel_id, module_id, panel->panel_stage);
+     if (!path.has_value()) {
+-        LOG(ERROR) << "FusionLight V2.1 profile was not found for panel " << panel->panel_id
++        LOG(ERROR) << "FusionLight profile was not found for panel " << panel->panel_id
+                    << ", sensor module " << module_id << ", stage " << panel->panel_stage;
+         return std::nullopt;
+     }
+@@ -593,13 +779,16 @@
+         return std::nullopt;
+     }
+     FusionConfig config;
++    // Stock uses the SensorModuleId from the profile, when it has one.
++    config.sensor_module_id = module_id;
+     std::string error;
+     if (!ParseConfig(stream, config, error)) {
+         LOG(ERROR) << "Invalid FusionLight profile " << *path << ": " << error;
+         return std::nullopt;
+     }
+     LoadCwbWeights(config.cwb);
+-    LOG(INFO) << "Loaded FusionLight V2.1 profile from " << *path;
++    LOG(INFO) << "Loaded FusionLight " << (config.screenshot_v2_1_supported ? "V2.1" : "view")
++              << " profile from " << *path;
+     return config;
+ }
+ 
+@@ -656,6 +845,92 @@
+     return calibration;
+ }
+ 
++std::vector<ViewCalibration> LoadViewCalibration(const FusionConfig& config) {
++    std::vector<ViewCalibration> calibration(config.segments.size(), ViewCalibration::Ones());
++    const auto service = GetService<ISensorFeature>();
++    if (service == nullptr) {
++        LOG(WARNING) << "ISensorFeature is unavailable; using unit FusionLight calibration";
++        return calibration;
++    }
++
++    std::string response;
++    const auto status = service->getSensorCalibrationData(kHighPwmSensorType, &response);
++    if (!status.isOk()) {
++        LOG(WARNING) << "ISensorFeature::getSensorCalibrationData failed: "
++                     << status.getDescription() << "; using unit FusionLight calibration";
++        return calibration;
++    }
++    LOG(INFO) << "ISensorFeature::getSensorCalibrationData returned " << response.size()
++              << " bytes: " << response;
++    if (response.empty() || response == "default") {
++        LOG(WARNING) << "No device FusionLight calibration; using unit calibration";
++        return calibration;
++    }
++
++    Json::CharReaderBuilder builder;
++    builder["collectComments"] = false;
++    std::istringstream stream(response);
++    Json::Value root;
++    std::string error;
++    if (!Json::parseFromStream(builder, stream, &root, &error)) {
++        LOG(WARNING) << "Invalid device FusionLight calibration: " << error;
++        return calibration;
++    }
++
++    // Measured leakage is indexed by screen view, then by sensor channel.
++    constexpr const char* kNames[] = {"R", "G", "B", "C"};
++    constexpr const char* kViews[] = {"R", "G", "B", "W"};
++    constexpr const char* kSuffixes[] = {"", "_M", "_L"};
++    std::vector<ViewCalibration> leakage(config.segments.size());
++    for (int segment = 0; segment < leakage.size(); ++segment) {
++        for (int view = 0; view < kChannelCount; ++view) {
++            for (int channel = 0; channel < kChannelCount; ++channel) {
++                const std::string key = std::string(kViews[view]) + "_VIEW_" + kNames[channel] +
++                                        "_MAX" + kSuffixes[segment];
++                const Json::Value* value = FindMember(root, key);
++                if (value == nullptr || !ReadNumber(*value, leakage[segment](view, channel))) {
++                    LOG(WARNING) << "Missing device FusionLight calibration value " << key
++                                 << "; using unit calibration";
++                    return calibration;
++                }
++            }
++        }
++    }
++
++    for (int segment = 0; segment < calibration.size(); ++segment) {
++        const auto& golden = config.segments[segment].golden;
++        const auto& measured = leakage[segment];
++        for (int channel = 0; channel < kChannelCount; ++channel) {
++            double measured_sum = 0.0;
++            double golden_sum = 0.0;
++            for (int view = 0; view < kChannelCount - 1; ++view) {
++                calibration[segment](channel, view) =
++                        measured(view, channel) / golden[channel][view];
++                measured_sum += measured(view, channel);
++                golden_sum += golden[channel][view];
++            }
++            // The white view is calibrated from what the color views leave unexplained.
++            double golden_white = golden_sum - golden[channel][kChannelCount - 1];
++            if (std::abs(golden_white) < 1e-7) {
++                golden_white = 1.0;
++            }
++            calibration[segment](channel, kChannelCount - 1) =
++                    (measured_sum - measured(kChannelCount - 1, channel)) / golden_white;
++        }
++        // Stock leaves unmeasured entries at unity, indexing them as measured.
++        for (int row = 0; row < kChannelCount; ++row) {
++            for (int column = 0; column < kChannelCount; ++column) {
++                if (std::abs(measured(row, column)) < 1e-7) {
++                    calibration[segment](row, column) = 1.0;
++                }
++            }
++        }
++    }
++    LOG(INFO) << "Applied FusionLight view calibration for " << calibration.size()
++              << " brightness segments";
++    return calibration;
++}
++
+ }  // namespace fusionlight
+ }  // namespace implementation
+ }  // namespace subhal
+diff --git a/sensors/fusionlight/FusionLightUtils.h b/sensors/fusionlight/FusionLightUtils.h
+index f8c88a7..ba39c23 100644
+--- a/sensors/fusionlight/FusionLightUtils.h
++++ b/sensors/fusionlight/FusionLightUtils.h
+@@ -27,6 +27,9 @@
+ using Polynomial = Eigen::Vector4d;
+ using LeakageModel = Eigen::Matrix<double, kLeakageTermCount, 1>;
+ using RatioModel = Eigen::Matrix<double, kRatioTermCount, 1>;
++using GreyScale = Eigen::Vector3d;
++// Rows are sensor channels, columns are the R/G/B/W screen views.
++using ViewCalibration = Eigen::Matrix4d;
+ 
+ struct ValueRange {
+     double min = 0.0;
+@@ -45,12 +48,26 @@
+     std::vector<int32_t> weights;
+ };
+ 
++// Pre-V2.1 model for one FusionLightBrightnesses segment.
++struct ViewSegment {
++    std::vector<ValueRange> ir_brightness;
++    std::array<std::vector<Channels>, kIrBandCount> lux_coefficients;
++    // Indexed by sensor channel, then by R/G/B/W screen view.
++    std::array<Channels, kChannelCount> golden;
++    std::array<GreyScale, kChannelCount> grey_scale;
++    std::array<std::array<Polynomial, kChannelCount>, kChannelCount> leakage;
++};
++
+ struct FusionConfig {
++    int32_t sensor_module_id = 0;
++    double low_light_accuracy = 0.0;
++
+     bool fusion_rgb_supported = false;
+     bool cwb_supported = false;
+     bool screenshot_v2_1_supported = false;
+     bool screen_off_lux_supported = false;
+     bool channel_count_policy_supported = false;
++    bool fod_linearity_segment_supported = false;
+ 
+     CwbConfig cwb;
+ 
+@@ -67,10 +84,16 @@
+     std::array<std::vector<Channels>, kIrBandCount> screen_off_coefficients;
+     std::vector<ChannelLimits> channel_thresholds;
+     std::vector<double> c_zero_thresholds;
++
++    std::vector<int32_t> segment_brightness;
++    std::vector<ViewSegment> segments;
++    std::vector<std::array<Polynomial, kChannelCount>> fod_linearity;
++    Channels fod_linearity_constant = Channels::Zero();
+ };
+ 
+ std::optional<FusionConfig> LoadConfig(const std::string& sensor_name);
+ std::vector<Channels> LoadCalibration(const FusionConfig& config);
++std::vector<ViewCalibration> LoadViewCalibration(const FusionConfig& config);
+ 
+ template <typename Interface>
+ std::shared_ptr<Interface> GetService() {

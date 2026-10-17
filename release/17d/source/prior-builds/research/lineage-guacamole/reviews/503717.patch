@@ -1,0 +1,117 @@
+From 45dc00e20ba4ee560a1dabd60b72e5a788747aec Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Sun, 20 Sep 2026 11:12:54 +0200
+Subject: [PATCH] Twelve: Refactor navbar fragment handling
+
+Change-Id: I42efc7c00aad4e177860ef29744ff4590ec6bb48
+---
+
+diff --git a/app/src/main/java/org/lineageos/twelve/fragments/MainFragment.kt b/app/src/main/java/org/lineageos/twelve/fragments/MainFragment.kt
+index ea2fa58..b84f5ef 100644
+--- a/app/src/main/java/org/lineageos/twelve/fragments/MainFragment.kt
++++ b/app/src/main/java/org/lineageos/twelve/fragments/MainFragment.kt
+@@ -13,10 +13,10 @@
+ import android.widget.LinearLayout
+ import androidx.activity.BackEventCompat
+ import androidx.activity.OnBackPressedCallback
++import androidx.annotation.IdRes
+ import androidx.core.graphics.Insets
+ import androidx.core.view.ViewCompat
+ import androidx.core.view.WindowInsetsCompat
+-import androidx.core.view.get
+ import androidx.core.view.isVisible
+ import androidx.core.widget.addTextChangedListener
+ import androidx.fragment.app.Fragment
+@@ -84,24 +84,6 @@
+     private val inputMethodManager: InputMethodManager
+         get() = requireContext().getSystemService(InputMethodManager::class.java)
+ 
+-    // ViewPager2
+-    private val onPageChangeCallback by lazy {
+-        object : ViewPager2.OnPageChangeCallback() {
+-            override fun onPageSelected(position: Int) {
+-                super.onPageSelected(position)
+-
+-                var offset = 0
+-
+-                // Search button
+-                if (position >= 1) {
+-                    offset += 1
+-                }
+-
+-                navigationBarView.menu[position + offset].isChecked = true
+-            }
+-        }
+-    }
+-
+     // RecyclerView
+     private val searchAdapter by lazy {
+         object : SimpleListAdapter<MediaItem<*>, ListItem>(
+@@ -351,30 +333,24 @@
+         // View pager
+         viewPager2.isUserInputEnabled = false
+         viewPager2.adapter = object : FragmentStateAdapter(this) {
+-            override fun getItemCount() = fragments.size
+-            override fun createFragment(position: Int) = fragments[position]()
++            override fun getItemCount() = Page.entries.size
++            override fun createFragment(position: Int) = Page.entries[position].createFragment()
+         }
+-        viewPager2.offscreenPageLimit = fragments.size
+-        viewPager2.registerOnPageChangeCallback(onPageChangeCallback)
++        viewPager2.offscreenPageLimit = Page.entries.size
+ 
+         navigationBarView.setOnItemSelectedListener { item ->
+-            when (item.itemId) {
+-                R.id.activityFragment -> {
+-                    viewPager2.currentItem = 0
+-                    true
+-                }
++            if (item.itemId == R.id.searchFragment) {
++                searchView.show()
++                return@setOnItemSelectedListener false
++            }
+ 
+-                R.id.searchFragment -> {
+-                    searchView.show()
+-                    false
+-                }
++            val index = Page.entries.indexOfFirst { it.menuItemId == item.itemId }
+ 
+-                R.id.libraryFragment -> {
+-                    viewPager2.currentItem = 1
+-                    true
+-                }
+-
+-                else -> false
++            if (index >= 0) {
++                viewPager2.currentItem = index
++                true
++            } else {
++                false
+             }
+         }
+ 
+@@ -452,15 +428,17 @@
+         super.onDestroyView()
+     }
+ 
++    private enum class Page(
++        @param:IdRes val menuItemId: Int,
++        val createFragment: () -> Fragment,
++    ) {
++        ACTIVITY(R.id.activityFragment, ::ActivityFragment),
++        LIBRARY(R.id.libraryFragment, ::LibraryFragment),
++    }
++
+     companion object {
+         private val LOG_TAG = MainFragment::class.simpleName!!
+ 
+-        // Keep in sync with the BottomNavigationView menu
+-        private val fragments = arrayOf(
+-            { ActivityFragment() },
+-            { LibraryFragment() },
+-        )
+-
+         private val searchDiffCallback = object : DiffUtil.ItemCallback<MediaItem<*>>() {
+             override fun areItemsTheSame(
+                 oldItem: MediaItem<*>,

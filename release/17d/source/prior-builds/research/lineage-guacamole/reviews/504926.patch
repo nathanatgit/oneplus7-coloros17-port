@@ -1,0 +1,33 @@
+From e64e4b6798159b5dfc9e245e2dcafec335439171 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sat, 26 Sep 2026 02:28:13 +0100
+Subject: [PATCH] lineage: res: Add missing mapping for Prime Video
+
+Prime Video only exposes a leanback launcher activity, which cannot be
+resolved through the regular package launch intent. Target its
+IgnitionActivity explicitly so the dedicated remote key opens the app.
+
+Requires: I38d82c493cd6220c60a647b3da781884ff6b2a08
+Change-Id: I380b3e236aab7ec780d4b488d68195d691989b62
+---
+
+diff --git a/lineage/res/res/values/arrays.xml b/lineage/res/res/values/arrays.xml
+index e6ebafd..647d54e 100644
+--- a/lineage/res/res/values/arrays.xml
++++ b/lineage/res/res/values/arrays.xml
+@@ -86,6 +86,7 @@
+         <item>176</item> <!-- KEYCODE_SETTINGS -->
+         <item>190</item> <!-- KEYCODE_BUTTON_3 -->
+         <item>191</item> <!-- KEYCODE_BUTTON_4 -->
++        <item>192</item> <!-- KEYCODE_BUTTON_5 -->
+         <item>193</item> <!-- KEYCODE_BUTTON_6 -->
+         <item>194</item> <!-- KEYCODE_BUTTON_7 -->
+         <item>195</item> <!-- KEYCODE_BUTTON_8 -->
+@@ -99,6 +100,7 @@
+         <item>android.settings.SETTINGS</item> <!-- This is an intent -->
+         <item>com.google.android.youtube.tv</item>
+         <item>com.netflix.ninja</item>
++        <item>com.amazon.amazonvideo.livingroom/com.amazon.ignition.IgnitionActivity</item>
+         <item>com.disney.disneyplus</item>
+         <item>com.hbo.hbonow</item>
+         <item>com.android.vending</item>

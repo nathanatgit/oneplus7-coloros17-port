@@ -1,0 +1,148 @@
+From 3372ec9801b0b29d1d414a751c31325ec41abb16 Mon Sep 17 00:00:00 2001
+From: chandu078 <chandudyavanapelli03@gmail.com>
+Date: Sun, 27 Sep 2026 19:48:41 +0000
+Subject: [PATCH] SystemUI: Preserve pure black theme preference
+
+Use the saved preference when applying the black overlay so it
+remains enabled even when no new overlays need to be created.
+
+Assisted-by: LLM
+Change-Id: I1b417835fb6b26b62eaf4f256be2148e4d153bc0
+---
+
+diff --git a/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayApplier.java b/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayApplier.java
+index fe928c3..5f0c55e 100644
+--- a/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayApplier.java
++++ b/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayApplier.java
+@@ -198,18 +198,18 @@
+      * @param currentUser Current User ID
+      * @param managedProfiles Profiles get overlays
+      * @param onComplete Callback for when resources are ready. Runs in the main thread.
++     * @param useBlackTheme Whether the pure-black overlay should be enabled
+      */
+     public void applyCurrentUserOverlays(
+             Map<String, OverlayIdentifier> categoryToPackage,
+             FabricatedOverlay[] pendingCreation,
+             int currentUser,
+             Set<UserHandle> managedProfiles,
+-            Runnable onComplete
++            Runnable onComplete,
++            boolean useBlackTheme
+     ) {
+ 
+         mBgExecutor.execute(() -> {
+-            boolean isBlackMode = false;
+-
+             // Disable all overlays that have not been specified in the user setting.
+             final Set<String> overlayCategoriesToDisable = new HashSet<>(THEME_CATEGORIES);
+             final Set<String> targetPackagesToQuery = overlayCategoriesToDisable.stream()
+@@ -232,7 +232,6 @@
+             OverlayManagerTransaction.Builder transaction = getTransactionBuilder();
+             HashSet<OverlayIdentifier> identifiersPending = new HashSet<>();
+             if (pendingCreation != null) {
+-                isBlackMode = pendingCreation.length == 2;
+                 for (FabricatedOverlay overlay : pendingCreation) {
+                     identifiersPending.add(overlay.getIdentifier());
+                     transaction.registerFabricatedOverlay(overlay);
+@@ -253,6 +252,11 @@
+                 }
+             }
+ 
++            // Apply the night-only black overlay after the neutral palette.
++            setEnabled(transaction, new OverlayIdentifier(OVERLAY_BLACK_THEME),
++                    OVERLAY_CATEGORY_SYSTEM_PALETTE, currentUser, managedProfiles,
++                    useBlackTheme, false);
++
+             try {
+                 mOverlayManager.commit(transaction.build());
+                 if (onComplete != null) {
+@@ -262,45 +266,9 @@
+             } catch (SecurityException | IllegalStateException e) {
+                 Log.e(TAG, "setEnabled failed", e);
+             }
+-
+-            checkDarkUserOverlays(currentUser, onComplete, isBlackMode);
+         });
+     }
+ 
+-    private void checkDarkUserOverlays(int currentUser, Runnable onComplete, boolean isBlackMode) {
+-        OverlayManagerTransaction.Builder transaction = getTransactionBuilder();
+-        try {
+-            transaction.setEnabled(getOverlayID(OVERLAY_BLACK_THEME), isBlackMode, currentUser);
+-            transaction.setEnabled(getOverlayID("android:neutral"), !isBlackMode, currentUser);
+-            mOverlayManager.commit(transaction.build());
+-            if (onComplete != null) {
+-                Log.d(TAG, "Executing onComplete runnable");
+-                mMainExecutor.execute(onComplete);
+-            }
+-        } catch (SecurityException | IllegalStateException e) {
+-            Log.e(TAG, "setEnabled failed", e);
+-        }
+-    }
+-
+-    private OverlayIdentifier getOverlayID(String name) throws IllegalStateException {
+-        if (name.contains(":")) {
+-            final String[] value = name.split(":");
+-            final String pkgName = value[0];
+-            final String overlayName = value[1];
+-            final List<OverlayInfo> infos =
+-                    mOverlayManager.getOverlayInfosForTarget(pkgName, UserHandle.CURRENT);
+-            for (OverlayInfo info : infos) {
+-                if (overlayName.equals(info.getOverlayName()))
+-                    return info.getOverlayIdentifier();
+-            }
+-            throw new IllegalStateException("No overlay found for " + name);
+-        }
+-        OverlayInfo overlayInfo = mOverlayManager.getOverlayInfo(name, UserHandle.CURRENT);
+-        if (overlayInfo != null)
+-            return overlayInfo.getOverlayIdentifier();
+-        throw new IllegalStateException("No overlay found for " + name);
+-    }
+-
+     @VisibleForTesting
+     protected OverlayManagerTransaction.Builder getTransactionBuilder() {
+         return new OverlayManagerTransaction.Builder();
+diff --git a/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayController.java b/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayController.java
+index a60d937..ea7a192 100644
+--- a/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayController.java
++++ b/packages/SystemUI/src/com/android/systemui/theme/ThemeOverlayController.java
+@@ -835,14 +835,14 @@
+             }
+         }
+ 
+-        boolean isBlackMode = (LineageSettings.Secure.getIntForUser(
++        final boolean useBlackTheme = LineageSettings.Secure.getIntForUser(
+                 mContext.getContentResolver(), LineageSettings.Secure.BERRY_BLACK_THEME,
+-                0, currentUser) == 1) && isNightMode();
++                0, currentUser) == 1;
+ 
+         // Compatibility with legacy themes, where full packages were defined, instead of just
+         // colors.
+         if (!categoryToPackage.containsKey(OVERLAY_CATEGORY_SYSTEM_PALETTE)
+-                && mNeutralOverlay != null && !isBlackMode) {
++                && mNeutralOverlay != null) {
+             categoryToPackage.put(OVERLAY_CATEGORY_SYSTEM_PALETTE,
+                     mNeutralOverlay.getIdentifier());
+         }
+@@ -878,17 +878,13 @@
+ 
+         if (mNeedsOverlayCreation) {
+             mNeedsOverlayCreation = false;
+-            fOverlays = new FabricatedOverlay[isBlackMode ? 2 : 3];
+-            int c = 0;
+-            fOverlays[c++] = mAccentOverlay;
+-            if (!isBlackMode) {
+-                fOverlays[c++] = mNeutralOverlay;
+-            }
+-            fOverlays[c++] = mDynamicOverlay;
++            fOverlays = new FabricatedOverlay[] {
++                    mAccentOverlay, mNeutralOverlay, mDynamicOverlay
++            };
+         }
+ 
+         mThemeManager.applyCurrentUserOverlays(categoryToPackage, fOverlays, currentUser,
+-                managedProfiles, onCompleteCallback);
++                managedProfiles, onCompleteCallback, useBlackTheme);
+ 
+     }
+ 

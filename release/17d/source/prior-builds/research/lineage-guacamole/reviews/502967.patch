@@ -1,0 +1,57 @@
+From 153847a298160cbf10c50bdbcdfbc956ae9400c9 Mon Sep 17 00:00:00 2001
+From: Luca Stefani <luca.stefani.ge1@gmail.com>
+Date: Tue, 15 Sep 2026 09:38:37 +0200
+Subject: [PATCH] ExactCalculator: Add REUSE to gerrit checks
+
+Change-Id: I39ba2648644470dbd765bfb9c26906286f6217a2
+---
+
+diff --git a/.github/workflows/gerrit.yml b/.github/workflows/gerrit.yml
+index 4a6c449..150cfb0 100644
+--- a/.github/workflows/gerrit.yml
++++ b/.github/workflows/gerrit.yml
+@@ -22,6 +22,9 @@
+     - name: Build
+       uses: ./.github/workflows/build
+ 
++    - name: REUSE lint
++      uses: ./.github/workflows/reuse
++
+     - uses: lineageos-infra/gerrit-vote@main
+       if: always()
+       with:
+diff --git a/.github/workflows/reuse/action.yml b/.github/workflows/reuse/action.yml
+new file mode 100644
+index 0000000..4222771
+--- /dev/null
++++ b/.github/workflows/reuse/action.yml
+@@ -0,0 +1,19 @@
++name: reuse
++
++runs:
++  using: composite
++
++  steps:
++    - name: Setup Python
++      uses: actions/setup-python@v7
++      with:
++        python-version: '>=3.10'
++        cache: 'pip'
++
++    - name: Install reuse
++      shell: bash
++      run: pip install -r requirements.txt
++
++    - name: Run reuse lint
++      shell: bash
++      run: reuse lint
+diff --git a/requirements.txt b/requirements.txt
+new file mode 100644
+index 0000000..87a2147
+--- /dev/null
++++ b/requirements.txt
+@@ -0,0 +1,4 @@
++# SPDX-FileCopyrightText: The LineageOS Project
++# SPDX-License-Identifier: Apache-2.0
++
++reuse

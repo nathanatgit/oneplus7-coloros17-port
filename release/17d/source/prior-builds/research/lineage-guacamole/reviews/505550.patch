@@ -1,0 +1,34 @@
+From 7c6bd7e33f9d8baba1eaae3c82c0aa1896443677 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Wed, 30 Sep 2026 14:43:42 +0530
+Subject: [PATCH] Launcher3: Start-align the SUW back nav on expressive
+
+Change-Id: I1cb56d9eff218289509caeca37280d66c599eefe
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/quickstep/src/com/android/launcher3/taskbar/navbutton/SetupNavLayoutter.kt b/quickstep/src/com/android/launcher3/taskbar/navbutton/SetupNavLayoutter.kt
+index 53ffccb..5748ee0 100644
+--- a/quickstep/src/com/android/launcher3/taskbar/navbutton/SetupNavLayoutter.kt
++++ b/quickstep/src/com/android/launcher3/taskbar/navbutton/SetupNavLayoutter.kt
+@@ -69,9 +69,6 @@
+         val SUWTheme = SystemProperties.get(SUW_THEME_SYSTEM_PROPERTY, "")
+         val expressiveThemeEnabled =
+             SUWTheme == GLIF_EXPRESSIVE_THEME || SUWTheme == GLIF_EXPRESSIVE_LIGHT_THEME
+-        if (expressiveThemeEnabled && !context.isSimpleViewEnabled) {
+-            return
+-        }
+         // Since setup wizard only has back button enabled, it looks strange to be
+         // end-aligned, so start-align instead.
+         val navButtonsLayoutParams = navButtonContainer.layoutParams as FrameLayout.LayoutParams
+@@ -98,6 +95,10 @@
+         mNearestTouchFrame.layoutParams = navButtonsOverallViewGroupLayoutParams
+         navButtonContainer.layoutParams = navButtonsLayoutParams
+ 
++        if (expressiveThemeEnabled && !context.isSimpleViewEnabled) {
++            return
++        }
++
+         endContextualContainer.removeAllViews()
+         startContextualContainer.removeAllViews()
+ 

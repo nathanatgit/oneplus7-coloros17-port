@@ -1,0 +1,25 @@
+From d4d3e68c1035aa29f57607c3c3d7e79966c179fd Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Sat, 07 Mar 2026 05:18:31 +0530
+Subject: [PATCH] SUW: Fully kotlin :)
+
+Change-Id: I57bc34bcc416939c186a5a1717dcc8024aece7ae
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/Android.bp b/app/Android.bp
+index fa3f16d..0c802c1 100644
+--- a/app/Android.bp
++++ b/app/Android.bp
+@@ -6,10 +6,7 @@
+ android_app {
+     name: "LineageSetupWizard",
+ 
+-    srcs: [
+-        "src/main/java/**/*.java",
+-        "src/main/java/**/*.kt",
+-    ],
++    srcs: ["src/main/java/**/*.kt"],
+     resource_dirs: ["src/main/res"],
+     manifest: "src/main/AndroidManifest.xml",
+ 

@@ -1,0 +1,25 @@
+From 8e74530186f555d7f4802a579e901535d9f0968f Mon Sep 17 00:00:00 2001
+From: Khargosxh18 <khargosxh18@gmail.com>
+Date: Sat, 19 Sep 2026 18:46:57 +0530
+Subject: [PATCH] power-libperfmgr: Add readproc group to service
+
+Required to read thread metrics from /proc under hidepid=2
+during ADPF hint sessions.
+
+Change-Id: I4cc7956902fab202c2c7f3c5ab57c790e1f1b0f4
+Signed-off-by: Khargosxh18 <khargosxh18@gmail.com>
+---
+
+diff --git a/power-libperfmgr/aidl/android.hardware.power-service.lineage-libperfmgr.rc b/power-libperfmgr/aidl/android.hardware.power-service.lineage-libperfmgr.rc
+index cf6d662..f227a67 100644
+--- a/power-libperfmgr/aidl/android.hardware.power-service.lineage-libperfmgr.rc
++++ b/power-libperfmgr/aidl/android.hardware.power-service.lineage-libperfmgr.rc
+@@ -1,7 +1,7 @@
+ service vendor.power-hal-aidl /vendor/bin/hw/android.hardware.power-service.lineage-libperfmgr
+     class hal
+     user root
+-    group system
++    group system readproc
+     priority -20
+ 
+ on late-fs

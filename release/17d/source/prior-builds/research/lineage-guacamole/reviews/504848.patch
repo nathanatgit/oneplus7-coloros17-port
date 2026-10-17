@@ -1,0 +1,66 @@
+From c7f509b8c67afb8232cb2422488bddb94c5cadac Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Fri, 25 Sep 2026 21:53:24 +0530
+Subject: [PATCH] SUW: Fall back to TvSettings for network setup
+
+- Along with a hack to get back to SUW
+
+Change-Id: I12f12ccb75219b8b99a0d381f54487712809941e
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/java/org/lineageos/setupwizard/network/NetworkSetupActivity.kt b/app/src/main/java/org/lineageos/setupwizard/network/NetworkSetupActivity.kt
+index 85ee558..25a8ed4 100644
+--- a/app/src/main/java/org/lineageos/setupwizard/network/NetworkSetupActivity.kt
++++ b/app/src/main/java/org/lineageos/setupwizard/network/NetworkSetupActivity.kt
+@@ -7,6 +7,7 @@
+ package org.lineageos.setupwizard.network
+ 
+ import android.content.Intent
++import androidx.activity.result.ActivityResult
+ import com.google.android.setupcompat.partnerconfig.PartnerConfigHelper
+ import com.google.android.setupcompat.util.ResultCodes.RESULT_SKIP
+ import org.lineageos.setupwizard.EXTRA_ENABLE_NEXT_ON_CONNECT
+@@ -19,6 +20,8 @@
+ 
+ class NetworkSetupActivity : SubBaseActivity() {
+ 
++    private var leftNetworkToTvSettings = false
++
+     override fun onStartSubactivity() {
+         if (
+             (!SetupWizardUtils.hasWifi(this) && !SetupWizardUtils.hasTelephony(this)) ||
+@@ -33,7 +36,7 @@
+         }
+ 
+         val intent =
+-            Intent(ACTION_SETUP_NETWORK).apply {
++            Intent(networkSetupAction()).apply {
+                 if (!PartnerConfigHelper.isGlifExpressiveEnabled(this@NetworkSetupActivity)) {
+                     putExtra(EXTRA_PREFS_SHOW_BUTTON_BAR, true)
+                     putExtra(EXTRA_PREFS_SHOW_SKIP, true)
+@@ -45,7 +48,24 @@
+         startSubactivity(intent)
+     }
+ 
++    private fun networkSetupAction(): String {
++        if (Intent(ACTION_SETUP_NETWORK).resolveActivity(packageManager) != null) {
++            return ACTION_SETUP_NETWORK
++        }
++        leftNetworkToTvSettings = true
++        return ACTION_SETUP_WIFI_LEANBACK
++    }
++
++    override fun onSubactivityResult(activityResult: ActivityResult) {
++        if (leftNetworkToTvSettings && !isSubactivityNotFound) {
++            nextAction(RESULT_OK)
++            return
++        }
++        super.onSubactivityResult(activityResult)
++    }
++
+     companion object {
+         private const val ACTION_SETUP_NETWORK = "android.settings.NETWORK_PROVIDER_SETUP"
++        private const val ACTION_SETUP_WIFI_LEANBACK = "com.android.net.wifi.SETUP_WIFI_NETWORK"
+     }
+ }

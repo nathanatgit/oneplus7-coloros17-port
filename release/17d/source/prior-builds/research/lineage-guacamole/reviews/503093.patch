@@ -1,0 +1,20 @@
+From 4b75f14a1b4f6839cebe0dbc964478a234556a63 Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 20:31:32 +0530
+Subject: [PATCH] Settings: Supply footer button radius partner config
+
+Change-Id: Ieac7f1699082ffd6b4c8e860c9bf816ce47d90a1
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/res/values/dimens.xml b/res/values/dimens.xml
+index 2ae2be8..e2333d6 100644
+--- a/res/values/dimens.xml
++++ b/res/values/dimens.xml
+@@ -602,4 +602,6 @@
+     <dimen name="bluetooth_battery_indicator_battery_meter_height">16dp</dimen>
+     <dimen name="bluetooth_battery_indicator_charging_icon_width">12dp</dimen>
+     <dimen name="bluetooth_battery_indicator_charging_icon_height">16dp</dimen>
++
++    <dimen name="setup_compat_footer_button_radius">@dimen/sud_glif_expressive_footer_button_radius</dimen>
+ </resources>

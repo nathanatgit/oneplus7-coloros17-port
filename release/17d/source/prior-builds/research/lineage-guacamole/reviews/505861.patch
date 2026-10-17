@@ -1,0 +1,21 @@
+From 39039dc59da81479742909ba9f7c2e1c0a5362ed Mon Sep 17 00:00:00 2001
+From: Alexander Koskovich <akoskovich@pm.me>
+Date: Tue, 29 Sep 2026 14:33:40 -0400
+Subject: [PATCH] core: Fix range-loop-construct error
+
+Change-Id: Ibc0d4853ceedf8d30cde859c60e5f0eda9ba490c
+---
+
+diff --git a/hal/core/Module.cpp b/hal/core/Module.cpp
+index d1406a3..421ba29 100644
+--- a/hal/core/Module.cpp
++++ b/hal/core/Module.cpp
+@@ -694,7 +694,7 @@
+                 // Check if profiles are non empty because they were populated
+                 // by a previous connection. Otherwise, it means that they are
+                 // not empty because the mix port has static profiles.
+-                for (const auto cp : mConnectedDevicePorts) {
++                for (const auto& cp : mConnectedDevicePorts) {
+                     if (cp.second.count(portsIt->id) > 0) {
+                         connectedPortsIt->second.insert(portsIt->id);
+                         break;

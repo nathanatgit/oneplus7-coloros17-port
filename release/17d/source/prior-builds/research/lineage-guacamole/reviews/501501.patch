@@ -1,0 +1,33 @@
+From 496d28f70a24d3dcddbbed83881577fe3f9ad2bd Mon Sep 17 00:00:00 2001
+From: Saalim Quadri <danascape@gmail.com>
+Date: Tue, 01 Sep 2026 03:12:06 +0530
+Subject: [PATCH] SUW: Map footer buttons to colors
+
+Change-Id: I89e2d9de6a8f981617add7e65a98f08147e14fd1
+Signed-off-by: Saalim Quadri <danascape@gmail.com>
+---
+
+diff --git a/app/src/main/res/values-night/colors.xml b/app/src/main/res/values-night/colors.xml
+index 6d38cf1..bce9125 100644
+--- a/app/src/main/res/values-night/colors.xml
++++ b/app/src/main/res/values-night/colors.xml
+@@ -8,4 +8,7 @@
+ 
+     <color name="setup_compat_footer_primary_button_bg_color">@*android:color/system_primary_dark</color>
+     <color name="setup_compat_footer_primary_button_text_color">@*android:color/system_on_primary_dark</color>
++
++    <color name="materialColorPrimary">@*android:color/system_primary_dark</color>
++    <color name="materialColorOnPrimary">@*android:color/system_on_primary_dark</color>
+ </resources>
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index 99a8394..e61a15c 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -14,4 +14,7 @@
+ 
+     <color name="setup_compat_footer_primary_button_bg_color">@*android:color/system_primary_light</color>
+     <color name="setup_compat_footer_primary_button_text_color">@*android:color/system_on_primary_light</color>
++
++    <color name="materialColorPrimary">@*android:color/system_primary_light</color>
++    <color name="materialColorOnPrimary">@*android:color/system_on_primary_light</color>
+ </resources>

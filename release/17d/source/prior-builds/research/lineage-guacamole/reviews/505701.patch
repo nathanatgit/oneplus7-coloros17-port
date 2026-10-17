@@ -1,0 +1,30 @@
+From 95077e1003c13adbdaed8a579c80d02ae11ba94c Mon Sep 17 00:00:00 2001
+From: Vivekachooz <vivekachooz@gmail.com>
+Date: Thu, 01 Oct 2026 11:23:51 +0530
+Subject: [PATCH] sepolicy: qti: Allow face HAL to interact with osense service
+
+avc:  denied  { find } for pid=1632 uid=1000 name=vendor.oplus.hardware.osense.client.IOsenseAidlHalReporter/default scontext=u:r:hal_oplus_face:s0 tcontext=u:object_r:hal_oplus_osense_aidl_service:s0 tclass=service_manager permissive=0
+
+Change-Id: Ie229d19a4ed6b195bd1b1bdf903af1590f3d7b86
+---
+
+diff --git a/sepolicy/qti/vendor/hal_oplus_face.te b/sepolicy/qti/vendor/hal_oplus_face.te
+index c7c8c70..fdf5854 100644
+--- a/sepolicy/qti/vendor/hal_oplus_face.te
++++ b/sepolicy/qti/vendor/hal_oplus_face.te
+@@ -8,6 +8,7 @@
+ 
+ hal_client_domain(hal_oplus_face, hal_graphics_allocator)
+ hal_client_domain(hal_oplus_face, vendor_hal_oplus_commondcs)
++hal_client_domain(hal_oplus_face, vendor_hal_oplus_osense)
+ hal_server_domain(hal_oplus_face, hal_face)
+ hal_server_domain(hal_oplus_face, vendor_hal_oplus_face)
+ 
+@@ -17,6 +18,7 @@
+ allow hal_oplus_face hal_graphics_allocator_service:service_manager find;
+ allow hal_oplus_face hal_oplus_commondcs_aidl_service:service_manager find;
+ allow hal_oplus_face hal_oplus_olc_aidl_service:service_manager find;
++allow hal_oplus_face hal_oplus_osense_aidl_service:service_manager find;
+ allow hal_oplus_face osense_service:service_manager find;
+ 
+ allow hal_oplus_face fwk_camera_hwservice:hwservice_manager find;

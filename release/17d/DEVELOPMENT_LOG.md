@@ -18,3 +18,7 @@
 - Verified: image hashes, no-root image preflight, read-only file-tree comparison, Magisk boot patch, temporary Magisk boot, root identity, package entry lists, and ZIP integrity checks.
 - Not verified: a clean-wipe install on another phone, clean boot of the no-root system, acoustic Breeno wake on a fresh data partition, and Wallet card provisioning on the exact release ZIP.
 - Target is limited to OnePlus 7 Pro PLK110/GM1910 with matching H.40 firmware. No firmware/base ROM is flashed by the installer.
+
+11. Expanded the first-release source snapshot to include 3,115 cumulative source/config/patch files from earlier build tools and research, plus 15 sanitized historical notes. The source archive SHA-256 manifest verifies with zero mismatches. Generated binaries, donor ROMs, decompiled app trees, external tool executables, and signing keys are excluded.
+
+
