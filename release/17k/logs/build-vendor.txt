@@ -1,0 +1,8 @@
+e2fsck 1.47.0 (5-Feb-2023)
+ePlus7Port/release/17j/images/vendor.img: OK
+-rwxr-xr-x. 1 root root u:object_r:vendor_file:s0 2037 Nov  6 09:53 /mnt/k17v/odm/bin/port-chglimit.sh
+-rw-r--r--. 1 root root u:object_r:vendor_configs_file:s0 338 Nov  6 09:53 /mnt/k17v/odm/etc/init/port-chglimit.rc
+-rwxr-xr-x. 1 root root u:object_r:vendor_file:s0 1297 Nov  6 09:53 /mnt/k17v/odm/bin/port-bmslevel.sh
+-rw-r--r--. 1 root root u:object_r:vendor_configs_file:s0 332 Nov  6 09:53 /mnt/k17v/odm/etc/init/port-bmslevel.rc
+vendor fsck clean
+d7e9a440d5a0fb6cbb7f3de6d3b04639488a262bcaaac4a6c072776da5fbe874  /mnt/c/Users/Han/Project/OnePlus7Port/out-plk-build17k/vendor.img

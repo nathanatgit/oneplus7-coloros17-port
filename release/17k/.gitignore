@@ -1,0 +1,6 @@
+# Large build and flash images are distributed through the external share.
+/images/*
+!/images/README.md
+
+# Generated release bundles are not stored in Git.
+/*.zip

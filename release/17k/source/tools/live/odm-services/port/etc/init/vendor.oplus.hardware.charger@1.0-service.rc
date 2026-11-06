@@ -1,0 +1,16 @@
+# OnePlus7Port: stock H.40 odm rc, unchanged except for the trailing newline (build-port-b.sh, tools/live/odm-services).
+# setenv LD_PRELOAD: the stock binary links against older libbase/jsoncpp exports (android::base::Trim(const std::string&), Json::Value::operator=(Json::Value)); compat/portcompat.S forwards them to the LOS24 equivalents (build 17 failed with CANNOT LINK).
+# Provides vendor.oplus.hardware.charger@1.0::ICharger/default (OplusBatteryService logged "getIChargerService fail").
+service charger_hal_service /odm/bin/hw/vendor.oplus.hardware.charger@1.0-service
+#	interface vendor.oplus.hardware.charger@1.0::ICharger default
+	class hal
+	user system
+	group system
+	setenv LD_PRELOAD /odm/lib64/libportcompat.so
+
+on property:sys.boot_completed=1
+	write /proc/ui_soc_decimal 1
+	chmod 0666 /sys/class/power_supply/battery/current_now
+	chown system system /sys/class/oplus_chg/wireless/status_keep
+	chmod 0666 /sys/class/oplus_wireless/pencil/rx_soc
+	chmod 0666 /sys/class/oplus_wireless/pencil/present

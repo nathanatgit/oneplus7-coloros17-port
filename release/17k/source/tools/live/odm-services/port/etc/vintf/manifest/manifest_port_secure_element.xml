@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OnePlus7Port: the eSE served by the stock H.40 android.hardware.secure_elementnq330@1.1-service (needs /dev/p73 from
+     the CONFIG_NFC_P73_ESE kernel). SIM1/SIM2 (@1.2) stay declared by the LOS24 vendor manifest. nxpese/eventprocessor are the
+     extra HIDL services the stock HAL registers (stock odm manifest_nfc_nq330.xml); the NFC HIDL HALs are NOT declared (LOS uses AIDL NFC). -->
+<manifest version="1.0" type="device">
+    <hal format="hidl">
+        <name>android.hardware.secure_element</name>
+        <transport>hwbinder</transport>
+        <fqname>@1.1::ISecureElement/eSE1</fqname>
+    </hal>
+    <hal format="hidl">
+        <name>vendor.nxpnq330.nxpese</name>
+        <transport>hwbinder</transport>
+        <fqname>@1.0::INxpEse/default</fqname>
+    </hal>
+    <hal format="hidl">
+        <name>vendor.nxp.eventprocessor</name>
+        <transport>hwbinder</transport>
+        <fqname>@1.0::INxpEseEvtProcessor/default</fqname>
+    </hal>
+</manifest>

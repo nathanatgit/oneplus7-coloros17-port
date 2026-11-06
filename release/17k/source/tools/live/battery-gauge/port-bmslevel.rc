@@ -1,0 +1,10 @@
+# OnePlus7Port: BatteryService reports the real fuel-gauge level (tools/live/battery-gauge/port-bmslevel.sh, BAKE-LIST B21).
+service port_bmslevel /system/bin/sh /odm/bin/port-bmslevel.sh
+    class late_start
+    user root
+    group root
+    seclabel u:r:su:s0
+    disabled
+
+on property:sys.boot_completed=1
+    start port_bmslevel

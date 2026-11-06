@@ -1,0 +1,12 @@
+e64a10ca29f384a877b223f255150dd8bb3616321f3b51e9b6f9c5ec43dc5726  system.img
+90479f1a327d27d5a0258de8261e8543e8e5e31045ddfaf1b64707a038fa15ea  boot.img
+d7e9a440d5a0fb6cbb7f3de6d3b04639488a262bcaaac4a6c072776da5fbe874  vendor.img
+135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189  my_stock.img
+PREFLIGHT PASS
+PREFLIGHT PASS
+== vendor 17j-r2 (release/17j/images/vendor.img d8f45456) vs 17k (out-plk-build17k/vendor.img)
+Only in /mnt/k17b/odm/bin: port-bmslevel.sh
+Only in /mnt/k17b/odm/bin: port-chglimit.sh
+Only in /mnt/k17b/odm/etc/init: port-bmslevel.rc
+Only in /mnt/k17b/odm/etc/init: port-chglimit.rc
+diff exit=1

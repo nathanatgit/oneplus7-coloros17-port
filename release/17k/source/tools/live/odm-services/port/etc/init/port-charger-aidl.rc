@@ -1,0 +1,7 @@
+# OnePlus7Port: minimal Java AIDL ICharger (V12) for ColorOS 17's OplusBatteryService (it only asks for the AIDL service
+# vendor.oplus.hardware.charger.ICharger/default; stock H.40 has the old HIDL HAL). Source: tools/live/charger-aidl.
+service port_charger_aidl /system/bin/app_process -cp /vendor/odm/lib64/port-charger.dex:/system_ext/framework/vendor.oplus.hardware.charger-V12-java.jar /system/bin port.Main
+    class main
+    user system
+    group system
+    seclabel u:r:su:s0

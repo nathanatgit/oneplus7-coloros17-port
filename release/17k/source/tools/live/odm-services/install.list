@@ -1,0 +1,57 @@
+# source (under tools/live/odm-services)  dest (under the vendor image's odm/)  mode  SELinux type
+# Files from the stock H.40 euclid odm (StockRom/H40-images/system.img -> system/euclid/odm.img; bin/hw services and
+# SHA256SUMS in this directory covers every source; build-port-b.sh checks it, preflight-b.sh re-checks the installed copies.
+stock/bin/hw/vendor.oplus.hardware.charger@1.0-service         bin/hw/vendor.oplus.hardware.charger@1.0-service         0755 vendor_file
+stock/bin/hw/vendor.oplus.hardware.cryptoeng@1.0-service       bin/hw/vendor.oplus.hardware.cryptoeng@1.0-service       0755 vendor_file
+stock/lib64/libqsee_keybox_ca.so                          lib64/libqsee_keybox_ca.so                          0644 vendor_file
+stock/lib64/vendor.oplus.hardware.charger@1.0.so          lib64/vendor.oplus.hardware.charger@1.0.so          0644 vendor_file
+stock/lib64/vendor.oplus.hardware.cryptoeng@1.0.so        lib64/vendor.oplus.hardware.cryptoeng@1.0.so        0644 vendor_file
+stock/firmware/cryptoeng.b00  vendor/firmware/cryptoeng.b00  0644 vendor_file
+stock/firmware/cryptoeng.b01  vendor/firmware/cryptoeng.b01  0644 vendor_file
+stock/firmware/cryptoeng.b02  vendor/firmware/cryptoeng.b02  0644 vendor_file
+stock/firmware/cryptoeng.b03  vendor/firmware/cryptoeng.b03  0644 vendor_file
+stock/firmware/cryptoeng.b04  vendor/firmware/cryptoeng.b04  0644 vendor_file
+stock/firmware/cryptoeng.b05  vendor/firmware/cryptoeng.b05  0644 vendor_file
+stock/firmware/cryptoeng.b06  vendor/firmware/cryptoeng.b06  0644 vendor_file
+stock/firmware/cryptoeng.b07  vendor/firmware/cryptoeng.b07  0644 vendor_file
+stock/firmware/cryptoeng.mdt  vendor/firmware/cryptoeng.mdt  0644 vendor_file
+stock/etc/vintf/manifest/manifest_oplus_cryptoeng.xml  etc/vintf/manifest/manifest_oplus_cryptoeng.xml  0644 vendor_configs_file
+port/etc/init/vendor.oplus.hardware.charger@1.0-service.rc    etc/init/vendor.oplus.hardware.charger@1.0-service.rc    0644 vendor_configs_file
+port/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc  etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc  0644 vendor_configs_file
+compat/libportcompat.so  lib64/libportcompat.so  0644 vendor_file
+# AIDL ICharger for ColorOS 17 (it only looks up vendor.oplus.hardware.charger.ICharger/default): Java stub from tools/live/charger-aidl
+# (sibling session's work, copied unchanged), run by app_process from port-charger-aidl.rc. The vintf fragment declares HIDL 1.0 + AIDL V12.
+port/etc/vintf/manifest/manifest_oplus_charger.xml  etc/vintf/manifest/manifest_oplus_charger.xml  0644 vendor_configs_file
+port/etc/init/port-charger-aidl.rc  etc/init/port-charger-aidl.rc  0644 vendor_configs_file
+port/lib64/port-charger.dex  lib64/port-charger.dex  0644 vendor_file
+# eSE HAL (build 17d; needs /dev/p73 from the CONFIG_NFC_P73_ESE kernel + the corrected eSE power GPIO, handoff §12/12b, tools/live/ese-kernel).
+# The HAL exits once (oneshot) on a kernel without /dev/p73.
+stock/bin/hw/android.hardware.secure_elementnq330@1.1-service  bin/hw/android.hardware.secure_elementnq330@1.1-service  0755 hal_secure_element_default_exec
+stock/lib64/android.hardware.nfc@1.0.so                   lib64/android.hardware.nfc@1.0.so                   0644 vendor_file
+stock/lib64/android.hardware.nfc@1.1.so                   lib64/android.hardware.nfc@1.1.so                   0644 vendor_file
+stock/lib64/ese_client.so                                 lib64/ese_client.so                                 0644 vendor_file
+stock/lib64/ese_spi_nxp_nq330.so                          lib64/ese_spi_nxp_nq330.so                          0644 vendor_file
+stock/lib64/libchrome.so                                  lib64/libchrome.so                                  0644 vendor_file
+stock/lib64/libevent.so                                   lib64/libevent.so                                   0644 vendor_file
+stock/lib64/ls_client.so                                  lib64/ls_client.so                                  0644 vendor_file
+stock/lib64/vendor.nxp.eventprocessor@1.0.so              lib64/vendor.nxp.eventprocessor@1.0.so              0644 vendor_file
+stock/lib64/vendor.nxp.nxpnfc@1.0.so                      lib64/vendor.nxp.nxpnfc@1.0.so                      0644 vendor_file
+stock/lib64/vendor.nxpnq330.nxpese@1.0.so                 lib64/vendor.nxpnq330.nxpese@1.0.so                 0644 vendor_file
+stock/etc/libese-nxp.conf                                 etc/libese-nxp.conf                                 0644 vendor_configs_file
+port/lib64/libport_shim_trim.so                           lib64/libport_shim_trim.so                          0644 vendor_file
+port/etc/init/android.hardware.secure_elementnq330@1.1-service.rc  etc/init/android.hardware.secure_elementnq330@1.1-service.rc  0644 vendor_configs_file
+port/etc/vintf/manifest/manifest_port_secure_element.xml  etc/vintf/manifest/manifest_port_secure_element.xml  0644 vendor_configs_file
+# ColorOS screen color mode -> LiveDisplay bridge (tools/live/colormode): script run by init service port_colormode at boot_completed
+port/bin/port-colormode.sh  bin/port-colormode.sh  0755 vendor_file
+port/etc/init/port-colormode.rc  etc/init/port-colormode.rc  0644 vendor_configs_file
+# ColorOS charging limit (regular charge protection) -> battery/mmi_charging_enable (tools/live/chglimit): script run by init service port_chglimit at boot_completed
+port/bin/port-chglimit.sh  bin/port-chglimit.sh  0755 vendor_file
+port/etc/init/port-chglimit.rc  etc/init/port-chglimit.rc  0644 vendor_configs_file
+# (B8, live-verified 2026-10-30) no-op AIDL vendor.qti.hardware.perf2.IPerf/default (tools/live/perf-stub/PerfStub.java): stops ColorOS's
+# Qualcomm perf client falling back to HIDL perf@2.3/@2.2 lazy starts (~4/s from system_server). Boosting stays with the LOS power HAL.
+port/etc/vintf/manifest/manifest_port_perf2.xml  etc/vintf/manifest/manifest_port_perf2.xml  0644 vendor_configs_file
+port/etc/init/port-perf2-stub.rc  etc/init/port-perf2-stub.rc  0644 vendor_configs_file
+port/lib64/port-stubs.dex  lib64/port-stubs.dex  0644 vendor_file
+# B21: bind real fuel-gauge (bms/capacity) over battery/capacity for health HAL (tools/live/battery-gauge)
+port/bin/port-bmslevel.sh  bin/port-bmslevel.sh  0755 vendor_file
+port/etc/init/port-bmslevel.rc  etc/init/port-bmslevel.rc  0644 vendor_configs_file

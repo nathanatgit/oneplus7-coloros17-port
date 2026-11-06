@@ -1,0 +1,2 @@
+163b9c058b757c2ab3ae5e99f0430f07e33b504164a7b295d747d85faa998efd  OnePlus7Pro-17k-NoRoot.zip
+0c137157479ebffa9aacbe6aca44693e79779ec230791ff60e70589d135fdde7  OnePlus7Pro-17k-Magisk31.zip

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OnePlus7Port: declares the no-op perf2 stub so libqti-perfd-client's AServiceManager_isDeclared() check passes. -->
+<manifest version="1.0" type="device">
+    <hal format="aidl">
+        <name>vendor.qti.hardware.perf2</name>
+        <version>1</version>
+        <fqname>IPerf/default</fqname>
+    </hal>
+</manifest>

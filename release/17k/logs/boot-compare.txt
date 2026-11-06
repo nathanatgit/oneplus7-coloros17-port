@@ -1,0 +1,11 @@
+== /mnt/c/Users/Han/Project/OnePlus7Port/out-ese/boot-ese-final.img: a96c205d24598b824c9e119e48cd7b363151920b21ab351e971539511e3cbe91
+== /mnt/c/Users/Han/Project/OnePlus7Port/out-plk-build17j/boot.img: 669511c8f4e7932d8140cb8b3bd3a669bd7e26dd13ddba9d69eadabd3b7c0458
+== ramdisk file content (ignoring mtimes)
+RAMDISK CONTENT IDENTICAL
+== cmdline (boot header v2, offset 64, 512 bytes + extra at 1600, 1024 bytes)
+boot-ese-final.img: androidboot.hardware=qcom androidboot.memcg=1 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.boot_devices=soc/1d84000.ufshc androidboot.selinux_xperms_supported=1|'Šð
+boot.img: androidboot.hardware=qcom androidboot.memcg=1 androidboot.usbcontroller=a600000.dwc3 loop.max_part=7 lpm_levels.sleep_disabled=1 msm_rtb.filter=0x237 service_locator.enable=1 swiotlb=2048 androidboot.boot_devices=soc/1d84000.ufshc androidboot.selinux_xperms_supported=1|'Šð
+CMDLINE IDENTICAL
+== kernel (header sizes; the eSE image carries its own kernel build, CONFIG_NFC_P73_ESE=y)
+header v2; kernel=49109008, ramdisk=19217627, second=0, recovery_dtbo=0, dtb=9053968
+header v2; kernel=49111064, ramdisk=19217743, second=0, recovery_dtbo=0, dtb=9053968

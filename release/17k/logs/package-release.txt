@@ -1,0 +1,38 @@
+copy C:\Users\Han\Project\OnePlus7Port\out-plk-build17k\system.img -> C:\Users\Han\Project\OnePlus7Port\release\17k\images\bootstrap-system.img
+copy C:\Users\Han\Project\OnePlus7Port\release\17j\images\system.img -> C:\Users\Han\Project\OnePlus7Port\release\17k\images\system.img
+copy C:\Users\Han\Project\OnePlus7Port\out-plk-build17k\vendor.img -> C:\Users\Han\Project\OnePlus7Port\release\17k\images\vendor.img
+copy C:\Users\Han\Project\OnePlus7Port\release\17j\images\my_stock.img -> C:\Users\Han\Project\OnePlus7Port\release\17k\images\my_stock.img
+hashing C:\Users\Han\Project\OnePlus7Port\out-plk-build17k\system.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17j\images\system.img
+hashing C:\Users\Han\Project\OnePlus7Port\out-plk-build17k\vendor.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17j\images\my_stock.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\boot-ese-final.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\boot-magisk31-17d.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\Magisk-v31.0.apk
+Adding images/bootstrap-system.img (3640655872 bytes)
+Adding images/system.img (3640655872 bytes)
+Adding images/vendor.img (1073741824 bytes)
+Adding images/my_stock.img (6917992448 bytes)
+Adding images/boot-ese-final.img (100663296 bytes)
+Adding README.md (2402 bytes)
+Adding Install-17k.ps1 (16475 bytes)
+Adding Install-17k.sh (13624 bytes)
+Adding Install-17k.bat (207 bytes)
+Adding SHA256SUMS (440 bytes)
+Created OnePlus7Pro-17k-NoRoot.zip: 11622185244 bytes; testing CRCs
+ZIP integrity PASS: OnePlus7Pro-17k-NoRoot.zip
+Adding images/system.img (3640655872 bytes)
+Adding images/vendor.img (1073741824 bytes)
+Adding images/my_stock.img (6917992448 bytes)
+Adding images/boot-magisk31-17d.img (100663296 bytes)
+Adding images/Magisk-v31.0.apk (11248935 bytes)
+Adding README.md (3302 bytes)
+Adding Install-17k.ps1 (16477 bytes)
+Adding Install-17k.sh (13626 bytes)
+Adding Install-17k.bat (207 bytes)
+Adding SHA256SUMS (439 bytes)
+Created OnePlus7Pro-17k-Magisk31.zip: 8816507126 bytes; testing CRCs
+ZIP integrity PASS: OnePlus7Pro-17k-Magisk31.zip
+163b9c058b757c2ab3ae5e99f0430f07e33b504164a7b295d747d85faa998efd  OnePlus7Pro-17k-NoRoot.zip
+0c137157479ebffa9aacbe6aca44693e79779ec230791ff60e70589d135fdde7  OnePlus7Pro-17k-Magisk31.zip
+

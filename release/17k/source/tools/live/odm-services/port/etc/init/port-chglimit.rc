@@ -1,0 +1,10 @@
+# OnePlus7Port: enforce the ColorOS charging limit through battery/mmi_charging_enable (tools/live/chglimit/port-chglimit.sh).
+service port_chglimit /system/bin/sh /odm/bin/port-chglimit.sh
+    class late_start
+    user system
+    group system
+    seclabel u:r:su:s0
+    disabled
+
+on property:sys.boot_completed=1
+    start port_chglimit

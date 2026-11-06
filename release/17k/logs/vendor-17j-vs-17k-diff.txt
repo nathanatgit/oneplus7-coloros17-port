@@ -1,0 +1,6 @@
+== vendor 17j-r2 (release/17j/images/vendor.img d8f45456) vs 17k (out-plk-build17k/vendor.img)
+Only in /mnt/k17b/odm/bin: port-bmslevel.sh
+Only in /mnt/k17b/odm/bin: port-chglimit.sh
+Only in /mnt/k17b/odm/etc/init: port-bmslevel.rc
+Only in /mnt/k17b/odm/etc/init: port-chglimit.rc
+diff exit=1

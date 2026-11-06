@@ -1,0 +1,10 @@
+# OnePlus7Port: port stand-in services (tools/live/perf-stub): no-op vendor.qti.hardware.perf2.IPerf/default (PerfStub.java) and
+# android.hardware.biometrics.face.virtualhal.IVirtualHal/virtual returning no face HAL (FaceVhalStub.java; ColorOS FaceService otherwise
+# waits forever for the OnePlus 15 virtual face HAL). ColorOS's Qualcomm perf client
+# otherwise falls back to HIDL perf@2.3/@2.2 lazy starts on every perf call (~4/s from system_server). It boosts nothing;
+# LineageOS's android.hardware.power-service.lineage keeps doing the real CPU boosting.
+service port_perf2_stub /system/bin/app_process -cp /vendor/odm/lib64/port-stubs.dex /system/bin port.PerfStub
+    class hal
+    user system
+    group system
+    seclabel u:r:su:s0

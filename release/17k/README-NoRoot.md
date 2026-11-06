@@ -1,0 +1,31 @@
+# 17k no-root upgrade bundle
+
+Target: a OnePlus 7 Pro (GM1910 / PLK110, fastboot product `guacamole` or `msmnile`) that already runs this ColorOS 17 port (17d or later) on its
+active slot, with an unlocked bootloader and matching H.40 firmware.
+
+**This is an upgrade. It keeps your data:** apps, accounts, settings and files stay. The installer never runs `fastboot -w`, never
+formats or erases userdata/metadata, and has no wipe step. It writes only the active slot's `vendor`, `system` and `boot`
+partitions and replaces `/data/port/my_stock.img` (the previous one stays as `/data/port/my_stock-prev.img`). The other slot is not
+touched. Back up anyway: a failed flash can still leave the phone unbootable.
+
+1. Extract the ZIP completely. Install Android platform-tools (`adb`, `fastboot`) and put them on `PATH`.
+2. Boot the phone into the port, enable USB debugging and authorize this computer (preferred), or put it in fastboot mode.
+3. Optional: `Install-17k.bat -DryRun` (Windows) or `bash ./Install-17k.sh --dry-run` (Linux/macOS) checks the images, the phone,
+   the slot, root and free space and changes nothing.
+4. Run `Install-17k.bat` (or `powershell -ExecutionPolicy Bypass -File .\Install-17k.ps1`), or `bash ./Install-17k.sh`.
+5. Type `GM1910` or `PLK110` when asked.
+
+How `my_stock.img` (about 6.9 GB, it lives in userdata) is placed:
+- If the running port gives the installer root (a development build with `adb root`, or Magisk), the image is copied to
+  `/data/port/my_stock.img.new`, verified on the phone and swapped in before the reboot; then one fastboot pass flashes vendor, the
+  production 17k system and the eSE boot.
+- Otherwise (a 17d no-root install): the installer flashes vendor, the temporary 17k **bootstrap** system (development build with
+  adb root) and the eSE boot, boots it once without wiping, copies and verifies `my_stock.img`, returns to fastboot and flashes the
+  final production-property 17k system.
+
+The final system has production properties (`ro.secure=1`, `ro.debuggable=0`, `ro.adb.secure=1`) and no builder ADB key. Your
+computer's existing ADB authorization is kept (it is in userdata).
+
+After the first boot, see "After flashing" in `README.md` of the release (camera update removal, wallpaper keeper, charging limit checks).
+
+The NoRoot installers have NOT been run. 17k itself was flashed once on one phone using the Magisk installer (see TEST-STATUS.md). Idle battery drain is not fixed.

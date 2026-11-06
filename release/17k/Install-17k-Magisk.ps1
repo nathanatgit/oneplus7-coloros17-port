@@ -1,0 +1,255 @@
+# OnePlus 7 Pro ColorOS 17 port, 17k Magisk 31 UPGRADE installer (Windows PowerShell).
+# Upgrades an installed port (17d or later) on the ACTIVE slot and KEEPS ALL USER DATA: it never wipes userdata or
+# metadata (no `fastboot -w`, no format). It flashes vendor, system and boot of the active slot only and replaces
+# /data/port/my_stock.img (the previous one is kept as /data/port/my_stock-prev.img).
+#   .\Install-17k.ps1           install
+#   .\Install-17k.ps1 -DryRun   check images, phone, slot, root and free space; change nothing
+# Start with the phone booted into the current port with USB debugging authorized (preferred), or in fastboot mode.
+param([switch]$DryRun)
+$ErrorActionPreference = 'Stop'
+$script:Variant = 'magisk'   # noroot | magisk
+$script:Fastboot = (Get-Command fastboot.exe -ErrorAction Stop).Source
+$script:Adb = (Get-Command adb.exe -ErrorAction Stop).Source
+$script:Root = $PSScriptRoot
+$script:Serial = $null
+$script:SuMode = 'none'
+$MyStockSha = '135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189'
+[long]$MyStockSize = 6917992448
+$img = Join-Path $script:Root 'images'
+$SystemImg = Join-Path $img 'system.img'
+$BootstrapImg = Join-Path $img 'bootstrap-system.img'
+$VendorImg = Join-Path $img 'vendor.img'
+$MyStockImg = Join-Path $img 'my_stock.img'
+$MagiskApk = Join-Path $img 'Magisk-v31.0.apk'
+if ($script:Variant -eq 'magisk') { $BootImg = Join-Path $img 'boot-magisk31-17d.img' } else { $BootImg = Join-Path $img 'boot-ese-final.img' }
+
+# Windows PowerShell 5.1 turns a native program's stderr into errors that 'Stop' makes fatal (fastboot prints everything on
+# stderr), so every adb/fastboot call goes through Run-Native with 'Continue' and plain strings.
+function Run-Native([string]$Exe, [string[]]$NativeArgs) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    # $null | : empty stdin, so adb/fastboot never read input meant for Read-Host
+    try { $out = @($null | & $Exe @NativeArgs 2>&1 | ForEach-Object { "$_" }); $code = $LASTEXITCODE }
+    finally { $ErrorActionPreference = $old }
+    return [pscustomobject]@{ Out = $out; Code = $code }
+}
+function Invoke-Fastboot([string[]]$FastbootArgs) {
+    Write-Host ("> fastboot " + ($FastbootArgs -join ' '))
+    $r = Run-Native $script:Fastboot (@('-s', $script:Serial) + $FastbootArgs)
+    $r.Out | ForEach-Object { Write-Host $_ }
+    if ($r.Code -ne 0) { throw "fastboot failed: $($FastbootArgs -join ' ')" }
+    return ($r.Out -join "`n")
+}
+function Invoke-Adb([string[]]$AdbArgs) {
+    Write-Host ("> adb " + ($AdbArgs -join ' '))
+    $r = Run-Native $script:Adb (@('-s', $script:Serial) + $AdbArgs)
+    $r.Out | ForEach-Object { Write-Host $_ }
+    if ($r.Code -ne 0) { throw "adb failed: $($AdbArgs -join ' ')" }
+    return ($r.Out -join "`n")
+}
+function Get-AdbOut([string[]]$AdbArgs) {   # quiet, never throws; returns trimmed output (stdout and stderr)
+    $r = Run-Native $script:Adb (@('-s', $script:Serial) + $AdbArgs)
+    return (($r.Out -join "`n").Trim())
+}
+function Test-Adb([string[]]$AdbArgs) {   # quiet; true when the command exits 0
+    return ((Run-Native $script:Adb (@('-s', $script:Serial) + $AdbArgs)).Code -eq 0)
+}
+function Invoke-Root([string]$Cmd) {   # run as root on the phone; throws on a non-zero exit
+    if ($script:SuMode -eq 'adbd') { return Invoke-Adb @('shell', $Cmd) }
+    return Invoke-Adb @('shell', "su -c '$Cmd'")   # one string: adb joins its args
+}
+function Test-Root([string]$Cmd) {
+    if ($script:SuMode -eq 'adbd') { return (Test-Adb @('shell', $Cmd)) }
+    return (Test-Adb @('shell', "su -c '$Cmd'"))
+}
+function Wait-ForAdb([int]$Seconds = 400) {
+    for ($i = 0; $i -lt $Seconds; $i += 2) {
+        if ((Get-AdbOut @('get-state')) -eq 'device') { return $true }
+        Start-Sleep -Seconds 2
+    }
+    return $false
+}
+function Wait-ForBoot([int]$Seconds = 400) {
+    for ($i = 0; $i -lt $Seconds; $i += 3) {
+        if ((Get-AdbOut @('shell', 'getprop', 'sys.boot_completed')) -eq '1') { return $true }
+        Start-Sleep -Seconds 3
+    }
+    return $false
+}
+function Wait-ForFastboot([int]$Seconds = 180) {
+    for ($i = 0; $i -lt $Seconds; $i += 2) {
+        $rows = @((Run-Native $script:Fastboot @('devices')).Out | Where-Object { $_ -match ('^' + [regex]::Escape($script:Serial) + '\s+fastboot') })
+        if ($rows.Count -eq 1) { return }
+        Start-Sleep -Seconds 2
+    }
+    throw 'Timed out waiting for the phone in fastboot.'
+}
+function Get-CurrentSlot {
+    $s = Invoke-Fastboot @('getvar', 'current-slot')
+    if ($s -notmatch 'current-slot:\s*([ab])') { throw "Cannot parse current slot: $s" }
+    return $Matches[1]
+}
+function Check-Image([string]$Path, [string]$ExpectedHash) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing package image: $Path" }
+    Write-Host "Checking $Path ..."
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actual -ne $ExpectedHash.ToLowerInvariant()) { throw "SHA-256 mismatch: $Path ($actual)" }
+}
+function Find-Root {   # sets $script:SuMode = adbd | su | none
+    $script:SuMode = 'none'
+    if ((Get-AdbOut @('shell', 'id')) -match 'uid=0\(root\)') { $script:SuMode = 'adbd'; return }
+    if (-not $DryRun -and (Get-AdbOut @('shell', 'getprop', 'ro.debuggable')) -eq '1') {
+        [void](Test-Adb @('root'))
+        Start-Sleep -Seconds 3
+        [void](Wait-ForAdb 60)
+        if ((Get-AdbOut @('shell', 'id')) -match 'uid=0\(root\)') { $script:SuMode = 'adbd'; return }
+    }
+    if ((Get-AdbOut @('shell', 'command -v su')) -match '/su$') {
+        Write-Host 'If Magisk asks to allow root for the ADB shell, approve it on the phone.'
+        if ((Get-AdbOut @('shell', 'su', '-c', 'id')) -match 'uid=0\(root\)') { $script:SuMode = 'su' }
+    }
+}
+function Get-FreeKiB {
+    $line = (Get-AdbOut @('shell', $(if ($script:SuMode -eq 'adbd') { 'df -k /data/port | tail -n 1' } else { "su -c 'df -k /data/port | tail -n 1'" })))
+    $f = ($line -split '\s+')[3]
+    if ($f -notmatch '^\d+$') { throw "Could not read free space on /data: $line" }
+    return [long]$f
+}
+# Copies my_stock.img to /data/port/my_stock.img.new, verifies it on the phone, then swaps it in (old -> my_stock-prev.img).
+function Stage-MyStock {
+    if (-not (Test-Root 'test -f /data/port/my_stock.img')) { throw 'No /data/port/my_stock.img on this phone: this is not an installed port. Use the clean install in README.md.' }
+    $free = Get-FreeKiB
+    if ($script:SuMode -eq 'su') { $need = [long]($MyStockSize * 2 / 1024) + 1048576 } else { $need = [long]($MyStockSize / 1024) + 1048576 }
+    if ($free -le $need) { throw "Not enough free space on /data: $free KiB free, $need KiB needed." }
+    Invoke-Root 'rm -f /data/port/my_stock.img.new' | Out-Null
+    if ($script:SuMode -eq 'adbd') {
+        Invoke-Adb @('push', $MyStockImg, '/data/port/my_stock.img.new') | Out-Null
+    } else {
+        Invoke-Adb @('shell', 'rm -f /data/local/tmp/my_stock.img.new') | Out-Null
+        Invoke-Adb @('push', $MyStockImg, '/data/local/tmp/my_stock.img.new') | Out-Null
+        Invoke-Root 'mv -f /data/local/tmp/my_stock.img.new /data/port/my_stock.img.new' | Out-Null
+    }
+    Write-Host 'Verifying my_stock.img on the phone ...'
+    $got = ((Invoke-Root 'sha256sum /data/port/my_stock.img.new') -split '\s+')[0].ToLowerInvariant()
+    if ($got -ne $MyStockSha) { Invoke-Root 'rm -f /data/port/my_stock.img.new' | Out-Null; throw "my_stock.img on the phone has SHA-256 $got; removed, nothing swapped." }
+    Invoke-Root 'cd /data/port && rm -f my_stock-prev.img && mv my_stock.img my_stock-prev.img && mv my_stock.img.new my_stock.img && chown 0:0 my_stock.img && chmod 0644 my_stock.img && chcon u:object_r:system_file:s0 my_stock.img && sync' | Out-Null
+    Write-Host 'my_stock.img staged; the previous image is /data/port/my_stock-prev.img.'
+}
+
+Check-Image (Join-Path $script:Root 'images/system.img') '0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9'
+Check-Image (Join-Path $script:Root 'images/vendor.img') 'd7e9a440d5a0fb6cbb7f3de6d3b04639488a262bcaaac4a6c072776da5fbe874'
+Check-Image (Join-Path $script:Root 'images/my_stock.img') '135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189'
+Check-Image (Join-Path $script:Root 'images/boot-magisk31-17d.img') 'b073b02da7c29f00f54e510fb4e6a7304d49c5c5df89f684f81d69fa90d4e155'
+Check-Image (Join-Path $script:Root 'images/Magisk-v31.0.apk') '2c8a488b9a5293e578e95ae4f07e3c57aba4feec4a52ca4dd852a2692d6dd4e8'
+
+# ---------- find the phone ----------
+$adbRows = @((Run-Native $script:Adb @('devices')).Out | Select-Object -Skip 1 | Where-Object { $_ -match '\sdevice\s*$' })
+$fbRows = @((Run-Native $script:Fastboot @('devices')).Out | Where-Object { $_ -match '\sfastboot\s*$' })
+if (($adbRows.Count + $fbRows.Count) -ne 1) { throw "Connect exactly one phone (Android with USB debugging authorized, or fastboot); found $($adbRows.Count) adb + $($fbRows.Count) fastboot." }
+if ($adbRows.Count -eq 1) { $mode = 'adb'; $script:Serial = ($adbRows[0] -split '\s+')[0] } else { $mode = 'fastboot'; $script:Serial = ($fbRows[0] -split '\s+')[0] }
+
+# ---------- phase 0: running Android ----------
+$staged = $false; $slot = $null
+if ($mode -eq 'adb') {
+    $code = Get-AdbOut @('shell', 'getprop', 'ro.boot.project_codename')
+    if ($code -ne 'guacamole') { throw "Expected a OnePlus 7 Pro (ro.boot.project_codename guacamole), got '$code'." }
+    if (-not (Test-Adb @('shell', 'test -f /system/etc/init/00-port-mystock.rc'))) { throw 'The running system is not this ColorOS port (no 00-port-mystock.rc). Use the clean install in README.md.' }
+    $slot = (Get-AdbOut @('shell', 'getprop', 'ro.boot.slot_suffix')).TrimStart('_')
+    if ($slot -notin @('a', 'b')) { throw "Cannot read the active slot: '$slot'." }
+    Write-Host "Device $($script:Serial): guacamole, running the port on slot $slot."
+    Find-Root
+    Write-Host "Root for staging on the running system: $script:SuMode"
+    if ($DryRun -and $script:SuMode -ne 'none') {
+        if (Test-Root 'test -f /data/port/my_stock.img') { Write-Host 'Found /data/port/my_stock.img (upgrade).' } else { Write-Host 'WARNING: no /data/port/my_stock.img: not an installed port, the real run would stop.' }
+        Write-Host "Free space on /data: $(Get-FreeKiB) KiB (my_stock.img is $([long]($MyStockSize / 1024)) KiB)."
+    }
+}
+
+if ($DryRun) {
+    Write-Host 'DRY RUN: image hashes and the phone verified; nothing was written, nothing rebooted, no data changed.'
+    if ($mode -eq 'fastboot') {
+        Invoke-Fastboot @('getvar', 'product') | Out-Null
+        Write-Host "Active slot: $(Get-CurrentSlot)"
+    }
+    if ($script:SuMode -ne 'none') {
+        Write-Host "Would: copy my_stock.img to /data/port (keeping the old one as my_stock-prev.img), reboot to fastboot, flash vendor_X, system_X, boot_X ($(Split-Path -Leaf $BootImg)) of the active slot, reboot. No wipe."
+    } elseif ($script:Variant -eq 'noroot') {
+        Write-Host 'Would: reboot to fastboot, flash vendor_X + the 17k bootstrap system (adb root) + boot_X of the active slot, boot it, copy my_stock.img to /data/port, reboot to fastboot, flash the final system_X, reboot. No wipe.'
+    } else {
+        Write-Host 'Would: reboot to fastboot, flash vendor_X, system_X and the Magisk boot_X of the active slot, boot, install Magisk if missing, copy my_stock.img with MagiskSU, reboot. No wipe.'
+    }
+    exit 0
+}
+
+Write-Host 'This UPGRADES the port on the active slot and keeps your data (apps, accounts, settings, files).'
+Write-Host 'It does not wipe anything, but back up first anyway: a failed flash can still leave the phone unbootable.'
+$model = Read-Host 'Confirm the phone is a OnePlus 7 Pro running this port; type GM1910 or PLK110'
+if ($model -cnotin @('GM1910', 'PLK110')) { throw 'Model confirmation did not match; nothing was changed.' }
+
+if ($mode -eq 'adb') {
+    if ($script:SuMode -ne 'none') { Stage-MyStock; $staged = $true }
+    Invoke-Adb @('reboot', 'bootloader') | Out-Null
+    Write-Host 'Waiting for fastboot ...'
+    Wait-ForFastboot
+}
+
+# ---------- phase 1: fastboot ----------
+$product = Invoke-Fastboot @('getvar', 'product')
+if ($product -notmatch 'product:\s*(guacamole|msmnile)\b') { throw "Expected fastboot product guacamole or msmnile (OnePlus 7 Pro bootloaders report either); got: $product" }
+$unlocked = Invoke-Fastboot @('getvar', 'unlocked')
+if ($unlocked -notmatch 'unlocked:\s*yes') { throw 'Bootloader is not reported unlocked.' }
+$fslot = Get-CurrentSlot
+if ($slot -and $slot -ne $fslot) { throw "Active slot changed ($slot -> $fslot); stopped before flashing." }
+$slot = $fslot
+Write-Host "Flashing slot $slot only (the other slot is not touched). No wipe."
+
+if ($staged -or $script:Variant -eq 'magisk') {
+    Invoke-Fastboot @('flash', "vendor_$slot", $VendorImg) | Out-Null
+    Invoke-Fastboot @('flash', "system_$slot", $SystemImg) | Out-Null
+    Invoke-Fastboot @('flash', "boot_$slot", $BootImg) | Out-Null
+    Invoke-Fastboot @('reboot') | Out-Null
+} else {
+    # no-root, nothing staged: the 17k development system (adb root) boots once so my_stock.img can be copied, then the final system
+    Invoke-Fastboot @('flash', "vendor_$slot", $VendorImg) | Out-Null
+    Invoke-Fastboot @('flash', "system_$slot", $BootstrapImg) | Out-Null
+    Invoke-Fastboot @('flash', "boot_$slot", $BootImg) | Out-Null
+    Invoke-Fastboot @('reboot') | Out-Null
+    Write-Host 'Waiting for the temporary 17k bootstrap system (adb root) ...'
+    if (-not (Wait-ForAdb 400)) { throw 'Timed out waiting for the bootstrap system. The phone runs the bootstrap; rerun this installer.' }
+    [void](Wait-ForBoot 400)
+    [void](Test-Adb @('root'))
+    Start-Sleep -Seconds 3
+    [void](Wait-ForAdb 60)
+    Find-Root
+    if ($script:SuMode -ne 'adbd') { throw 'Bootstrap adb root is unavailable; the final system was not flashed. Rerun this installer.' }
+    Stage-MyStock; $staged = $true
+    Invoke-Adb @('reboot', 'bootloader') | Out-Null
+    Wait-ForFastboot
+    if ((Get-CurrentSlot) -ne $slot) { throw 'Active slot changed during staging; stopped before the final flash.' }
+    Invoke-Fastboot @('flash', "system_$slot", $SystemImg) | Out-Null
+    Invoke-Fastboot @('reboot') | Out-Null
+}
+
+if (-not $staged) {
+    # Magisk variant without root on the old system: stage with MagiskSU on the new system, then reboot once more.
+    Write-Host 'Unlock the phone and approve this computer for USB debugging if asked. Waiting for Android ...'
+    if (-not (Wait-ForAdb 400)) { throw 'Timed out waiting for authorized ADB. Finish my_stock staging by hand (README.md).' }
+    if (-not (Wait-ForBoot 400)) { throw 'Android did not report boot completed. Finish my_stock staging by hand (README.md).' }
+    if ((Get-AdbOut @('shell', 'pm', 'path', 'com.topjohnwu.magisk')) -notmatch 'package:') { Invoke-Adb @('install', '-r', $MagiskApk) | Out-Null }
+    Find-Root
+    if ($script:SuMode -ne 'su') { throw 'MagiskSU root was not granted. Approve it in Magisk, then rerun this installer.' }
+    Stage-MyStock; $staged = $true
+    Invoke-Adb @('reboot') | Out-Null
+} elseif ($script:Variant -eq 'magisk') {
+    Write-Host 'Waiting for Android to install the Magisk app if it is missing (unlock the phone and approve USB debugging if asked) ...'
+    if ((Wait-ForAdb 400) -and (Wait-ForBoot 400)) {
+        if ((Get-AdbOut @('shell', 'pm', 'path', 'com.topjohnwu.magisk')) -notmatch 'package:') {
+            try { Invoke-Adb @('install', '-r', $MagiskApk) | Out-Null } catch { Write-Host 'Could not install Magisk; install images\Magisk-v31.0.apk by hand.' }
+        }
+    } else { Write-Host 'ADB did not come up; if the Magisk app is missing, install images\Magisk-v31.0.apk by hand.' }
+}
+
+Write-Host '17k upgrade flashed; user data kept. The phone is rebooting (first boot can take a few minutes).'
+Write-Host 'After it has booted, once (see README.md):'
+Write-Host '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'
+Write-Host '  seed the wallpaper keeper as root: echo com.heytap.colorfulengine/.wallpaper.service.ColorfulWallpaperService > /data/port/wp/wallpaper-component'
+Write-Host '  do NOT run tools/live/camera-donor17/restore-live.sh any more.'
