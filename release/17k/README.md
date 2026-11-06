@@ -1,14 +1,18 @@
-# OnePlus 7 Pro ColorOS 17 port — 17k upgrade release
+# OnePlus 7 Pro ColorOS 17 port — 17k-r2 upgrade release
 
-**STATUS (honest): 17k was installed and booted once on the author's phone (2026-11-06, see [TEST-STATUS.md](TEST-STATUS.md) for what was and was not verified); it is otherwise untested.** It is the 17j-r2 system/my_stock (with the B18 wallpaper-saver fix, which was also not boot-tested) plus a vendor image that adds the B20 charging-limit enforcer and the B21 real-fuel-gauge level (both were verified live on a running 17j-r2 phone on 2026-11-04, but never from a boot-time start). Only the Magisk `.sh` installer has been run end to end (once, on one phone); the NoRoot, `.bat` and `.ps1` installers have not. The idle battery drain (~150 mA screen-off) is NOT fixed; the B19 experiments (Wi-Fi scan, appops, package disabling) are not included; no mem_sleep changes. See docs/battery-handoff-2026-11-05.md.
+**17k-r2 (this release) adds a defensive guard for one problem seen on the author's phone after the first 17k upgrade:** Settings.Global `restricted_networking_mode` was `1`, so every normal app had NO network (Wi-Fi and cellular) while the adb shell still worked (`dumpsys netpolicy`: "Restricted networking mode: true"). `settings put global restricted_networking_mode 0` fixed it at once. **The component that writes the 1 is UNKNOWN** (nothing in our scripts, docs or logs sets it; the investigation was cut short), so r2 is a guard, not a root-cause fix: the vendor image gains an init oneshot (`port_netguard`) that, at boot and again at +30 s, +120 s and +300 s, sets the value to 0 if it is exactly 1, then exits (no polling), and the installers do the same once through adb after the final flash. **17k-r2 itself has NOT been flashed or boot-tested on a phone.**
+
+**STATUS (honest, first 17k): 17k was installed and booted once on the author's phone (2026-11-06, see [TEST-STATUS.md](TEST-STATUS.md) for what was and was not verified); it is otherwise untested.** It is the 17j-r2 system/my_stock (with the B18 wallpaper-saver fix, which was also not boot-tested) plus a vendor image that adds the B20 charging-limit enforcer and the B21 real-fuel-gauge level (both were verified live on a running 17j-r2 phone on 2026-11-04, but never from a boot-time start). Only the Magisk `.sh` installer has been run end to end (once, on one phone); the NoRoot, `.bat` and `.ps1` installers have not. The idle battery drain (~150 mA screen-off) is NOT fixed; the B19 experiments (Wi-Fi scan, appops, package disabling) are not included; no mem_sleep changes. See docs/battery-handoff-2026-11-05.md.
 
 Local test release for the OnePlus 7 Pro GM1910 / PLK110 (`guacamole`, Snapdragon 855 / `msmnile`), ColorOS 17 (PLK110 donor) on
 the LineageOS 24 vendor and kernel. It contains two standalone fastboot bundles:
 
-- `OnePlus7Pro-17k-NoRoot.zip`
-- `OnePlus7Pro-17k-Magisk31.zip`
+- `OnePlus7Pro-17k-r2-NoRoot.zip`
+- `OnePlus7Pro-17k-r2-Magisk31.zip`
 
-What changed: [docs/CHANGELOG-17k.md](docs/CHANGELOG-17k.md) (17k = 17j-r2 + B20 charge-limit enforcer + B21 real fuel-gauge level); everything since 17d is in [docs/CHANGELOG-17j-history.md](docs/CHANGELOG-17j-history.md) (builds 17e–17i plus the 17j bake: ColorOS 17 donor camera, battery-drain fixes, H.40 props, OnePlus 7 Pro identity, live-wallpaper keeper).
+(The folder and the `Install-17k-*` file names stay `17k`; the first 17k zips were `OnePlus7Pro-17k-NoRoot.zip` / `-Magisk31.zip` and are replaced by these. To apply r2 on a phone that already runs 17k, re-run `Install-17k-Magisk.sh` (upgrade, no wipe).)
+
+What changed: [docs/CHANGELOG-17k.md](docs/CHANGELOG-17k.md) (17k = 17j-r2 + B20 charge-limit enforcer + B21 real fuel-gauge level; 17k-r2 = 17k + B22 network-restriction guard); everything since 17d is in [docs/CHANGELOG-17j-history.md](docs/CHANGELOG-17j-history.md) (builds 17e–17i plus the 17j bake: ColorOS 17 donor camera, battery-drain fixes, H.40 props, OnePlus 7 Pro identity, live-wallpaper keeper).
 
 ## Install = upgrade, user data is kept
 
@@ -74,4 +78,6 @@ not flash firmware, modem, dtbo or vbmeta.
 images were built), [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md), `logs/` (build and preflight output), `scripts/` (build, finalize,
 compare and packaging scripts). Image download details: [images/README.md](images/README.md).
 
-The 17k images passed `tools/preflight-b.sh` (`PREFLIGHT PASS`, development and production pairs; logs/). 17k was flashed once and booted on the author's phone (see TEST-STATUS.md). Only the Magisk `.sh` installer has been run; the NoRoot, `.bat` and `.ps1` installers have not. Dev/prod system images and my_stock are byte-identical to the 17j-r2 rebuild in `release/17j/images`; the vendor image differs from 17j-r2's only by the four B20/B21 odm files (`logs/vendor-17j-vs-17k-diff.txt`).
+The 17k-r2 images passed `tools/preflight-b.sh` (`PREFLIGHT PASS`, development and production pairs; `logs/preflight-17k-r2-*.txt`, new section "B22"); the r2 vendor differs from the first 17k vendor only by `odm/bin/port-netguard.sh` and `odm/etc/init/port-netguard.rc` (`logs/vendor-17k-vs-17k-r2-diff.txt`). The guard script was tested offline only (stub `settings`/`log`/`sleep`, `logs/netguard-stub-test.txt`); the installers were only syntax-checked (`logs/installer-syntax-check.txt`). r2 was never flashed. About the first 17k:
+
+The first 17k images passed `tools/preflight-b.sh` (`PREFLIGHT PASS`, development and production pairs; logs/). 17k was flashed once and booted on the author's phone (see TEST-STATUS.md). Only the Magisk `.sh` installer has been run; the NoRoot, `.bat` and `.ps1` installers have not. Dev/prod system images and my_stock are byte-identical to the 17j-r2 rebuild in `release/17j/images`; the vendor image differs from 17j-r2's only by the four B20/B21 odm files (`logs/vendor-17j-vs-17k-diff.txt`).

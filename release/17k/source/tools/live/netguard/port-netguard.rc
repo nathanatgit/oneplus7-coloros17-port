@@ -1,0 +1,12 @@
+# OnePlus7Port 17k-r2: clear Settings.Global restricted_networking_mode if it is 1 (tools/live/netguard/port-netguard.sh, BAKE-LIST B22).
+# Oneshot at boot, four checks over ~5 minutes, then it exits (no polling).
+service port_netguard /system/bin/sh /odm/bin/port-netguard.sh
+    class late_start
+    user root
+    group root
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
+on property:sys.boot_completed=1
+    start port_netguard

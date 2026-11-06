@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OnePlus 7 Pro ColorOS 17 port, 17k @VARIANT_NAME@ UPGRADE installer (Linux/macOS).
+# OnePlus 7 Pro ColorOS 17 port, 17k-r2 @VARIANT_NAME@ UPGRADE installer (Linux/macOS).
 # Upgrades an installed port (17d or later) on the ACTIVE slot and KEEPS ALL USER DATA: it never wipes userdata or
 # metadata (no `fastboot -w`, no format). It flashes vendor, system and boot of the active slot only and replaces
 # /data/port/my_stock.img (the previous one is kept as /data/port/my_stock-prev.img).
@@ -39,6 +39,51 @@ check_image() {
   say "Checking $path ..."
   actual=$(sha256 "$path")
   [[ "$actual" == "$expected" ]] || die "SHA-256 mismatch for $path: $actual"
+}
+
+# ---------- 17k-r2: Magisk variant: let OPPO Health run (best effort, never fails the install) ----------
+# OPPO Health (com.heytap.health) shows a "risk notice" and closes when it can see root: Magisk puts `su` in /product/bin, which is
+# first on every app's PATH. Magisk's DenyList hides Magisk from the listed apps only, but it must be ENFORCED: adding the app is
+# not enough, `magisk --denylist enable` is needed (it also saves the setting in Magisk's database, so it survives reboots and
+# later upgrades). Needs root for the ADB shell (MagiskSU); without it this step is skipped.
+health_denylist() {
+  [[ $VARIANT == magisk ]] || return 0
+  detect_root
+  if [[ $ROOT == none ]]; then
+    say 'No root for the ADB shell: skipped the Magisk DenyList step for OPPO Health. Later: adb shell su -c "magisk --denylist enable; magisk --denylist add com.heytap.health"'
+    return 0
+  fi
+  R 'magisk --denylist enable' >/dev/null 2>&1 || true
+  R 'magisk --denylist add com.heytap.health' >/dev/null 2>&1 || true
+  if R 'magisk --denylist status' >/dev/null 2>&1; then
+    say 'Magisk DenyList is enforced and lists com.heytap.health (hides Magisk from the OPPO Health root check).'
+  else
+    say 'Could not confirm the Magisk DenyList; if OPPO Health reports a rooted device, run: adb shell su -c "magisk --denylist enable; magisk --denylist add com.heytap.health"'
+  fi
+  return 0
+}
+
+# ---------- 17k-r2: network-restriction guard (best effort, never fails the install) ----------
+# The first 17k upgrade left Settings.Global restricted_networking_mode = 1 on the author's phone: every normal app had no
+# network (Wi-Fi and cellular), adb shell still worked. The writer is UNKNOWN. The image now ships a boot-time guard
+# (port_netguard); this installer step additionally clears the value once through adb after the final flash.
+net_guard() {
+  local v v2
+  sleep 20   # let a reboot that was just requested take the phone down before we look for adb
+  say 'Waiting for Android to finish booting to check the network restriction setting (best effort) ...'
+  if wait_adb 400 && wait_boot 400; then
+    v=$(A shell settings get global restricted_networking_mode 2>/dev/null | tr -d '\r' || true)
+    if [[ "$v" == 1 ]]; then
+      A shell settings put global restricted_networking_mode 0 >/dev/null 2>&1 || true
+      v2=$(A shell settings get global restricted_networking_mode 2>/dev/null | tr -d '\r' || true)
+      say "restricted_networking_mode was 1 (apps would have had no network); set to 0, now reads '${v2:-?}'."
+    else
+      say "restricted_networking_mode reads '${v:-?}': nothing to do."
+    fi
+  else
+    say 'ADB did not come up; if apps have no network after boot, run: adb shell settings put global restricted_networking_mode 0'
+  fi
+  return 0
 }
 @CHECK_IMAGES@
 
@@ -221,7 +266,9 @@ elif [[ $VARIANT == magisk ]]; then
   fi
 fi
 
-say '17k upgrade flashed; user data kept. The phone is rebooting (first boot can take a few minutes).'
+net_guard || true
+health_denylist || true
+say '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
 say 'After it has booted, once (see README.md):'
 say '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'
 say '  seed the wallpaper keeper as root: echo com.heytap.colorfulengine/.wallpaper.service.ColorfulWallpaperService > /data/port/wp/wallpaper-component'

@@ -1,4 +1,4 @@
-# 17j docs — what is in this build and why
+# 17j docs — what is in this build and why (17k-r2 adds only B22, see CHANGELOG-17k.md)
 
 17j = the 17d release + everything built and verified on the author's phone since (17e–17i) + the 17j bake (donor camera, battery
 drain fixes, H.40 props, identity, wallpaper keeper). Read in this order:

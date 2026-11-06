@@ -1,4 +1,6 @@
-# 17k release facts
+# 17k release facts (17k-r2)
+
+17k-r2 = the first 17k + B22 `port-netguard` in the vendor image + a non-fatal restricted_networking_mode step in the installers. Only `vendor.img` changed; every other image is byte-identical to the first 17k. **Never flashed or boot-tested.** The writer of `restricted_networking_mode=1` is unknown: the guard is defensive, not a root-cause fix.
 
 ## Target and behaviour
 
@@ -13,7 +15,7 @@
 |---|---|---|---|
 | `system.img` | `0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9` | 3,640,655,872 | 17j-r2 production system (unchanged); both bundles |
 | `bootstrap-system.img` | `e64a10ca29f384a877b223f255150dd8bb3616321f3b51e9b6f9c5ec43dc5726` | 3,640,655,872 | 17j-r2 development system (adb root) = `out-plk-build17k/system.img` |
-| `vendor.img` | `d7e9a440d5a0fb6cbb7f3de6d3b04639488a262bcaaac4a6c072776da5fbe874` | 1,073,741,824 | 17j-r2 vendor (`d8f45456...`) + 4 odm files B20/B21 |
+| `vendor.img` | `3a70f811ef98cad2e94916c923b744da6c827256e451da8c0084db96788a0d29` | 1,073,741,824 | first 17k vendor (`d7e9a440...` = 17j-r2 `d8f45456...` + 4 odm files B20/B21) + 2 odm files B22 (r2) |
 | `my_stock.img` | `135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189` | 6,917,992,448 | 17j-r2 my_stock, byte-identical; NOT rebuildable (source gone) |
 | `boot-ese-final.img` | `a96c205d24598b824c9e119e48cd7b363151920b21ab351e971539511e3cbe91` | 100,663,296 | 17d eSE-kernel boot |
 | `boot-magisk31-17d.img` | `b073b02da7c29f00f54e510fb4e6a7304d49c5c5df89f684f81d69fa90d4e155` | 100,663,296 | Magisk v31.0 patch of it |
@@ -21,14 +23,19 @@
 
 B20/B21 files (sources `tools/live/odm-services/port/...`): `bin/port-chglimit.sh` `ac6aa905f3cf632af216a26989275a947370653541c3ce761bf5308783e1fd69` (uses `/sys/class/oplus_chg/battery/mmi_charging_enable` when present, else `power_supply/battery/`), `etc/init/port-chglimit.rc` `72d396c8...943a`, `bin/port-bmslevel.sh` `6344969d...094e`, `etc/init/port-bmslevel.rc` `74ce260a...316b`. Installed to `/vendor/odm/bin` 0755 `vendor_file` and `/vendor/odm/etc/init` 0644 `vendor_configs_file`; rc `seclabel u:r:su:s0`.
 
+B22 files (sources `tools/live/odm-services/port/...`, `tools/live/netguard/`): `bin/port-netguard.sh` `67b33c2836688da6abdd17c9a2eac0b6a16158291edfe1f1175a5a7168e4870c` (0755 `vendor_file`), `etc/init/port-netguard.rc` `0b3cb5681872b929e9ee0fc79855786c5bc7d35b8c88a7a24311f660ac3964aa` (0644 `vendor_configs_file`; oneshot service `port_netguard`, user root, seclabel su, started at `sys.boot_completed=1`). Behaviour: reads `settings get global restricted_networking_mode`; if exactly `1` -> `settings put ... 0` + `log -t netguard`; checks at start, +30 s, +120 s, +300 s, then exits; null/0 -> nothing; no loop.
+
 ## Verification
 
-- `tools/preflight-b.sh` development set (system `e64a10ca`, vendor `d7e9a440`, boot, my_stock): **PREFLIGHT PASS** (`logs/preflight-17k-development.txt`), includes the new "B20+B21" section.
+- r2: `tools/preflight-b.sh` development set (system `e64a10ca`, vendor `3a70f811`, boot, my_stock): **PREFLIGHT PASS** (`logs/preflight-17k-r2-development.txt`); production pair (`PROD_PROPS=1`, system `0b24fcb2`): **PREFLIGHT PASS** (`logs/preflight-17k-r2-production.txt`); both include the new "B22" section. Vendor diff vs the first 17k vendor: only the two B22 files (`logs/vendor-17k-vs-17k-r2-diff.txt`). Offline stub test of the guard script (dash): `logs/netguard-stub-test.txt`. Installers: `bash -n` and the PowerShell parser only (`logs/installer-syntax-check.txt`), never run.
+- first 17k: `tools/preflight-b.sh` development set (system `e64a10ca`, vendor `d7e9a440`, boot, my_stock): **PREFLIGHT PASS** (`logs/preflight-17k-development.txt`), includes the "B20+B21" section.
 - `PROD_PROPS=1 tools/preflight-b.sh` production system `0b24fcb2` + 17k vendor/boot/my_stock: **PREFLIGHT PASS** (`logs/preflight-17k-production.txt`).
 - Vendor file-level diff vs 17j-r2 vendor: only the four B20/B21 odm files (`logs/vendor-17j-vs-17k-diff.txt`).
 - Live (2026-11-04, 17j-r2 phone, scripts started by hand): B20 hold/release at a lowered limit, B21 gauge tracking; chglimit with the node fallback started on the phone 2026-11-06 and left mmi untouched (below limit).
 
 ## Not verified
+
+- **17k-r2 was not flashed or booted.** Not tested on a phone: that `port_netguard` starts from /odm at boot, that the installer step works on a real phone, that clearing the value is enough. The writer of `restricted_networking_mode=1` is unknown, so it can come back later than +300 s or by another path; the guard does not cover that. Idle drain is still not fixed.
 
 - 17k was flashed once and booted on the author's phone (2026-11-06; TEST-STATUS.md): `port_chglimit` / `port_bmslevel` start from /odm at boot and the gauge matches. The real 85 % crossing and the B18 saver across reboots are still untested; only the Magisk `.sh` installer has been run. Idle drain (~150 mA screen-off) is not fixed. B19 experiments are not included.
 - The oplus_chg node path fallback in port-chglimit.sh is untested on a kernel that has that path (the port's kernel does not).

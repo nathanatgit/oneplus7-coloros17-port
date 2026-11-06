@@ -1,0 +1,4 @@
+== vendor first 17k (out-plk-build17k/vendor.img d7e9a440) vs 17k-r2 (out-plk-build17k-r2/vendor.img)
+Only in /mnt/k17rb/odm/bin: port-netguard.sh
+Only in /mnt/k17rb/odm/etc/init: port-netguard.rc
+diff exit=1

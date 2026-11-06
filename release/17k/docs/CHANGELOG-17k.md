@@ -1,5 +1,19 @@
 # 17k changelog vs 17j-r2
 
+## 17k-r2 (2026-11-06) = 17k + B22 network-restriction guard
+
+| Item | Change | Status |
+| --- | --- | --- |
+| B22 restricted_networking_mode guard | After the first 17k upgrade the author's phone had Settings.Global `restricted_networking_mode` = 1: every normal app had no network (Wi-Fi and cellular), the adb shell did. Live fix: `settings put global restricted_networking_mode 0`. r2 ships `/vendor/odm/bin/port-netguard.sh` + `/vendor/odm/etc/init/port-netguard.rc` (init oneshot `port_netguard`, user root, seclabel su, at `sys.boot_completed=1`): if the value is exactly 1 it writes 0 and logs `netguard`; checks at start, +30 s, +120 s, +300 s, then exits (no polling). The four installers also clear it once through adb (as the shell user) after the final flash; non-fatal. | script: offline stub tests only (dash); installers: syntax check only; boot-time start from /odm U; **never flashed** |
+
+**Root cause NOT found.** The writer of the 1 is unknown (defaultSysSet=true: some system component, not us). The guard only clears the value within ~5 minutes of boot; a later write, or a different cause of lost network, is not covered. It is a defensive workaround, not a fix of the cause. The idle drain is still not fixed.
+
+Also in r2 (installer only, Magisk variant): the installer enforces Magisk's DenyList for `com.heytap.health` (`magisk --denylist enable` + `add`) so OPPO Health no longer reports a rooted device. Found live on the author's phone: the DenyList entry alone does nothing until enforcement is switched on, and `enable` persists the setting. Not part of the images.
+
+Files that differ from the first 17k (`logs/vendor-17k-vs-17k-r2-diff.txt`): `vendor.img` gains `odm/bin/port-netguard.sh` and `odm/etc/init/port-netguard.rc`. All other images are byte-identical. The installers differ by the post-flash step. Zip names: `OnePlus7Pro-17k-r2-NoRoot.zip` / `OnePlus7Pro-17k-r2-Magisk31.zip`.
+
+## 17k vs 17j-r2
+
 17k = the 17j-r2 rebuild (2026-11-05, with the B18 wallpaper-saver fix) + two battery-related fixes in the vendor image.
 Everything older is in [CHANGELOG-17j-history.md](CHANGELOG-17j-history.md). Item numbers are those of `tools/live/BAKE-LIST.md` (A03).
 **L** = verified live on a running phone, baked and not booted from a flashed image, **U** = untested.

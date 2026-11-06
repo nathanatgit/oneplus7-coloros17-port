@@ -44,3 +44,5 @@ ac6aa905f3cf632af216a26989275a947370653541c3ce761bf5308783e1fd69 *port/bin/port-
 72d396c84fc5cefe981f005eee94c181be832f3bf5b6da872cd9d35af146943a *port/etc/init/port-chglimit.rc
 6344969d27f982693dde041a61766b4e475a6bcfe8216fe41bc681c2c280094e *port/bin/port-bmslevel.sh
 74ce260a73a76be2d786d5bdc36373cd840220580ef356b3f2564aa59592316b *port/etc/init/port-bmslevel.rc
+67b33c2836688da6abdd17c9a2eac0b6a16158291edfe1f1175a5a7168e4870c *port/bin/port-netguard.sh
+0b3cb5681872b929e9ee0fc79855786c5bc7d35b8c88a7a24311f660ac3964aa *port/etc/init/port-netguard.rc

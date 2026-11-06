@@ -1,4 +1,4 @@
-# OnePlus 7 Pro ColorOS 17 port, 17k NoRoot UPGRADE installer (Windows PowerShell).
+# OnePlus 7 Pro ColorOS 17 port, 17k-r2 NoRoot UPGRADE installer (Windows PowerShell).
 # Upgrades an installed port (17d or later) on the ACTIVE slot and KEEPS ALL USER DATA: it never wipes userdata or
 # metadata (no `fastboot -w`, no format). It flashes vendor, system and boot of the active slot only and replaces
 # /data/port/my_stock.img (the previous one is kept as /data/port/my_stock-prev.img).
@@ -135,9 +135,55 @@ function Stage-MyStock {
     Write-Host 'my_stock.img staged; the previous image is /data/port/my_stock-prev.img.'
 }
 
+
+# ---------- 17k-r2: Magisk variant: let OPPO Health run (best effort, never fails the install) ----------
+# OPPO Health (com.heytap.health) shows a "risk notice" and closes when it can see root: Magisk puts `su` in /product/bin, which is
+# first on every app's PATH. Magisk's DenyList hides Magisk from the listed apps only, but it must be ENFORCED: adding the app is
+# not enough, `magisk --denylist enable` is needed (it also saves the setting in Magisk's database, so it survives reboots and
+# later upgrades). Needs root for the ADB shell (MagiskSU); without it this step is skipped.
+function Invoke-HealthDenyList {
+    if ($script:Variant -ne 'magisk') { return }
+    try {
+        Find-Root
+        if ($script:SuMode -eq 'none') {
+            Write-Host 'No root for the ADB shell: skipped the Magisk DenyList step for OPPO Health. Later: adb shell su -c "magisk --denylist enable; magisk --denylist add com.heytap.health"'
+            return
+        }
+        [void](Test-Root 'magisk --denylist enable')
+        [void](Test-Root 'magisk --denylist add com.heytap.health')
+        if (Test-Root 'magisk --denylist status') {
+            Write-Host 'Magisk DenyList is enforced and lists com.heytap.health (hides Magisk from the OPPO Health root check).'
+        } else {
+            Write-Host 'Could not confirm the Magisk DenyList; if OPPO Health reports a rooted device, run: adb shell su -c "magisk --denylist enable; magisk --denylist add com.heytap.health"'
+        }
+    } catch { Write-Host "Skipped the Magisk DenyList step: $_" }
+}
+
+# ---------- 17k-r2: network-restriction guard (best effort, never fails the install) ----------
+# The first 17k upgrade left Settings.Global restricted_networking_mode = 1 on the author's phone: every normal app had no
+# network (Wi-Fi and cellular), adb shell still worked. The writer is UNKNOWN. The image now ships a boot-time guard
+# (port_netguard); this installer step additionally clears the value once through adb after the final flash.
+function Invoke-NetGuard {
+    try {
+        Start-Sleep -Seconds 20   # let a reboot that was just requested take the phone down before we look for adb
+        Write-Host 'Waiting for Android to finish booting to check the network restriction setting (best effort) ...'
+        if ((Wait-ForAdb 400) -and (Wait-ForBoot 400)) {
+            $v = Get-AdbOut @('shell', 'settings', 'get', 'global', 'restricted_networking_mode')
+            if ($v -eq '1') {
+                [void](Get-AdbOut @('shell', 'settings', 'put', 'global', 'restricted_networking_mode', '0'))
+                $v2 = Get-AdbOut @('shell', 'settings', 'get', 'global', 'restricted_networking_mode')
+                Write-Host "restricted_networking_mode was 1 (apps would have had no network); set to 0, now reads '$v2'."
+            } else {
+                Write-Host "restricted_networking_mode reads '$v': nothing to do."
+            }
+        } else {
+            Write-Host 'ADB did not come up; if apps have no network after boot, run: adb shell settings put global restricted_networking_mode 0'
+        }
+    } catch { Write-Host "Network restriction check skipped: $($_.Exception.Message)" }
+}
 Check-Image (Join-Path $script:Root 'images/bootstrap-system.img') 'e64a10ca29f384a877b223f255150dd8bb3616321f3b51e9b6f9c5ec43dc5726'
 Check-Image (Join-Path $script:Root 'images/system.img') '0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9'
-Check-Image (Join-Path $script:Root 'images/vendor.img') 'd7e9a440d5a0fb6cbb7f3de6d3b04639488a262bcaaac4a6c072776da5fbe874'
+Check-Image (Join-Path $script:Root 'images/vendor.img') '3a70f811ef98cad2e94916c923b744da6c827256e451da8c0084db96788a0d29'
 Check-Image (Join-Path $script:Root 'images/my_stock.img') '135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189'
 Check-Image (Join-Path $script:Root 'images/boot-ese-final.img') 'a96c205d24598b824c9e119e48cd7b363151920b21ab351e971539511e3cbe91'
 
@@ -248,7 +294,9 @@ if (-not $staged) {
     } else { Write-Host 'ADB did not come up; if the Magisk app is missing, install images\Magisk-v31.0.apk by hand.' }
 }
 
-Write-Host '17k upgrade flashed; user data kept. The phone is rebooting (first boot can take a few minutes).'
+Invoke-NetGuard
+Invoke-HealthDenyList
+Write-Host '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
 Write-Host 'After it has booted, once (see README.md):'
 Write-Host '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'
 Write-Host '  seed the wallpaper keeper as root: echo com.heytap.colorfulengine/.wallpaper.service.ColorfulWallpaperService > /data/port/wp/wallpaper-component'

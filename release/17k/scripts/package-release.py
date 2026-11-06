@@ -1,4 +1,4 @@
-"""17k release packager: copies the images into release/17k/images, renders the installers from scripts/templates,
+"""17k-r2 release packager: copies the images into release/17k/images, renders the installers from scripts/templates,
 writes the per-package SHA256SUMS, builds the two ZIPs, CRC-tests them and writes RELEASE-SHA256SUMS.txt.
 Run from the repository root:  uv run python -I release/17k/scripts/package-release.py [--no-zip] [--no-copy]
 """
@@ -13,7 +13,7 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 REL = ROOT / "release" / "17k"
 TPL = REL / "scripts" / "templates"
-OUT = ROOT / "out-plk-build17k"
+OUT = ROOT / "out-plk-build17k-r2"
 R17D = ROOT / "release" / "17k" / "images"  # kept 17d boot images + Magisk, carried through 17j (copied once from release/17j/images)
 R17J = ROOT / "release" / "17j" / "images"
 PROD_SYSTEM_SHA = "0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9"  # production system of the 17j-r2 rebuild (B18 saver fix), reused unchanged
@@ -25,7 +25,7 @@ SOURCES = {
     "images/bootstrap-system.img": OUT / "system.img",          # 17k development system (adb root): no-root staging only
     "images/system.img": R17J / "system.img",                   # 17j-r2 production-property system (B18 saver fix), reused byte-for-byte
     "images/vendor.img": OUT / "vendor.img",
-    "images/my_stock.img": R17J / "my_stock.img",               # byte-identical to out-plk-build17k/my_stock.img (source tree gone: never rebuild)
+    "images/my_stock.img": R17J / "my_stock.img",               # byte-identical to out-plk-build17k-r2/my_stock.img (source tree gone: never rebuild)
     "images/boot-ese-final.img": R17D / "boot-ese-final.img",
     "images/boot-magisk31-17d.img": R17D / "boot-magisk31-17d.img",
     "images/Magisk-v31.0.apk": R17D / "Magisk-v31.0.apk",
@@ -36,9 +36,9 @@ KNOWN = {  # fixed inputs carried from 17d
     "images/Magisk-v31.0.apk": "2c8a488b9a5293e578e95ae4f07e3c57aba4feec4a52ca4dd852a2692d6dd4e8",
 }
 PACKAGES = {
-    "no-root": ("noroot", "NoRoot", "OnePlus7Pro-17k-NoRoot.zip",
+    "no-root": ("noroot", "NoRoot", "OnePlus7Pro-17k-r2-NoRoot.zip",
                 ["images/bootstrap-system.img", "images/system.img", "images/vendor.img", "images/my_stock.img", "images/boot-ese-final.img"]),
-    "magisk": ("magisk", "Magisk 31", "OnePlus7Pro-17k-Magisk31.zip",
+    "magisk": ("magisk", "Magisk 31", "OnePlus7Pro-17k-r2-Magisk31.zip",
                ["images/system.img", "images/vendor.img", "images/my_stock.img", "images/boot-magisk31-17d.img", "images/Magisk-v31.0.apk"]),
 }
 

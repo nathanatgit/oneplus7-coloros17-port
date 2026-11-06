@@ -1,0 +1,6 @@
+/mnt/c/Users/Han/Project/OnePlus7Port/out-plk-build17k/vendor.img: OK
+-rwxr-xr-x. 1 root root u:object_r:vendor_file:s0 962 Nov  6 11:25 /mnt/k17r2v/odm/bin/port-netguard.sh
+-rw-r--r--. 1 root root u:object_r:vendor_configs_file:s0 433 Nov  6 11:25 /mnt/k17r2v/odm/etc/init/port-netguard.rc
+e2fsck 1.47.0 (5-Feb-2023)
+vendor fsck clean
+3a70f811ef98cad2e94916c923b744da6c827256e451da8c0084db96788a0d29  /mnt/c/Users/Han/Project/OnePlus7Port/out-plk-build17k-r2/vendor.img

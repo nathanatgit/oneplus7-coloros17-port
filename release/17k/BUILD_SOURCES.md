@@ -1,5 +1,9 @@
 # Build sources
 
+**17k-r2 (2026-11-06):** only the vendor was rebuilt again: `scripts/build-17k-r2-vendor.sh` copies the FIRST 17k vendor (`out-plk-build17k/vendor.img`, `d7e9a440...`), installs `port-netguard.sh` / `.rc` from `tools/live/odm-services/install.list` (0755 `vendor_file`, 0644 `vendor_configs_file`), fsck, dd to `out-plk-build17k-r2/vendor.img` (3a70f811...). `scripts/build-17k-r2-assemble.sh` assembles `out-plk-build17k-r2/` (system `e64a10ca` / boot / my_stock `135022d0` copied byte-for-byte), runs the development and production preflight and the vendor diff (`logs/preflight-17k-r2-*.txt`, `logs/vendor-17k-vs-17k-r2-diff.txt`). `scripts/package-release.py` now reads `out-plk-build17k-r2` and writes `OnePlus7Pro-17k-r2-*.zip`. The installer templates gained the `net_guard` / `Invoke-NetGuard` step. my_stock was NOT rebuilt (source gone).
+
+The text below describes the first 17k build, which r2 builds on.
+
 17k reuses the finished 17j-r2 system images and my_stock and rebuilds only the vendor image:
 
 - `system.img` (production) / `bootstrap-system.img` (development): the 17j-r2 rebuild of 2026-11-05 (`release/17j/scripts/build-17j-r2-wsl.sh` + `finalize-production-system-r2-wsl.sh`), reused byte-for-byte.

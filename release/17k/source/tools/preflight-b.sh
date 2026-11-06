@@ -154,6 +154,19 @@ done
 grep -q 'mmi_charging_enable' $V/odm/bin/port-chglimit.sh && grep -q 'bms/capacity' $V/odm/bin/port-chglimit.sh || { echo "port-chglimit.sh content (B20)"; ok=0; }
 grep -q 'mount -o bind \$F \$P/battery/capacity' $V/odm/bin/port-bmslevel.sh && grep -q '^F=/dev/port-battery-capacity$' $V/odm/bin/port-bmslevel.sh || { echo "port-bmslevel.sh content (B21)"; ok=0; }
 grep -qx '    user root' $V/odm/etc/init/port-bmslevel.rc && grep -qx '    user system' $V/odm/etc/init/port-chglimit.rc || { echo "B20/B21 rc users"; ok=0; }
+echo "== B22: restricted_networking_mode guard (port-netguard)"
+sh_=$V/odm/bin/port-netguard.sh; rc_=$V/odm/etc/init/port-netguard.rc
+if [ -f "$sh_" ] && [ -f "$rc_" ]; then
+  [ "$(stat -c %a $sh_)" = 755 ] && [ "$(stat -c %a $rc_)" = 644 ] || { echo "modes of port-netguard (B22)"; ok=0; }
+  getfattr -n security.selinux --only-values $sh_ 2>/dev/null | tr -d '\0' | grep -qx 'u:object_r:vendor_file:s0' || { echo "label of port-netguard.sh"; ok=0; }
+  getfattr -n security.selinux --only-values $rc_ 2>/dev/null | tr -d '\0' | grep -qx 'u:object_r:vendor_configs_file:s0' || { echo "label of port-netguard.rc"; ok=0; }
+  grep -q $'\r' $sh_ $rc_ && { echo "CRLF in port-netguard (B22)"; ok=0; }
+  grep -qx "service port_netguard /system/bin/sh /odm/bin/port-netguard.sh" $rc_ && grep -qx '    seclabel u:r:su:s0' $rc_ && grep -qx '    disabled' $rc_ && grep -qx '    oneshot' $rc_ \
+    && grep -qx 'on property:sys.boot_completed=1' $rc_ && grep -qx "    start port_netguard" $rc_ || { echo "rc content of port-netguard (B22)"; ok=0; }
+  grep -q 'settings get global "\$KEY"' $sh_ && grep -q 'settings put global "\$KEY" 0' $sh_ && grep -qx 'KEY=restricted_networking_mode' $sh_ && grep -qx '#!/system/bin/sh' $sh_ \
+    && ! grep -Eq '^[[:space:]]*(while|until|for)[[:space:]]' $sh_ && ! grep -q 'set -e' $sh_ || { echo "port-netguard.sh content (B22: guard logic / must not loop)"; ok=0; }
+  [ "$(grep -c '^sleep ' $sh_)" = 3 ] || { echo "port-netguard.sh: expected exactly 3 sleeps (+30/+120/+300 s)"; ok=0; }
+else echo "port-netguard script/rc missing (B22)"; ok=0; fi
 grep -q 'port.Main' $V/odm/etc/init/port-charger-aidl.rc && grep -q '<version>12</version>' $V/odm/etc/vintf/manifest/manifest_oplus_charger.xml || { echo "AIDL ICharger stub (what ColorOS 17 OplusBatteryServiceFeature looks up) rc/vintf missing"; ok=0; }
 grep -qx '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None' $V/odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc || { echo "cryptoeng mkdir line"; ok=0; }
 grep -q 'vendor_de 0770\|mkdir /data/vendor_de 0\|mkdir /data/vendor_de/0 ' $V/odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc && { echo "cryptoeng rc re-owns /data/vendor_de"; ok=0; }

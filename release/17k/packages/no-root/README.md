@@ -28,4 +28,4 @@ computer's existing ADB authorization is kept (it is in userdata).
 
 After the first boot, see "After flashing" in `README.md` of the release (camera update removal, wallpaper keeper, charging limit checks).
 
-17k has NOT been flashed or boot-tested; the installers have not been run end to end. Idle battery drain is not fixed.
+17k-r2 has NOT been flashed or boot-tested; the installers have not been run end to end. r2 = the first 17k (installed once on the author's phone) + a defensive guard for `restricted_networking_mode` = 1 (all apps without network after the first 17k upgrade; the component that writes it is unknown): a boot-time service in the vendor image and a non-fatal step at the end of the installer that sets it to 0 through adb. Idle battery drain is not fixed.

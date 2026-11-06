@@ -1,0 +1,68 @@
+== t1_1_then_0 (1,0, put=fix) exit=0
+get -> 1
+put 0
+get -> 0
+log -t netguard restricted_networking_mode was 1 (boot), set to 0 (reads '0')
+sleep 30
+get -> 0
+sleep 90
+get -> 0
+sleep 180
+get -> 0
+== t2_null (null, put=fix) exit=0
+get -> null
+sleep 30
+get -> null
+sleep 90
+get -> null
+sleep 180
+get -> null
+== t3_zero (0, put=fix) exit=0
+get -> 0
+sleep 30
+get -> 0
+sleep 90
+get -> 0
+sleep 180
+get -> 0
+== t4_sticky_1 (1, put=stick) exit=0
+get -> 1
+put 0
+get -> 1
+log -t netguard restricted_networking_mode was 1 (boot), set to 0 (reads '1')
+sleep 30
+get -> 1
+put 0
+get -> 1
+log -t netguard restricted_networking_mode was 1 (+30s), set to 0 (reads '1')
+sleep 90
+get -> 1
+put 0
+get -> 1
+log -t netguard restricted_networking_mode was 1 (+120s), set to 0 (reads '1')
+sleep 180
+get -> 1
+put 0
+get -> 1
+log -t netguard restricted_networking_mode was 1 (+300s), set to 0 (reads '1')
+== t5_rearm (null,null,null,null,null,1, put=fix) exit=0
+get -> null
+sleep 30
+get -> null
+sleep 90
+get -> null
+sleep 180
+get -> null
+lrwxrwxrwx 1 root root 4 Mar 31  2024 /bin/sh -> dash
+== t5_rearm_at_120s (null,null,1, put=fix) exit=0
+get -> null
+sleep 30
+get -> null
+sleep 90
+get -> 1
+put 0
+get -> 0
+log -t netguard restricted_networking_mode was 1 (+120s), set to 0 (reads '0')
+sleep 180
+get -> 0
+lrwxrwxrwx 1 root root 4 Mar 31  2024 /bin/sh -> dash

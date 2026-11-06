@@ -55,3 +55,6 @@ port/lib64/port-stubs.dex  lib64/port-stubs.dex  0644 vendor_file
 # B21: bind real fuel-gauge (bms/capacity) over battery/capacity for health HAL (tools/live/battery-gauge)
 port/bin/port-bmslevel.sh  bin/port-bmslevel.sh  0755 vendor_file
 port/etc/init/port-bmslevel.rc  etc/init/port-bmslevel.rc  0644 vendor_configs_file
+# B22 (17k-r2): defensive guard, clears Settings.Global restricted_networking_mode if it is 1 (tools/live/netguard); oneshot, 4 checks over ~5 min at boot
+port/bin/port-netguard.sh  bin/port-netguard.sh  0755 vendor_file
+port/etc/init/port-netguard.rc  etc/init/port-netguard.rc  0644 vendor_configs_file
