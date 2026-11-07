@@ -1,0 +1,9 @@
+e64a10ca29f384a877b223f255150dd8bb3616321f3b51e9b6f9c5ec43dc5726  system.img
+90479f1a327d27d5a0258de8261e8543e8e5e31045ddfaf1b64707a038fa15ea  boot.img
+3805ab33c05fd2843e66daee449532df8f67ccd659de598dd448dc04f4f198a7  vendor.img
+135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189  my_stock.img
+PREFLIGHT PASS
+PREFLIGHT PASS
+== vendor 17k-r2 rebuilt (e61b3b19, out-plk-build17k-r2/vendor-r2-final.img) vs 17k-r3 (vendor.img)
+Only in /mnt/k17rb/odm/etc/init: port-offlinecam-stub.rc
+diff exit=1

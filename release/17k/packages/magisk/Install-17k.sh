@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OnePlus 7 Pro ColorOS 17 port, 17k-r2 Magisk 31 UPGRADE installer (Linux/macOS).
+# OnePlus 7 Pro ColorOS 17 port, 17k-r3 Magisk 31 UPGRADE installer (Linux/macOS).
 # Default = UPGRADE of an installed port (17d or later) on the ACTIVE slot, KEEPING ALL USER DATA: it flashes vendor, system and
 # boot of the active slot only and replaces /data/port/my_stock.img (the previous one is kept as my_stock-prev.img).
 # After the images are flashed it asks whether to wipe /data; only the exact word WIPE does (clean install, `fastboot -w`);
@@ -55,7 +55,7 @@ check_image() {
   [[ "$actual" == "$expected" ]] || die "SHA-256 mismatch for $path: $actual"
 }
 
-# ---------- 17k-r2: Magisk variant: let OPPO Health run (best effort, never fails the install) ----------
+# ---------- 17k-r3: Magisk variant: let OPPO Health run (best effort, never fails the install) ----------
 # OPPO Health (com.heytap.health) shows a "risk notice" and closes when it can see root: Magisk puts `su` in /product/bin, which is
 # first on every app's PATH. Magisk's DenyList hides Magisk from the listed apps only, but it must be ENFORCED: adding the app is
 # not enough, `magisk --denylist enable` is needed (it also saves the setting in Magisk's database, so it survives reboots and
@@ -77,7 +77,7 @@ health_denylist() {
   return 0
 }
 
-# ---------- 17k-r2: network-restriction guard (best effort, never fails the install) ----------
+# ---------- 17k-r3: network-restriction guard (best effort, never fails the install) ----------
 # The first 17k upgrade left Settings.Global restricted_networking_mode = 1 on the author's phone: every normal app had no
 # network (Wi-Fi and cellular), adb shell still worked. The writer is UNKNOWN. The image now ships a boot-time guard
 # (port_netguard); this installer step additionally clears the value once through adb after the final flash.
@@ -100,7 +100,7 @@ net_guard() {
   return 0
 }
 check_image images/system.img 0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9
-check_image images/vendor.img e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c
+check_image images/vendor.img 3805ab33c05fd2843e66daee449532df8f67ccd659de598dd448dc04f4f198a7
 check_image images/my_stock.img 135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189
 check_image images/boot-magisk31-17d.img b073b02da7c29f00f54e510fb4e6a7304d49c5c5df89f684f81d69fa90d4e155
 check_image images/Magisk-v31.0.apk 2c8a488b9a5293e578e95ae4f07e3c57aba4feec4a52ca4dd852a2692d6dd4e8
@@ -375,9 +375,9 @@ fi
 net_guard || true
 health_denylist || true
 if [[ $WIPED == 1 ]]; then
-  say '17k-r2 CLEAN INSTALL flashed; /data was wiped and my_stock.img copied. The first boot can take several minutes; finish the setup wizard.'
+  say '17k-r3 CLEAN INSTALL flashed; /data was wiped and my_stock.img copied. The first boot can take several minutes; finish the setup wizard.'
 else
-  say '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
+  say '17k-r3 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
 fi
 say 'After it has booted, once (see README.md):'
 say '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'

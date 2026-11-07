@@ -193,6 +193,17 @@ for f in audio_policy_configuration audio_policy_configuration_a2dp_offload_disa
   [ "$(getfattr -n security.selinux --only-values $a 2>/dev/null | tr -d '\0')" = "u:object_r:vendor_configs_file:s0" ] || { echo "label of $f.xml (B26)"; ok=0; }
   python3 -I -c 'import sys,xml.dom.minidom as m; m.parse(sys.argv[1])' $a || { echo "$f.xml not well-formed (B26)"; ok=0; }
 done
+echo "== B27 (17k-r3): dummy IOfflineCameraService/default (port_offlinecam_stub)"
+rc_=$V/odm/etc/init/port-offlinecam-stub.rc
+if [ -f $rc_ ]; then
+  [ "$(stat -c %a $rc_)" = 644 ] || { echo "mode of port-offlinecam-stub.rc (B27)"; ok=0; }
+  getfattr -n security.selinux --only-values $rc_ 2>/dev/null | tr -d ' ' | grep -qx "u:object_r:vendor_configs_file:s0" || { echo "label of port-offlinecam-stub.rc (B27)"; ok=0; }
+  grep -q $'' $rc_ && { echo "CRLF in port-offlinecam-stub.rc (B27)"; ok=0; }
+  [ "$(sha $rc_)" = 83bbe348253aef73c24f20e8344ea6225bcdcbb2fa99584a24140d2ecaf070b4 ] || { echo "port-offlinecam-stub.rc sha (B27)"; ok=0; }
+  grep -qx 'service port_offlinecam_stub /system/bin/app_process /system/bin port.OplusStubs vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default' $rc_     && grep -qx '    setenv CLASSPATH /system/framework/oplus-port-stubs.dex' $rc_ && grep -qx '    seclabel u:r:su:s0' $rc_ && grep -qx '    user root' $rc_     && grep -qx '    disabled' $rc_ && ! grep -qx '    oneshot' $rc_ && grep -qx 'on boot' $rc_ && grep -qx '    start port_offlinecam_stub' $rc_ || { echo "rc content of port-offlinecam-stub.rc (B27: must be restartable, started at on boot)"; ok=0; }
+  # the dex it loads (stock, or the bind-mounted hold dex) must contain the registration class and the plain stub binder
+  grep -aq 'Lport/OplusStubs;' $S/system/framework/oplus-port-stubs.dex && grep -aq 'Lport/StubBinder;' $S/system/framework/oplus-port-stubs.dex && grep -aq 'Lport/OplusStubs;' $V/odm/bin/port-slider-hold.dex || { echo "port.OplusStubs missing in a dex (B27)"; ok=0; }
+else echo "port-offlinecam-stub.rc missing (B27)"; ok=0; fi
 grep -q 'port.Main' $V/odm/etc/init/port-charger-aidl.rc && grep -q '<version>12</version>' $V/odm/etc/vintf/manifest/manifest_oplus_charger.xml || { echo "AIDL ICharger stub (what ColorOS 17 OplusBatteryServiceFeature looks up) rc/vintf missing"; ok=0; }
 grep -qx '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None' $V/odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc || { echo "cryptoeng mkdir line"; ok=0; }
 grep -q 'vendor_de 0770\|mkdir /data/vendor_de 0\|mkdir /data/vendor_de/0 ' $V/odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc && { echo "cryptoeng rc re-owns /data/vendor_de"; ok=0; }

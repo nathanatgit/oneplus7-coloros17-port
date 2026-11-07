@@ -30,6 +30,7 @@ Facts that are not obvious from the code, with where they were measured. Useful 
 - init refuses to start a service whose binary has no SELinux exec type with a domain transition ("incorrect label or no domain transition") even though SELinux is permissive, and reports it as a generic "unable to start service".
 - Every HIDL/AIDL service needs a VINTF manifest entry (odm fragment); the servicemanagers read manifests at start, so a manifest edit needs a reboot.
 - SELinux is permissive on this port; the policy is capped to v29 by the donor init.
+- cameraserver loads `/vendor/odm/lib64/libAlgoProcess.so` for third-party camera apps (APS path); its `AlgoInterface::init` -> `jpegCodecRegister` waits for the AIDL service `vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default`. A name that is only declared in the VINTF matrix but never registered makes the 20 s `thirdPartyAlgoTimerFunc` abort cameraserver (the donor camera uses another path and is unaffected). A plain `port.OplusStubs` dummy binder under that name is enough; an init service (not oneshot) keeps it alive.
 
 ## Tooling and environment
 

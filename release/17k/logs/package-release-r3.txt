@@ -1,0 +1,36 @@
+copy C:\Users\Han\Project\OnePlus7Port\out-plk-build17k-r3\vendor.img -> C:\Users\Han\Project\OnePlus7Port\release\17k\images\vendor.img
+hashing C:\Users\Han\Project\OnePlus7Port\out-plk-build17k-r3\system.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\system.img
+hashing C:\Users\Han\Project\OnePlus7Port\out-plk-build17k-r3\vendor.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\my_stock.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\boot-ese-final.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\boot-magisk31-17d.img
+hashing C:\Users\Han\Project\OnePlus7Port\release\17k\images\Magisk-v31.0.apk
+Adding images/bootstrap-system.img (3640655872 bytes)
+Adding images/system.img (3640655872 bytes)
+Adding images/vendor.img (1073741824 bytes)
+Adding images/my_stock.img (6917992448 bytes)
+Adding images/boot-ese-final.img (100663296 bytes)
+Adding README.md (5234 bytes)
+Adding Install-17k.ps1 (26827 bytes)
+Adding Install-17k.sh (23042 bytes)
+Adding Install-17k.bat (207 bytes)
+Adding SHA256SUMS (440 bytes)
+Created OnePlus7Pro-17k-r3-NoRoot.zip: 11622203823 bytes; testing CRCs
+ZIP integrity PASS: OnePlus7Pro-17k-r3-NoRoot.zip
+Adding images/system.img (3640655872 bytes)
+Adding images/vendor.img (1073741824 bytes)
+Adding images/my_stock.img (6917992448 bytes)
+Adding images/boot-magisk31-17d.img (100663296 bytes)
+Adding images/Magisk-v31.0.apk (11248935 bytes)
+Adding README.md (6095 bytes)
+Adding Install-17k.ps1 (26829 bytes)
+Adding Install-17k.sh (23044 bytes)
+Adding Install-17k.bat (207 bytes)
+Adding SHA256SUMS (439 bytes)
+Created OnePlus7Pro-17k-r3-Magisk31.zip: 8816525723 bytes; testing CRCs
+ZIP integrity PASS: OnePlus7Pro-17k-r3-Magisk31.zip
+d3a431eb3957a15d819570a8c8806d7632e355f916c44efbb3d212759b3ae81e  OnePlus7Pro-17k-r3-NoRoot.zip
+2a67779f51f693a8fe0bfc246111db3c1d99115a1f78a2f9adbd8e0dee8339aa  OnePlus7Pro-17k-r3-Magisk31.zip
+
+done

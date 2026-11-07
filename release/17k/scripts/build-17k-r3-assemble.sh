@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Assemble out-plk-build17k-r3 (dev) and run preflight for dev + production pairs; vendor file-level diff vs the first 17k vendor. Root, WSL.
+# system/bootstrap/my_stock/boot are reused byte-for-byte from release/17k/images and out-plk-build17k (my_stock source is gone: never rebuild).
+set -uo pipefail
+P=/mnt/c/Users/Han/Project/OnePlus7Port; R=$P/release/17k/images; O17=$P/out-plk-build17k-r2; OUT=$P/out-plk-build17k-r3; L=$P/logs/plk-build17k-r3
+mkdir -p $L
+cp_d() { sync; echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true; dd if="$1" of="$2" bs=16M oflag=direct status=none; }
+[ "${SKIP_COPY:-0}" = 1 ] || { cp_d $R/bootstrap-system.img $OUT/system.img; cp_d $O17/boot.img $OUT/boot.img; cp_d $R/my_stock.img $OUT/my_stock.img; }
+(cd $OUT && sha256sum system.img boot.img vendor.img my_stock.img | tee SHA256SUMS)
+grep -q '^e64a10ca.*system.img' $OUT/SHA256SUMS && grep -q '^135022d0.*my_stock.img' $OUT/SHA256SUMS || { echo "UNEXPECTED SHAS"; exit 1; }
+OUT=$OUT bash $P/tools/preflight-b.sh > $L/preflight-17k-r3-development.txt 2>&1; tail -1 $L/preflight-17k-r3-development.txt
+PF=/root/port17k-r3-prod-preflight; rm -rf $PF; mkdir -p $PF
+ln -s $R/system.img $PF/system.img; ln -s $OUT/vendor.img $PF/vendor.img; ln -s $OUT/boot.img $PF/boot.img; ln -s $OUT/my_stock.img $PF/my_stock.img
+PROD_PROPS=1 OUT=$PF bash $P/tools/preflight-b.sh > $L/preflight-17k-r3-production.txt 2>&1; tail -1 $L/preflight-17k-r3-production.txt
+R2=$P/out-plk-build17k-r2/vendor-r2-final.img
+mkdir -p /mnt/k17rc /mnt/k17rb
+mount -t ext4 -o loop,ro $R2 /mnt/k17rc; mount -t ext4 -o loop,ro $OUT/vendor.img /mnt/k17rb
+{ echo "== vendor 17k-r2 rebuilt (e61b3b19, out-plk-build17k-r2/vendor-r2-final.img) vs 17k-r3 (vendor.img)"; diff -qr --no-dereference /mnt/k17rc /mnt/k17rb; echo "diff exit=$?"; } > $L/vendor-17k-r2-vs-r3-diff.txt 2>&1
+umount /mnt/k17rc /mnt/k17rb; cat $L/vendor-17k-r2-vs-r3-diff.txt

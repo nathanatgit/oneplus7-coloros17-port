@@ -1,0 +1,3 @@
+== vendor 17k-r2 rebuilt (e61b3b19, out-plk-build17k-r2/vendor-r2-final.img) vs 17k-r3 (vendor.img)
+Only in /mnt/k17rb/odm/etc/init: port-offlinecam-stub.rc
+diff exit=1

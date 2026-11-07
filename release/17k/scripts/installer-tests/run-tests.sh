@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Offline test matrix for the 17k-r2 .sh installers using stub adb/fastboot. Never touches a real phone:
+# Offline test matrix for the 17k-r3 .sh installers using stub adb/fastboot. Never touches a real phone:
 # PATH is stub-first and ADB/FASTBOOT point at the stub wrappers; every case asserts that.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)

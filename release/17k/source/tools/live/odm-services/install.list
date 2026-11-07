@@ -62,3 +62,5 @@ port/etc/init/port-netguard.rc  etc/init/port-netguard.rc  0644 vendor_configs_f
 port/bin/port-slider-hold.dex  bin/port-slider-hold.dex  0644 vendor_file
 port/bin/port-sliderdex.sh  bin/port-sliderdex.sh  0755 vendor_file
 port/etc/init/port-sliderdex.rc  etc/init/port-sliderdex.rc  0644 vendor_configs_file
+# B27 (17k-r3): dummy IOfflineCameraService/default (same port.OplusStubs class, started at "on boot", restarted by init) so cameraserver's APS timer does not abort; see tools/live/offlinecam-stub
+port/etc/init/port-offlinecam-stub.rc  etc/init/port-offlinecam-stub.rc  0644 vendor_configs_file

@@ -1,0 +1,14 @@
+# OnePlus7Port 17k-r3 (BAKE-LIST B27): dummy binder for vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default.
+# libAlgoProcess.so (cameraserver, 3rd-party camera apps) waits for this AIDL service; without it the 20 s APS timer aborts cameraserver.
+# Same class and dex as port_oplus_stubs (plain StubBinder). Not oneshot: init restarts it if it dies. Started at "on boot" so it is
+# registered long before any camera use (boot_completed is not needed: servicemanager is up since early boot).
+service port_offlinecam_stub /system/bin/app_process /system/bin port.OplusStubs vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default
+    class late_start
+    user root
+    group root system
+    setenv CLASSPATH /system/framework/oplus-port-stubs.dex
+    seclabel u:r:su:s0
+    disabled
+
+on boot
+    start port_offlinecam_stub

@@ -17,3 +17,10 @@
 3. B20/B21: confirmed `tools/live/odm-services/install.list` + `SHA256SUMS` carry the four files; added the preflight section "B20+B21". Because `stock-app-source/extracted/my_stock.img` is gone, the vendor was rebuilt alone from the 17j-r2 vendor; systems and my_stock reused byte-for-byte.
 4. Preflight (development + production) and the vendor file diff: see `logs/`.
 5. Not done: no flash, no boot test, installers not run end to end, idle drain not addressed.
+
+## 2026-11-07 (17k-r3)
+1. User approved: "rebake 17k as r3, update the release folder 17k and everything in GitHub" (build, release packaging, git commit + push; no flashing).
+2. BAKE-LIST first: new entry A06, B27 marked baked. Route: vendor-only, one odm rc (`tools/live/odm-services/port/etc/init/port-offlinecam-stub.rc`, install.list + SHA256SUMS), no system.img change (the system rc declaring `port_oplus_stubs` stays as is).
+3. `tools/build-17k-r3-vendor.sh` (rebuilt r2 vendor + 1 file), `tools/build-17k-r3-assemble.sh` (preflight dev + prod, vendor diff). New preflight section "B27".
+4. Packaged like r2 (`scripts/package-release.py`, ZIP names `OnePlus7Pro-17k-r3-*.zip`); the r2 zips were removed (as r1's were at r2). The Quark upload of r3 is for the author to do.
+5. Not done: no flash, no boot test, installers not run on a phone.

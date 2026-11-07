@@ -49,3 +49,4 @@ ac6aa905f3cf632af216a26989275a947370653541c3ce761bf5308783e1fd69 *port/bin/port-
 5ac5b643ae23bfb6bd078c7d7a341ea2ff54b2094fcf8987593595c22d609f54 *port/bin/port-slider-hold.dex
 edd344a138bd6dee18b6e43b53a2c62371c23320baa57ce596d95396c600e689 *port/bin/port-sliderdex.sh
 d5830a9681ab3dcc86aa9ea1455a78c081c219c4c98b89a41dd1955d67344cca *port/etc/init/port-sliderdex.rc
+83bbe348253aef73c24f20e8344ea6225bcdcbb2fa99584a24140d2ecaf070b4 *port/etc/init/port-offlinecam-stub.rc

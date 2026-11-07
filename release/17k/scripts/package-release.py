@@ -1,4 +1,4 @@
-"""17k-r2 release packager: copies the images into release/17k/images, renders the installers from scripts/templates,
+"""17k-r3 release packager: copies the images into release/17k/images, renders the installers from scripts/templates,
 writes the per-package SHA256SUMS, builds the two ZIPs, CRC-tests them and writes RELEASE-SHA256SUMS.txt.
 Run from the repository root:  uv run python -I release/17k/scripts/package-release.py [--no-zip] [--no-copy]
 """
@@ -13,9 +13,9 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 REL = ROOT / "release" / "17k"
 TPL = REL / "scripts" / "templates"
-OUT = ROOT / "out-plk-build17k-r2"
+OUT = ROOT / "out-plk-build17k-r3"
 R17D = ROOT / "release" / "17k" / "images"  # kept 17d boot images + Magisk, carried through 17j (copied once from release/17j/images)
-R17J = ROOT / "release" / "17j" / "images"
+R17J = ROOT / "release" / "17k" / "images"  # 17j-r2 production system and my_stock, already in this folder (release/17j/images no longer exists); reused byte-for-byte
 PROD_SYSTEM_SHA = "0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9"  # production system of the 17j-r2 rebuild (B18 saver fix), reused unchanged
 CHUNK = 4 * 1024 * 1024
 
@@ -36,9 +36,9 @@ KNOWN = {  # fixed inputs carried from 17d
     "images/Magisk-v31.0.apk": "2c8a488b9a5293e578e95ae4f07e3c57aba4feec4a52ca4dd852a2692d6dd4e8",
 }
 PACKAGES = {
-    "no-root": ("noroot", "NoRoot", "OnePlus7Pro-17k-r2-NoRoot.zip",
+    "no-root": ("noroot", "NoRoot", "OnePlus7Pro-17k-r3-NoRoot.zip",
                 ["images/bootstrap-system.img", "images/system.img", "images/vendor.img", "images/my_stock.img", "images/boot-ese-final.img"]),
-    "magisk": ("magisk", "Magisk 31", "OnePlus7Pro-17k-r2-Magisk31.zip",
+    "magisk": ("magisk", "Magisk 31", "OnePlus7Pro-17k-r3-Magisk31.zip",
                ["images/system.img", "images/vendor.img", "images/my_stock.img", "images/boot-magisk31-17d.img", "images/Magisk-v31.0.apk"]),
 }
 
@@ -82,7 +82,7 @@ def render(template: str, variant: str, vname: str, images: list[str], sums: dic
     if any(t in out for t in ("@VARIANT", "@SHA_", "@SIZE_", "@CHECK_")):
         raise RuntimeError("unfilled placeholder in " + template)
     code = "\n".join(l for l in out.split("\n") if not l.lstrip().startswith("#"))
-    # 17k-r2 installers may wipe, but only through ONE call, taken only after the typed word WIPE or --wipe/-Wipe: exactly one
+    # 17k-r2/r3 installers may wipe, but only through ONE call, taken only after the typed word WIPE or --wipe/-Wipe: exactly one
     # `fastboot -w`, no other fastboot -w spelling, and no fastboot erase/format of any partition.
     wipes = len(re.findall(r"^\s*F -w$|Invoke-Fastboot @\('-w'\)", code, re.M))
     others = [l for l in code.split("\n") if re.search(r"(fastboot\S*|\bF|Invoke-Fastboot\s+@\()[^\n]*['\s]-w\b", l)]

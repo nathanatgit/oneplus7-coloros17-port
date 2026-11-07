@@ -1,4 +1,12 @@
-# 17k / 17k-r2 test status
+# 17k / 17k-r3 test status
+
+## 17k-r3 (2026-11-07): NOT flashed, NOT boot-tested
+- Adds B27 (vendor image only, vendor sha256 `3805ab33c05fd2843e66daee449532df8f67ccd659de598dd448dc04f4f198a7`): odm rc `port-offlinecam-stub.rc` starting service `port_offlinecam_stub` at `on boot`, so `vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default` exists and `cameraserver` is no longer aborted by the APS timer when Douyin / WeChat use the camera.
+- Verified on the author's phone only by hand (same command line, 2026-11-07): service registered, Douyin flip rear/front/rear, cameraserver alive 40 s+ after closing.
+- Offline only: development and production preflight (section "B27"), vendor diff vs rebuilt r2, rc content checks.
+- Not verified: the image booting, the service starting from `/odm` at boot, registration before first camera use, WeChat, the unchanged r2 items (slider hold, audio sharing) from the baked image. After a flash: `service list | grep offlinecamera`, `getprop init.svc.port_offlinecam_stub`, camera open/close/flip in Douyin and WeChat, `pidof cameraserver` unchanged after 40 s.
+
+---
 
 ## Installer revision (2026-11-07): mode detection, product check, optional WIPE - stub-tested only
 - Images unchanged. New installers (`.sh`, `.ps1`, `.bat`; Magisk and NoRoot) tested ONLY with stub `adb`/`fastboot` scripts on PATH (`logs/installer-stub-test.txt`: Android mode no-wipe, bootloader mode with msmnile, wrong product with `no` / Enter / EOF / `YES` / `yes`, WIPE, Enter, EOF, lowercase `wipe`, piped text without the word, `--wipe`, `--no-wipe`, `--dry-run`, two devices, unknown option) plus `bash -n` and the PowerShell parser. Result: bash installers 283 PASS / 0 FAIL, PowerShell installers 102 PASS / 0 FAIL (Magisk and NoRoot; see that log).

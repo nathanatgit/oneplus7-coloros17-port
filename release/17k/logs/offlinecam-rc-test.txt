@@ -1,0 +1,9 @@
+PASS no CRLF
+PASS one service
+PASS service line
+PASS not oneshot (init restarts it)
+PASS disabled + explicit start
+PASS user/group/seclabel/CLASSPATH
+PASS only known keywords
+PASS sha matches SHA256SUMS
+ALL PASS

@@ -1,4 +1,4 @@
-# OnePlus 7 Pro ColorOS 17 port, 17k-r2 @VARIANT_NAME@ UPGRADE installer (Windows PowerShell).
+# OnePlus 7 Pro ColorOS 17 port, 17k-r3 @VARIANT_NAME@ UPGRADE installer (Windows PowerShell).
 # Default = UPGRADE of an installed port (17d or later) on the ACTIVE slot, KEEPING ALL USER DATA: it flashes vendor, system and
 # boot of the active slot only and replaces /data/port/my_stock.img (the previous one is kept as my_stock-prev.img).
 # After the images are flashed it asks whether to wipe /data; only the exact word WIPE does (clean install, `fastboot -w`);
@@ -149,7 +149,7 @@ function Stage-MyStock {
 }
 
 
-# ---------- 17k-r2: Magisk variant: let OPPO Health run (best effort, never fails the install) ----------
+# ---------- 17k-r3: Magisk variant: let OPPO Health run (best effort, never fails the install) ----------
 # OPPO Health (com.heytap.health) shows a "risk notice" and closes when it can see root: Magisk puts `su` in /product/bin, which is
 # first on every app's PATH. Magisk's DenyList hides Magisk from the listed apps only, but it must be ENFORCED: adding the app is
 # not enough, `magisk --denylist enable` is needed (it also saves the setting in Magisk's database, so it survives reboots and
@@ -172,7 +172,7 @@ function Invoke-HealthDenyList {
     } catch { Write-Host "Skipped the Magisk DenyList step: $_" }
 }
 
-# ---------- 17k-r2: network-restriction guard (best effort, never fails the install) ----------
+# ---------- 17k-r3: network-restriction guard (best effort, never fails the install) ----------
 # The first 17k upgrade left Settings.Global restricted_networking_mode = 1 on the author's phone: every normal app had no
 # network (Wi-Fi and cellular), adb shell still worked. The writer is UNKNOWN. The image now ships a boot-time guard
 # (port_netguard); this installer step additionally clears the value once through adb after the final flash.
@@ -385,9 +385,9 @@ if (-not $staged) {
 Invoke-NetGuard
 Invoke-HealthDenyList
 if ($script:Wiped) {
-    Write-Host '17k-r2 CLEAN INSTALL flashed; /data was wiped and my_stock.img copied. The first boot can take several minutes; finish the setup wizard.'
+    Write-Host '17k-r3 CLEAN INSTALL flashed; /data was wiped and my_stock.img copied. The first boot can take several minutes; finish the setup wizard.'
 } else {
-    Write-Host '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
+    Write-Host '17k-r3 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
 }
 Write-Host 'After it has booted, once (see README.md):'
 Write-Host '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'

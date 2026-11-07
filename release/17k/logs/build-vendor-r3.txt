@@ -1,0 +1,5 @@
+/mnt/c/Users/Han/Project/OnePlus7Port/out-plk-build17k-r2/vendor-r2-final.img: OK
+-rw-r--r--. 1 root root u:object_r:vendor_configs_file:s0 855 Nov  7 22:32 /mnt/k17r3v/odm/etc/init/port-offlinecam-stub.rc
+e2fsck 1.47.0 (5-Feb-2023)
+vendor fsck clean
+3805ab33c05fd2843e66daee449532df8f67ccd659de598dd448dc04f4f198a7  /mnt/c/Users/Han/Project/OnePlus7Port/out-plk-build17k-r3/vendor.img

@@ -1,0 +1,4 @@
+bash -n ok Install-17k-Magisk.sh
+bash -n ok Install-17k-NoRoot.sh
+bash -n ok packages/magisk/Install-17k.sh
+bash -n ok packages/no-root/Install-17k.sh

@@ -1,5 +1,14 @@
 # 17k changelog vs 17j-r2
 
+## 17k-r3 (2026-11-07) = 17k-r2 (rebuilt) + B27 dummy IOfflineCameraService - vendor image only
+
+- Vendor `3805ab33c05fd2843e66daee449532df8f67ccd659de598dd448dc04f4f198a7` = the rebuilt r2 vendor (`e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c`, kept as `out-plk-build17k-r2/vendor-r2-final.img`) + ONE file: `/vendor/odm/etc/init/port-offlinecam-stub.rc` (0644 `vendor_configs_file`, sha `83bbe348253aef73c24f20e8344ea6225bcdcbb2fa99584a24140d2ecaf070b4`). system, bootstrap-system, boot images, Magisk, my_stock are byte-identical to r2.
+- Problem (B27): third-party camera apps (Douyin, WeChat) opened the camera, then `cameraserver` died about 20 s after the first open/close (`thirdPartyAlgoTimerFunc ... aps_algo_none`, SIGABRT from `libAlgoProcess.so`), so front camera / flip stopped working. The library blocks in `AServiceManager_waitForService("vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default")`; that service is only declared in the VINTF matrix and does not exist on the port. The donor camera is not affected.
+- Fix: init service `port_offlinecam_stub` = `app_process /system/bin port.OplusStubs vendor.qti.hardware.camera.offlinecamera.IOfflineCameraService/default` (CLASSPATH `/system/framework/oplus-port-stubs.dex`, user root, group root system, seclabel `u:r:su:s0`, `disabled`, NOT oneshot so init restarts it), started by `on boot`. The same class registers the other Oplus stubs from `port_oplus_stubs`; the slider-hold dex that `port_sliderdex` bind-mounts at `on boot` contains the same `port.OplusStubs` / `port.StubBinder`, so either dex works.
+- Verified live (2026-11-07, by hand with the same command line): `service list` shows the name; Douyin record page, rear/front/rear flip, back out, `cameraserver` stayed up 40 s+ with the same pid, MotorBridge motor events fired. NOT verified: the baked service starting from `/odm` at boot, its registration timing, and the Douyin/WeChat test from the image. Nothing booted or flashed.
+- Preflight section "B27" added (presence, sha, mode, label, no CRLF, rc content, dex classes); development and production results in `logs/`. Vendor diff vs the rebuilt r2: only that rc file (`logs/vendor-17k-r2-vs-r3-diff.txt`).
+- After flashing: `adb shell service list | grep offlinecamera`, `adb shell getprop init.svc.port_offlinecam_stub` (running), open/close/flip the camera in Douyin and WeChat, `cameraserver` pid unchanged after 40 s.
+
 ## Installer revision (2026-11-07, still named 17k-r2): connection-mode detection, product check, optional WIPE
 
 Images are unchanged (vendor `e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c`, same system / my_stock / boot / Magisk hashes). Only the installers (`.sh`, `.ps1`, `.bat` wrappers; both variants), the package READMEs, these docs, the packager guard and the two ZIPs (new hashes) changed.

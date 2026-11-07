@@ -4,7 +4,7 @@ ColorOS 17 (PLK110 donor GSI) running on the OnePlus 7 Pro (`guacamole`, SM8150)
 
 Current release: **17k** (local test release, not production). 17k is a no-wipe upgrade for a phone that already runs the port; 17d was the last full-install release.
 
-**Download (17k-r2 ZIPs and images, Quark share):** <https://pan.quark.cn/s/3dfce1464625?pwd=5VTb> — extraction code `5VTb`. Check each file against `release/17k/RELEASE-SHA256SUMS.txt` before flashing.
+**Download (17k-r3 ZIPs and images): UPLOAD PENDING, link to be added by the author.** The Quark share <https://pan.quark.cn/s/3dfce1464625?pwd=5VTb> (code `5VTb`) still holds the 17k-r2 files, not r3. Check each file against `release/17k/RELEASE-SHA256SUMS.txt` before flashing.
 
 | Start here | |
 | --- | --- |
