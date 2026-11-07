@@ -1,0 +1,25 @@
+/usr/bin/dash
+t1_ok exit=0 D=dex
+0 calls: mount -o bind hold.dex fw/oplus-port-stubs.dex|log -t sliderdex hold dex bound over fw/oplus-port-stubs.dex|getprop init.svc.port_slider_bridge|
+  [ok] t1_ok has 'mount -o bind'
+  [ok] t1_ok has 'hold dex bound'
+  [ok] t1_ok lacks 'stop port'
+t2_missing exit=0 D=stock calls: log -t sliderdex missing hold.dex, stock dex kept|
+  [ok] t2_missing has 'stock dex kept'
+  [ok] t2_missing lacks 'mount -o'
+t3_badsha exit=0 D=stock calls: log -t sliderdex unexpected sha of hold.dex, stock dex kept|
+  [ok] t3_badsha has 'unexpected sha'
+  [ok] t3_badsha lacks 'mount -o'
+t4_already exit=0 D=stock calls: log -t sliderdex already mounted|
+  [ok] t4_already has 'already mounted'
+  [ok] t4_already lacks 'mount -o'
+t5_mountfail exit=0 D=stock calls: mount -o bind hold.dex fw/oplus-port-stubs.dex|log -t sliderdex bind mount failed, stock dex kept|
+  [ok] t5_mountfail has 'bind mount failed'
+t6_noop_mismatch exit=0 D=stock calls: mount -o bind hold.dex fw/oplus-port-stubs.dex|umount fw/oplus-port-stubs.dex|log -t sliderdex verify failed after bind, unmounted, stock dex kept|
+  [ok] t6_noop_mismatch has 'umount'
+  [ok] t6_noop_mismatch has 'verify failed'
+t7_running exit=0 D=dex
+0 calls: mount -o bind hold.dex fw/oplus-port-stubs.dex|log -t sliderdex hold dex bound over fw/oplus-port-stubs.dex|getprop init.svc.port_slider_bridge|stop port_slider_bridge|start port_slider_bridge|
+  [ok] t7_running has 'stop port_slider_bridge'
+  [ok] t7_running has 'start port_slider_bridge'
+ALL PASS

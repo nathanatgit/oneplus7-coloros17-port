@@ -1,6 +1,17 @@
 # 17k changelog vs 17j-r2
 
-## 17k-r2 (2026-11-06) = 17k + B22 network-restriction guard
+## 17k-r2 rebuilt (2026-11-07) = 17k + B22 + B24/B25b slider hold + B26 audio sharing
+
+| Item | Change | Status |
+| --- | --- | --- |
+| B24 alert slider hold | Slider DOWN = ACTION_BUTTON (780) DOWN kept until the slider leaves DOWN (ColorOS turns it into LONG_PRESS 782 after ~0.5 s); watchdog releases on screen off / state lost; stale key released after a killed bridge. UP = click unchanged, MIDDLE = nothing. | verified live on the author's phone; the baked image was never booted |
+| B25b release ends 一键闪记 | On release (after 3 s grace) `am force-stop com.oplus.aimemory` if it still holds a mic / shows FlashMemoryAnimation; the record animation stays. | same |
+| baking | `odm/bin/port-slider-hold.dex` (`5ac5b643...`) + `port-sliderdex.sh` + `port-sliderdex.rc`: oneshot at `on boot` bind-mounts the dex over `/system/framework/oplus-port-stubs.dex` (system.img unchanged); stock dex stays if the file is missing / sha differs / mount fails. | stub-tested under dash; not booted |
+| B26 audio sharing | `audio_policy_configuration.xml` and `..._a2dp_offload_disabled.xml`: mixPort `primary input` maxOpenCount 2 -> 1 (two capture clients share one HAL stream; the second stream used to hit the starved `audio-record-compress2` HAL path and recorded nothing). | live OK for 随口记 (user); calls / video audio unverified |
+
+Files that differ from the previous r2 vendor (`logs/vendor-r2-prev-vs-r2-rebuilt-diff.txt`): those three odm files and the two policy XMLs. All other images are byte-identical. Installers/templates unchanged. ASR/note depends on the cloud server.
+
+## 17k-r2 (2026-11-06, first build, replaced) = 17k + B22 network-restriction guard
 
 | Item | Change | Status |
 | --- | --- | --- |

@@ -1,0 +1,12 @@
+# OnePlus7Port 17k-r2: slider hold dex (tools/live/slider-hold, BAKE-LIST B24/B25b). Oneshot at "on boot", a single bind mount of
+# /odm/bin/port-slider-hold.dex over /system/framework/oplus-port-stubs.dex, long before port_slider_bridge starts (boot_completed).
+service port_sliderdex /system/bin/sh /odm/bin/port-sliderdex.sh
+    class late_start
+    user root
+    group root
+    seclabel u:r:su:s0
+    oneshot
+    disabled
+
+on boot
+    start port_sliderdex

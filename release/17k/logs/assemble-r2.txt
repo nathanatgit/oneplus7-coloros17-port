@@ -1,10 +1,22 @@
 e64a10ca29f384a877b223f255150dd8bb3616321f3b51e9b6f9c5ec43dc5726  system.img
 90479f1a327d27d5a0258de8261e8543e8e5e31045ddfaf1b64707a038fa15ea  boot.img
-3a70f811ef98cad2e94916c923b744da6c827256e451da8c0084db96788a0d29  vendor.img
+e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c  vendor.img
 135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189  my_stock.img
 PREFLIGHT PASS
 PREFLIGHT PASS
 == vendor first 17k (out-plk-build17k/vendor.img d7e9a440) vs 17k-r2 (out-plk-build17k-r2/vendor.img)
+Files /mnt/k17ra/etc/audio_policy_configuration.xml and /mnt/k17rb/etc/audio_policy_configuration.xml differ
+Files /mnt/k17ra/etc/audio_policy_configuration_a2dp_offload_disabled.xml and /mnt/k17rb/etc/audio_policy_configuration_a2dp_offload_disabled.xml differ
 Only in /mnt/k17rb/odm/bin: port-netguard.sh
+Only in /mnt/k17rb/odm/bin: port-slider-hold.dex
+Only in /mnt/k17rb/odm/bin: port-sliderdex.sh
 Only in /mnt/k17rb/odm/etc/init: port-netguard.rc
+Only in /mnt/k17rb/odm/etc/init: port-sliderdex.rc
+diff exit=1
+== vendor previous 17k-r2 (3a70f811, vendor-r2-prev.img) vs rebuilt 17k-r2 (vendor.img)
+Files /mnt/k17rc/etc/audio_policy_configuration.xml and /mnt/k17rb/etc/audio_policy_configuration.xml differ
+Files /mnt/k17rc/etc/audio_policy_configuration_a2dp_offload_disabled.xml and /mnt/k17rb/etc/audio_policy_configuration_a2dp_offload_disabled.xml differ
+Only in /mnt/k17rb/odm/bin: port-slider-hold.dex
+Only in /mnt/k17rb/odm/bin: port-sliderdex.sh
+Only in /mnt/k17rb/odm/etc/init: port-sliderdex.rc
 diff exit=1

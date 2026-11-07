@@ -182,7 +182,7 @@ function Invoke-NetGuard {
     } catch { Write-Host "Network restriction check skipped: $($_.Exception.Message)" }
 }
 Check-Image (Join-Path $script:Root 'images/system.img') '0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9'
-Check-Image (Join-Path $script:Root 'images/vendor.img') '3a70f811ef98cad2e94916c923b744da6c827256e451da8c0084db96788a0d29'
+Check-Image (Join-Path $script:Root 'images/vendor.img') 'e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c'
 Check-Image (Join-Path $script:Root 'images/my_stock.img') '135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189'
 Check-Image (Join-Path $script:Root 'images/boot-magisk31-17d.img') 'b073b02da7c29f00f54e510fb4e6a7304d49c5c5df89f684f81d69fa90d4e155'
 Check-Image (Join-Path $script:Root 'images/Magisk-v31.0.apk') '2c8a488b9a5293e578e95ae4f07e3c57aba4feec4a52ca4dd852a2692d6dd4e8'

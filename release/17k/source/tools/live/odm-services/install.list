@@ -58,3 +58,7 @@ port/etc/init/port-bmslevel.rc  etc/init/port-bmslevel.rc  0644 vendor_configs_f
 # B22 (17k-r2): defensive guard, clears Settings.Global restricted_networking_mode if it is 1 (tools/live/netguard); oneshot, 4 checks over ~5 min at boot
 port/bin/port-netguard.sh  bin/port-netguard.sh  0755 vendor_file
 port/etc/init/port-netguard.rc  etc/init/port-netguard.rc  0644 vendor_configs_file
+# B24/B25b (17k-r2): slider DOWN = hold, release ends the 一键闪记 capture (tools/live/slider-hold). dex bind-mounted over system's oplus-port-stubs.dex at "on boot" by port_sliderdex; stock dex stays if anything is wrong
+port/bin/port-slider-hold.dex  bin/port-slider-hold.dex  0644 vendor_file
+port/bin/port-sliderdex.sh  bin/port-sliderdex.sh  0755 vendor_file
+port/etc/init/port-sliderdex.rc  etc/init/port-sliderdex.rc  0644 vendor_configs_file

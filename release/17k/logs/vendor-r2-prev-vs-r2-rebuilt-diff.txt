@@ -1,0 +1,7 @@
+== vendor previous 17k-r2 (3a70f811, vendor-r2-prev.img) vs rebuilt 17k-r2 (vendor.img)
+Files /mnt/k17rc/etc/audio_policy_configuration.xml and /mnt/k17rb/etc/audio_policy_configuration.xml differ
+Files /mnt/k17rc/etc/audio_policy_configuration_a2dp_offload_disabled.xml and /mnt/k17rb/etc/audio_policy_configuration_a2dp_offload_disabled.xml differ
+Only in /mnt/k17rb/odm/bin: port-slider-hold.dex
+Only in /mnt/k17rb/odm/bin: port-sliderdex.sh
+Only in /mnt/k17rb/odm/etc/init: port-sliderdex.rc
+diff exit=1

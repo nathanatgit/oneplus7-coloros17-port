@@ -1,5 +1,6 @@
-OnePlus7Pro-17k-NoRoot.zip: OK
-OnePlus7Pro-17k-Magisk31.zip: OK
+# release verify 2026-11-07 (sha256sum -c from the release root)
+OnePlus7Pro-17k-r2-NoRoot.zip: OK
+OnePlus7Pro-17k-r2-Magisk31.zip: OK
 images/bootstrap-system.img: OK
 images/system.img: OK
 images/vendor.img: OK
@@ -7,13 +8,3 @@ images/my_stock.img: OK
 images/boot-ese-final.img: OK
 images/boot-magisk31-17d.img: OK
 images/Magisk-v31.0.apk: OK
-Install-17k.bat
-Install-17k.ps1
-Install-17k.sh
-README.md
-SHA256SUMS
-Install-17k.bat
-Install-17k.ps1
-Install-17k.sh
-README.md
-SHA256SUMS

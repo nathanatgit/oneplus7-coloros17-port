@@ -1,5 +1,14 @@
 # 17k / 17k-r2 test status
 
+## 17k-r2 rebuilt (2026-11-07): NOT flashed, NOT boot-tested
+- Adds B24/B25b slider hold and B26 audio sharing (vendor image only, vendor sha256 `e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c`) to the r2 below.
+- **Verified LIVE on the author's phone (bind mounts, not the baked image), 2026-11-07:** holding the alert slider DOWN started 随口记, recorded audio and saved a note (B26 `primary input` maxOpenCount 1 + B24/B25b dex).
+- Offline only: development and production preflight PASS (section "B24/B25b/B26"); vendor diff vs the previous r2 = only the slider files and the two policy XMLs; `port-sliderdex.sh` stub-tested under dash; `bash -n` of the `.sh` installers and the PowerShell parser on the `.ps1`. The installers were not run.
+- NOT verified: the baked image booting; `port_sliderdex` and `port_netguard` starting from /odm at boot and the bind mount holding after a reboot; the slider hold with the baked layout; other audio after `maxOpenCount` 1 (calls, video audio, other recorders); the ASR/note result depends on the cloud server.
+- To apply (after a separate decision to flash): re-run `Install-17k-Magisk.sh` (upgrade, no wipe).
+
+---
+
 ## 17k-r2 (2026-11-06): NOT flashed, NOT boot-tested
 - Built and checked offline only: development and production preflight PASS (new section "B22"), vendor diff against the first 17k vendor = only `port-netguard.sh` / `.rc`, stub test of the guard script under dash (value 1 then 0; null; 0; 1 that survives the put and is retried at every check; value that turns 1 only at +120 s; the script exits after the +300 s check), `bash -n` of the `.sh` installers and the PowerShell parser on the `.ps1` installers. The installers were NOT run (not even `--dry-run`), nothing was flashed, no phone was touched.
 - Why r2 exists: the first 17k (below) exposed `restricted_networking_mode` = 1 on the author's phone: all normal apps had no network (Wi-Fi and cellular), adb shell worked, `dumpsys netpolicy` said "Restricted networking mode: true". Fixed live with `settings put global restricted_networking_mode 0`; it reads null after one more reboot. r2 adds the guard (boot service + installer step).

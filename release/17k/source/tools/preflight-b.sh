@@ -167,6 +167,32 @@ if [ -f "$sh_" ] && [ -f "$rc_" ]; then
     && ! grep -Eq '^[[:space:]]*(while|until|for)[[:space:]]' $sh_ && ! grep -q 'set -e' $sh_ || { echo "port-netguard.sh content (B22: guard logic / must not loop)"; ok=0; }
   [ "$(grep -c '^sleep ' $sh_)" = 3 ] || { echo "port-netguard.sh: expected exactly 3 sleeps (+30/+120/+300 s)"; ok=0; }
 else echo "port-netguard script/rc missing (B22)"; ok=0; fi
+echo "== B24/B25b/B26 (17k-r2): slider hold dex + audio policy sharing"
+sh_=$V/odm/bin/port-sliderdex.sh; rc_=$V/odm/etc/init/port-sliderdex.rc; dx_=$V/odm/bin/port-slider-hold.dex
+if [ -f $sh_ ] && [ -f $rc_ ] && [ -f $dx_ ]; then
+  [ "$(stat -c %a $sh_)" = 755 ] && [ "$(stat -c %a $rc_)" = 644 ] && [ "$(stat -c %a $dx_)" = 644 ] || { echo "modes of port-sliderdex files (B24)"; ok=0; }
+  for x in $sh_:vendor_file $dx_:vendor_file $rc_:vendor_configs_file; do
+    getfattr -n security.selinux --only-values ${x%%:*} 2>/dev/null | tr -d '\0' | grep -qx "u:object_r:${x##*:}:s0" || { echo "label of ${x%%:*} (B24)"; ok=0; }
+  done
+  grep -q $'\r' $sh_ $rc_ && { echo "CRLF in port-sliderdex (B24)"; ok=0; }
+  [ "$(sha $dx_)" = 5ac5b643ae23bfb6bd078c7d7a341ea2ff54b2094fcf8987593595c22d609f54 ] || { echo "port-slider-hold.dex is not the live-verified dex"; ok=0; }
+  grep -aq 'Lport/SliderHold;' $dx_ || { echo "hold dex lacks port.SliderHold"; ok=0; }
+  grep -qx "service port_sliderdex /system/bin/sh /odm/bin/port-sliderdex.sh" $rc_ && grep -qx '    seclabel u:r:su:s0' $rc_ && grep -qx '    oneshot' $rc_ && grep -qx '    disabled' $rc_ \
+    && grep -qx 'on boot' $rc_ && grep -qx '    start port_sliderdex' $rc_ || { echo "rc content of port-sliderdex (B24)"; ok=0; }
+  grep -qx 'SHA=5ac5b643ae23bfb6bd078c7d7a341ea2ff54b2094fcf8987593595c22d609f54' $sh_ && grep -qx 'mount -o bind "$S" "$D" || { log -t sliderdex "bind mount failed, stock dex kept"; exit 0; }' $sh_ \
+    && ! grep -Eq '^[[:space:]]*(while|until|for|sleep)[[:space:]]' $sh_ && ! grep -q 'set -e' $sh_ || { echo "port-sliderdex.sh content (B24: must not loop/sleep, must fall back)"; ok=0; }
+  # the bridge must start AFTER "on boot": it is started at sys.boot_completed by the system rc
+  grep -qx '    start port_slider_bridge' $S/system/etc/init/00-port-oplus-stubs.rc || { echo "system rc no longer starts port_slider_bridge"; ok=0; }
+  grep -B1 -x '    start port_slider_bridge' $S/system/etc/init/00-port-oplus-stubs.rc | grep -qx 'on property:sys.boot_completed=1' || { echo "port_slider_bridge not started at boot_completed (B24 ordering)"; ok=0; }
+else echo "port-sliderdex files missing (B24)"; ok=0; fi
+for f in audio_policy_configuration audio_policy_configuration_a2dp_offload_disabled; do
+  a=$V/etc/$f.xml
+  [ "$(grep -c 'name="primary input" role="sink" maxOpenCount="1" maxActiveCount="2"' $a)" = 1 ] && ! grep -q 'name="primary input" role="sink" maxOpenCount="2"' $a || { echo "$f.xml: primary input maxOpenCount is not 1 (B26)"; ok=0; }
+  cmp -s $a $P/tools/live/audio-policy-1input/$f.xml || { echo "$f.xml differs from the live-verified file (B26)"; ok=0; }
+  grep -q $'\r' $a && { echo "CRLF in $f.xml (B26)"; ok=0; }
+  [ "$(getfattr -n security.selinux --only-values $a 2>/dev/null | tr -d '\0')" = "u:object_r:vendor_configs_file:s0" ] || { echo "label of $f.xml (B26)"; ok=0; }
+  python3 -I -c 'import sys,xml.dom.minidom as m; m.parse(sys.argv[1])' $a || { echo "$f.xml not well-formed (B26)"; ok=0; }
+done
 grep -q 'port.Main' $V/odm/etc/init/port-charger-aidl.rc && grep -q '<version>12</version>' $V/odm/etc/vintf/manifest/manifest_oplus_charger.xml || { echo "AIDL ICharger stub (what ColorOS 17 OplusBatteryServiceFeature looks up) rc/vintf missing"; ok=0; }
 grep -qx '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None' $V/odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc || { echo "cryptoeng mkdir line"; ok=0; }
 grep -q 'vendor_de 0770\|mkdir /data/vendor_de 0\|mkdir /data/vendor_de/0 ' $V/odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service.rc && { echo "cryptoeng rc re-owns /data/vendor_de"; ok=0; }

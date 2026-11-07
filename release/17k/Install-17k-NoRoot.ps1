@@ -183,7 +183,7 @@ function Invoke-NetGuard {
 }
 Check-Image (Join-Path $script:Root 'images/bootstrap-system.img') 'e64a10ca29f384a877b223f255150dd8bb3616321f3b51e9b6f9c5ec43dc5726'
 Check-Image (Join-Path $script:Root 'images/system.img') '0b24fcb2d323f406deba2ed4c46a8edb38c4532bde0b44b026c0a9e8373af3b9'
-Check-Image (Join-Path $script:Root 'images/vendor.img') '3a70f811ef98cad2e94916c923b744da6c827256e451da8c0084db96788a0d29'
+Check-Image (Join-Path $script:Root 'images/vendor.img') 'e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c'
 Check-Image (Join-Path $script:Root 'images/my_stock.img') '135022d0d5816296a365cb39e920a73c0eabc32ff4f5be18dfa70c86d203c189'
 Check-Image (Join-Path $script:Root 'images/boot-ese-final.img') 'a96c205d24598b824c9e119e48cd7b363151920b21ab351e971539511e3cbe91'
 

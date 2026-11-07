@@ -1,5 +1,10 @@
 # Development log — 17k
 
+## 2026-11-07: 17k-r2 rebuilt
+1. User approved baking B24 (slider hold), B25b (release ends the capture) and B26 (audio policy maxOpenCount 1; verified live by the user: slider 随口记 recorded and saved a note). Same release name r2, folder 17k, replacing the never-flashed r2 artifacts.
+2. Baked without rebuilding system.img: dex in the vendor (`/odm/bin`), init oneshot at `on boot` bind-mounts it (same technique as the live test), fallback to the stock dex. The two XMLs edited in the vendor image.
+3. Preflight section "B24/B25b/B26", dev + prod PASS, vendor diff = the 5 expected files, dash stub test PASS. Not flashed, not booted, installers not run.
+
 ## 2026-11-06 (later): 17k-r2
 1. After the first 17k upgrade the author's phone had Settings.Global `restricted_networking_mode` = 1: all normal apps without network (Wi-Fi and cellular), adb shell fine, `dumpsys netpolicy` "Restricted networking mode: true". `settings put global restricted_networking_mode 0` fixed it immediately; after one more reboot the key reads null. The row had defaultValue=1 defaultSysSet=true (made by a system component), was absent from the 2026-11-05 13:17 settings backup and survived a reboot while it was 1.
 2. The writer is UNKNOWN (none of our scripts/docs/transcripts sets it; the investigation was cut short). The user approved a defensive fix: "update your release script in github to avoid this and make new 17k image to bake that".

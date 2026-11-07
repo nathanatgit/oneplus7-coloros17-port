@@ -16,3 +16,9 @@ mkdir -p /mnt/k17ra /mnt/k17rb
 mount -t ext4 -o loop,ro $O17/vendor.img /mnt/k17ra; mount -t ext4 -o loop,ro $OUT/vendor.img /mnt/k17rb
 { echo "== vendor first 17k (out-plk-build17k/vendor.img d7e9a440) vs 17k-r2 (out-plk-build17k-r2/vendor.img)"; diff -qr --no-dereference /mnt/k17ra /mnt/k17rb; echo "diff exit=$?"; } > $L/vendor-17k-vs-17k-r2-diff.txt 2>&1
 umount /mnt/k17ra /mnt/k17rb; cat $L/vendor-17k-vs-17k-r2-diff.txt
+# previous (first-built) 17k-r2 vendor 3a70f811 vs the rebuilt r2: expect only the slider files + the 2 audio policy XMLs
+if [ -f $OUT/vendor-r2-prev.img ]; then
+  mkdir -p /mnt/k17rc; mount -t ext4 -o loop,ro $OUT/vendor-r2-prev.img /mnt/k17rc; mount -t ext4 -o loop,ro $OUT/vendor.img /mnt/k17rb
+  { echo "== vendor previous 17k-r2 (3a70f811, vendor-r2-prev.img) vs rebuilt 17k-r2 (vendor.img)"; diff -qr --no-dereference /mnt/k17rc /mnt/k17rb; echo "diff exit=$?"; } > $L/vendor-r2-prev-vs-r2-rebuilt-diff.txt 2>&1
+  umount /mnt/k17rc /mnt/k17rb; cat $L/vendor-r2-prev-vs-r2-rebuilt-diff.txt
+fi

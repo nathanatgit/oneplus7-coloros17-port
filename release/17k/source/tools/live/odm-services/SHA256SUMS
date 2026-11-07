@@ -46,3 +46,6 @@ ac6aa905f3cf632af216a26989275a947370653541c3ce761bf5308783e1fd69 *port/bin/port-
 74ce260a73a76be2d786d5bdc36373cd840220580ef356b3f2564aa59592316b *port/etc/init/port-bmslevel.rc
 67b33c2836688da6abdd17c9a2eac0b6a16158291edfe1f1175a5a7168e4870c *port/bin/port-netguard.sh
 0b3cb5681872b929e9ee0fc79855786c5bc7d35b8c88a7a24311f660ac3964aa *port/etc/init/port-netguard.rc
+5ac5b643ae23bfb6bd078c7d7a341ea2ff54b2094fcf8987593595c22d609f54 *port/bin/port-slider-hold.dex
+edd344a138bd6dee18b6e43b53a2c62371c23320baa57ce596d95396c600e689 *port/bin/port-sliderdex.sh
+d5830a9681ab3dcc86aa9ea1455a78c081c219c4c98b89a41dd1955d67344cca *port/etc/init/port-sliderdex.rc
