@@ -39,7 +39,7 @@ These came out of failures. Follow them when adding a fix to 17j or merging anot
 
 ## 6. Safety rules (user-set)
 
-- Slot A is stock H.40 and the rollback path: never flash it, never `fastboot -w` or format it; wipes for slot A go through stock recovery.
+- Flash only `vendor_b`, `system_b` and `boot_b`; the only wipe is the installer's WIPE answer (`fastboot -w`).
 - Ask before any flash, wipe or slot change; use `fastboot boot` for temporary tests.
 - **Do not build a new image until the user approves or requests it; record the fixes first** (handoff §14).
 - Keep the previous builds and their hashes for rollback; never accept an OTA inside the port.

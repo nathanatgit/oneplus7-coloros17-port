@@ -1,6 +1,6 @@
 # OnePlus 7 Pro — ColorOS 17 port
 
-ColorOS 17 (PLK110 donor GSI) running on the OnePlus 7 Pro (`guacamole`, SM8150) on top of a LineageOS 24 kernel and vendor, with selected stock H.40 pieces (camera, odm HALs). Slot A stays stock H.40; the port lives on slot B.
+ColorOS 17 (PLK110 donor GSI) running on the OnePlus 7 Pro (`guacamole`, SM8150) on top of a LineageOS 24 kernel and vendor, with selected stock H.40 pieces (camera, odm HALs). The port lives on slot B (`vendor_b`, `system_b`, `boot_b`).
 
 Current release: **17k** (local test release, not production). 17k is a no-wipe upgrade for a phone that already runs the port; 17d was the last full-install release.
 

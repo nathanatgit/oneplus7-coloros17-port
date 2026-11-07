@@ -48,4 +48,4 @@ GPS fix near a window, DC dimming at low brightness, screen off for a few minute
   `cd /data/port && mv my_stock.img my_stock-17j.img && mv my_stock-prev.img my_stock.img && chcon u:object_r:system_file:s0 my_stock.img && sync`
   (the 17j installer keeps the previous image as `my_stock-prev.img`). 17j's system works with an older my_stock for a boot (no donor
   camera then), an older system ignores 17j's extra `/my_stock/port-camera`.
-- Slot A (stock H.40 on the author's phone) is never touched by the installers.
+- The installers write only `vendor`, `system` and `boot` of the slot they flash (the port runs from slot B), and `userdata` only when you type WIPE.
