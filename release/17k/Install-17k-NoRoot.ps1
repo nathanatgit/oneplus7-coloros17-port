@@ -1,15 +1,22 @@
 # OnePlus 7 Pro ColorOS 17 port, 17k-r2 NoRoot UPGRADE installer (Windows PowerShell).
-# Upgrades an installed port (17d or later) on the ACTIVE slot and KEEPS ALL USER DATA: it never wipes userdata or
-# metadata (no `fastboot -w`, no format). It flashes vendor, system and boot of the active slot only and replaces
-# /data/port/my_stock.img (the previous one is kept as /data/port/my_stock-prev.img).
-#   .\Install-17k.ps1           install
-#   .\Install-17k.ps1 -DryRun   check images, phone, slot, root and free space; change nothing
-# Start with the phone booted into the current port with USB debugging authorized (preferred), or in fastboot mode.
-param([switch]$DryRun)
+# Default = UPGRADE of an installed port (17d or later) on the ACTIVE slot, KEEPING ALL USER DATA: it flashes vendor, system and
+# boot of the active slot only and replaces /data/port/my_stock.img (the previous one is kept as my_stock-prev.img).
+# After the images are flashed it asks whether to wipe /data; only the exact word WIPE does (clean install, `fastboot -w`);
+# Enter, anything else, or no input (piped/non-interactive) keeps the data.
+#   .\Install-17k.ps1                  install (asks the WIPE question after flashing)
+#   .\Install-17k.ps1 -DryRun          check images, phone, slot, root and free space; change nothing
+#   .\Install-17k.ps1 -Wipe            scripted: wipe /data without asking (clean install)
+#   .\Install-17k.ps1 -NoWipe          scripted: keep /data without asking
+#   .\Install-17k.ps1 -ConfirmDevice   scripted: accept a fastboot product other than msmnile without asking
+# Start with the phone booted into the current port with USB debugging authorized (preferred), or in fastboot (bootloader) mode.
+param([switch]$DryRun, [switch]$Wipe, [switch]$NoWipe, [switch]$ConfirmDevice)
 $ErrorActionPreference = 'Stop'
+if ($Wipe -and $NoWipe) { throw '-Wipe and -NoWipe cannot be combined.' }
 $script:Variant = 'noroot'   # noroot | magisk
-$script:Fastboot = (Get-Command fastboot.exe -ErrorAction Stop).Source
-$script:Adb = (Get-Command adb.exe -ErrorAction Stop).Source
+$script:Wiped = $false
+# FASTBOOT / ADB environment variables override the program (like the .sh installer); default = the ones on PATH.
+if ($env:FASTBOOT) { $script:Fastboot = $env:FASTBOOT } else { $script:Fastboot = (Get-Command fastboot.exe -ErrorAction Stop).Source }
+if ($env:ADB) { $script:Adb = $env:ADB } else { $script:Adb = (Get-Command adb.exe -ErrorAction Stop).Source }
 $script:Root = $PSScriptRoot
 $script:Serial = $null
 $script:SuMode = 'none'
@@ -116,7 +123,13 @@ function Get-FreeKiB {
 }
 # Copies my_stock.img to /data/port/my_stock.img.new, verifies it on the phone, then swaps it in (old -> my_stock-prev.img).
 function Stage-MyStock {
-    if (-not (Test-Root 'test -f /data/port/my_stock.img')) { throw 'No /data/port/my_stock.img on this phone: this is not an installed port. Use the clean install in README.md.' }
+    if ($script:Wiped) {
+        # /data was just wiped: it is empty, create the directory exactly like the 17d clean install did (init normally makes it too)
+        for ($i = 0; $i -lt 90; $i += 2) { if (Test-Root 'test -d /data/port') { break }; Start-Sleep -Seconds 2 }
+        [void](Test-Root 'mkdir -p /data/port; chown 0:0 /data/port; chmod 0750 /data/port; mkdir -p /data/local/tmp')
+    } elseif (-not (Test-Root 'test -f /data/port/my_stock.img')) {
+        throw 'No /data/port/my_stock.img on this phone: this is not an installed port. Rerun and answer WIPE for a clean install (README.md), or copy images\my_stock.img to /data/port by hand.'
+    }
     $free = Get-FreeKiB
     if ($script:SuMode -eq 'su') { $need = [long]($MyStockSize * 2 / 1024) + 1048576 } else { $need = [long]($MyStockSize / 1024) + 1048576 }
     if ($free -le $need) { throw "Not enough free space on /data: $free KiB free, $need KiB needed." }
@@ -131,8 +144,8 @@ function Stage-MyStock {
     Write-Host 'Verifying my_stock.img on the phone ...'
     $got = ((Invoke-Root 'sha256sum /data/port/my_stock.img.new') -split '\s+')[0].ToLowerInvariant()
     if ($got -ne $MyStockSha) { Invoke-Root 'rm -f /data/port/my_stock.img.new' | Out-Null; throw "my_stock.img on the phone has SHA-256 $got; removed, nothing swapped." }
-    Invoke-Root 'cd /data/port && rm -f my_stock-prev.img && mv my_stock.img my_stock-prev.img && mv my_stock.img.new my_stock.img && chown 0:0 my_stock.img && chmod 0644 my_stock.img && chcon u:object_r:system_file:s0 my_stock.img && sync' | Out-Null
-    Write-Host 'my_stock.img staged; the previous image is /data/port/my_stock-prev.img.'
+    Invoke-Root 'cd /data/port && rm -f my_stock-prev.img && { test ! -f my_stock.img || mv my_stock.img my_stock-prev.img; } && mv my_stock.img.new my_stock.img && chown 0:0 my_stock.img && chmod 0644 my_stock.img && chcon u:object_r:system_file:s0 my_stock.img && sync' | Out-Null
+    if ($script:Wiped) { Write-Host 'my_stock.img staged on the freshly wiped /data.' } else { Write-Host 'my_stock.img staged; the previous image is /data/port/my_stock-prev.img.' }
 }
 
 
@@ -198,7 +211,7 @@ $staged = $false; $slot = $null
 if ($mode -eq 'adb') {
     $code = Get-AdbOut @('shell', 'getprop', 'ro.boot.project_codename')
     if ($code -ne 'guacamole') { throw "Expected a OnePlus 7 Pro (ro.boot.project_codename guacamole), got '$code'." }
-    if (-not (Test-Adb @('shell', 'test -f /system/etc/init/00-port-mystock.rc'))) { throw 'The running system is not this ColorOS port (no 00-port-mystock.rc). Use the clean install in README.md.' }
+    if (-not (Test-Adb @('shell', 'test -f /system/etc/init/00-port-mystock.rc'))) { throw 'The running system is not this ColorOS port (no 00-port-mystock.rc). Start the phone in fastboot mode and rerun this installer, answering WIPE for a clean install (README.md).' }
     $slot = (Get-AdbOut @('shell', 'getprop', 'ro.boot.slot_suffix')).TrimStart('_')
     if ($slot -notin @('a', 'b')) { throw "Cannot read the active slot: '$slot'." }
     Write-Host "Device $($script:Serial): guacamole, running the port on slot $slot."
@@ -210,79 +223,158 @@ if ($mode -eq 'adb') {
     }
 }
 
+if ($mode -eq 'fastboot') {
+    Write-Host "Device $($script:Serial): bootloader (fastboot) mode."
+    Write-Host 'Nothing can be staged through adb from here, so my_stock.img is copied after the first boot (see below) once the images are flashed.'
+}
+
+# Reads one line from the console; empty string on EOF, redirected/closed stdin or any error (= the safe default answer).
+function Read-Answer([string]$Prompt) {
+    Write-Host -NoNewline $Prompt
+    try { $a = [Console]::In.ReadLine() } catch { $a = $null }
+    Write-Host ''
+    if ($null -eq $a) { return '' }
+    return $a.Trim("`r", "`n")
+}
+
+# ---------- fastboot product check ----------
+# msmnile = the OnePlus 7 Pro (GM1910 / guacamole) board name. In bootloader mode anything else needs a typed "yes".
+function Test-Product {
+    $out = Invoke-Fastboot @('getvar', 'product')
+    if ($out -notmatch '(?m)^\s*(\(bootloader\)\s*)?product:\s*(\S+)') { throw "Cannot parse the fastboot product: $out" }
+    $prod = $Matches[2]
+    if ($prod -eq 'msmnile') { Write-Host 'fastboot product: msmnile (OnePlus 7 Pro).'; return }
+    if ($mode -eq 'adb' -and $prod -eq 'guacamole') { return }   # already verified over adb (project_codename guacamole)
+    Write-Host "WARNING: fastboot reports product '$prod', expected 'msmnile' (OnePlus 7 Pro GM1910 / guacamole)."
+    Write-Host 'Flashing this port onto another model can leave the phone unbootable.'
+    if ($mode -eq 'adb') { throw "The phone was verified as guacamole over adb but fastboot reports '$prod'. Stopped before flashing; the phone is in fastboot (run: fastboot reboot)." }
+    if ($DryRun) { Write-Host 'DRY RUN: the real run would ask you to type yes to continue.'; return }
+    if ($ConfirmDevice) { Write-Host '-ConfirmDevice given: continuing.'; return }
+    Write-Host 'Make sure this is a OnePlus 7 Pro (GM1910 / guacamole) before continuing.'
+    $ans = Read-Answer 'Type yes to continue; anything else aborts and nothing is written: '
+    if ($ans -cne 'yes') { throw 'Aborted: product not confirmed; nothing was written.' }
+}
+
+# ---------- wipe question (asked after the images are flashed, before the final reboot) ----------
+function Get-WipeAnswer {
+    if ($Wipe) { Write-Host '-Wipe given: /data will be erased.'; return $true }
+    if ($NoWipe) { Write-Host '-NoWipe given: /data is kept.'; return $false }
+    Write-Host 'Wipe user data? Default is No: upgrade keeps your data. Type WIPE to erase /data.'
+    $ans = Read-Answer '> '
+    return ($ans -ceq 'WIPE')   # case sensitive; Enter, EOF or anything else keeps the data
+}
+
+# After a wipe the phone must not be left without my_stock.img: say exactly how to finish by hand.
+function Stop-Staging([string]$Message) {
+    if ($script:Wiped) {
+        Write-Host 'IMPORTANT: /data was wiped and my_stock.img is NOT on the phone yet, so the port will not start properly. Finish by hand (needs adb root or MagiskSU):'
+        Write-Host '  adb shell "mkdir -p /data/port; chown 0:0 /data/port; chmod 0750 /data/port"'
+        Write-Host '  adb push images\my_stock.img /data/local/tmp/my_stock.img   (then as root: cp it to /data/port/my_stock.img; chown 0:0; chmod 0644; chcon u:object_r:system_file:s0; sync)'
+    }
+    throw $Message
+}
+
 if ($DryRun) {
     Write-Host 'DRY RUN: image hashes and the phone verified; nothing was written, nothing rebooted, no data changed.'
     if ($mode -eq 'fastboot') {
-        Invoke-Fastboot @('getvar', 'product') | Out-Null
+        Test-Product
         Write-Host "Active slot: $(Get-CurrentSlot)"
     }
-    if ($script:SuMode -ne 'none') {
-        Write-Host "Would: copy my_stock.img to /data/port (keeping the old one as my_stock-prev.img), reboot to fastboot, flash vendor_X, system_X, boot_X ($(Split-Path -Leaf $BootImg)) of the active slot, reboot. No wipe."
+    if ($Wipe) {
+        Write-Host "Would: wipe /data (clean install, -Wipe given). Variant $($script:Variant): flash the images, wipe userdata and metadata, boot, copy my_stock.img onto the fresh /data (see README.md), reboot. my_stock.img is NOT pushed before the wipe."
+    } elseif ($mode -eq 'fastboot') {
+        Write-Host 'Would: flash vendor_X, system_X, boot_X of the active slot, then ask "Wipe user data?" (default No; only the word WIPE wipes). No wipe: boot, copy my_stock.img after the first boot (NoRoot: via the temporary bootstrap system; Magisk: via MagiskSU), reboot. WIPE: wipe userdata, same copy onto the fresh /data.'
+    } elseif ($script:SuMode -ne 'none') {
+        Write-Host "Would: copy my_stock.img to /data/port (keeping the old one as my_stock-prev.img), reboot to fastboot, flash vendor_X, system_X, boot_X ($(Split-Path -Leaf $BootImg)) of the active slot, then ask `"Wipe user data?`" (default No, only the word WIPE wipes; -NoWipe skips the question), reboot."
     } elseif ($script:Variant -eq 'noroot') {
-        Write-Host 'Would: reboot to fastboot, flash vendor_X + the 17k bootstrap system (adb root) + boot_X of the active slot, boot it, copy my_stock.img to /data/port, reboot to fastboot, flash the final system_X, reboot. No wipe.'
+        Write-Host 'Would: reboot to fastboot, flash vendor_X + the 17k bootstrap system (adb root) + boot_X, then ask "Wipe user data?" (default No), boot, copy my_stock.img to /data/port, reboot to fastboot, flash the final system_X, reboot.'
     } else {
-        Write-Host 'Would: reboot to fastboot, flash vendor_X, system_X and the Magisk boot_X of the active slot, boot, install Magisk if missing, copy my_stock.img with MagiskSU, reboot. No wipe.'
+        Write-Host 'Would: reboot to fastboot, flash vendor_X, system_X and the Magisk boot_X, then ask "Wipe user data?" (default No), boot, install Magisk if missing, copy my_stock.img with MagiskSU, reboot.'
     }
+    Write-Host 'Without the word WIPE (or -Wipe) nothing is erased.'
     exit 0
 }
 
-Write-Host 'This UPGRADES the port on the active slot and keeps your data (apps, accounts, settings, files).'
-Write-Host 'It does not wipe anything, but back up first anyway: a failed flash can still leave the phone unbootable.'
-$model = Read-Host 'Confirm the phone is a OnePlus 7 Pro running this port; type GM1910 or PLK110'
-if ($model -cnotin @('GM1910', 'PLK110')) { throw 'Model confirmation did not match; nothing was changed.' }
+if ($Wipe) {
+    Write-Host 'WIPE requested (-Wipe): /data will be erased after the images are flashed. Back up first.'
+} else {
+    Write-Host 'Default is an UPGRADE that keeps your data (apps, accounts, settings, files). You will be asked about a wipe after the images are flashed.'
+    Write-Host 'Back up first anyway: a failed flash can still leave the phone unbootable.'
+}
 
 if ($mode -eq 'adb') {
-    if ($script:SuMode -ne 'none') { Stage-MyStock; $staged = $true }
+    # With -Wipe the staged copy would be erased with /data, so it is skipped; the copy happens after the wipe instead.
+    if ($script:SuMode -ne 'none' -and -not $Wipe) { Stage-MyStock; $staged = $true }
     Invoke-Adb @('reboot', 'bootloader') | Out-Null
     Write-Host 'Waiting for fastboot ...'
     Wait-ForFastboot
 }
 
 # ---------- phase 1: fastboot ----------
-$product = Invoke-Fastboot @('getvar', 'product')
-if ($product -notmatch 'product:\s*(guacamole|msmnile)\b') { throw "Expected fastboot product guacamole or msmnile (OnePlus 7 Pro bootloaders report either); got: $product" }
+Test-Product
 $unlocked = Invoke-Fastboot @('getvar', 'unlocked')
 if ($unlocked -notmatch 'unlocked:\s*yes') { throw 'Bootloader is not reported unlocked.' }
 $fslot = Get-CurrentSlot
 if ($slot -and $slot -ne $fslot) { throw "Active slot changed ($slot -> $fslot); stopped before flashing." }
 $slot = $fslot
-Write-Host "Flashing slot $slot only (the other slot is not touched). No wipe."
+Write-Host "Flashing slot $slot only (the other slot is not touched)."
 
-if ($staged -or $script:Variant -eq 'magisk') {
-    Invoke-Fastboot @('flash', "vendor_$slot", $VendorImg) | Out-Null
-    Invoke-Fastboot @('flash', "system_$slot", $SystemImg) | Out-Null
-    Invoke-Fastboot @('flash', "boot_$slot", $BootImg) | Out-Null
-    Invoke-Fastboot @('reboot') | Out-Null
+# NoRoot with nothing staged (and every wipe): the 17k development system (adb root) boots once so my_stock.img can be copied,
+# then the final system is flashed. Magisk copies with MagiskSU on the final system instead.
+if ($script:Variant -eq 'noroot' -and -not $staged) { $firstSystem = $BootstrapImg } else { $firstSystem = $SystemImg }
+Invoke-Fastboot @('flash', "vendor_$slot", $VendorImg) | Out-Null
+Invoke-Fastboot @('flash', "system_$slot", $firstSystem) | Out-Null
+Invoke-Fastboot @('flash', "boot_$slot", $BootImg) | Out-Null
+
+$script:Wiped = $false
+if (Get-WipeAnswer) {
+    if ($staged) {
+        Write-Host 'The my_stock.img copied to /data/port before the reboot is erased by the wipe; it is copied again onto the fresh /data after the first boot.'
+        $staged = $false
+        if ($script:Variant -eq 'noroot' -and $firstSystem -ne $BootstrapImg) {
+            Write-Host 'Reflashing the temporary bootstrap system so my_stock.img can be copied onto the fresh /data.'
+            $firstSystem = $BootstrapImg
+            Invoke-Fastboot @('flash', "system_$slot", $BootstrapImg) | Out-Null
+        }
+    }
+    Write-Host 'Wiping userdata and metadata ...'
+    Invoke-Fastboot @('-w') | Out-Null
+    $script:Wiped = $true
+    Write-Host 'After the reboot the phone starts like a new phone. Keep it connected; the installer copies my_stock.img to /data/port once Android (or the bootstrap) is up.'
+    if ($script:Variant -eq 'magisk') {
+        Write-Host 'Magisk variant: on the fresh phone enable USB debugging (Settings > About phone > tap Build number 7x > Developer options > USB debugging), authorize this computer, and approve the Magisk root request for the ADB shell when it appears.'
+    }
 } else {
-    # no-root, nothing staged: the 17k development system (adb root) boots once so my_stock.img can be copied, then the final system
-    Invoke-Fastboot @('flash', "vendor_$slot", $VendorImg) | Out-Null
-    Invoke-Fastboot @('flash', "system_$slot", $BootstrapImg) | Out-Null
-    Invoke-Fastboot @('flash', "boot_$slot", $BootImg) | Out-Null
-    Invoke-Fastboot @('reboot') | Out-Null
+    Write-Host 'Keeping /data (no wipe).'
+}
+Invoke-Fastboot @('reboot') | Out-Null
+$waitBoot = 400; if ($script:Wiped) { $waitBoot = 900 }
+
+if ($script:Variant -eq 'noroot' -and -not $staged) {
     Write-Host 'Waiting for the temporary 17k bootstrap system (adb root) ...'
-    if (-not (Wait-ForAdb 400)) { throw 'Timed out waiting for the bootstrap system. The phone runs the bootstrap; rerun this installer.' }
-    [void](Wait-ForBoot 400)
+    if (-not (Wait-ForAdb $waitBoot)) { Stop-Staging 'Timed out waiting for the bootstrap system. The phone runs the bootstrap; rerun this installer.' }
+    [void](Wait-ForBoot $waitBoot)
     [void](Test-Adb @('root'))
     Start-Sleep -Seconds 3
     [void](Wait-ForAdb 60)
     Find-Root
-    if ($script:SuMode -ne 'adbd') { throw 'Bootstrap adb root is unavailable; the final system was not flashed. Rerun this installer.' }
+    if ($script:SuMode -ne 'adbd') { Stop-Staging 'Bootstrap adb root is unavailable; the final system was not flashed. Rerun this installer.' }
     Stage-MyStock; $staged = $true
     Invoke-Adb @('reboot', 'bootloader') | Out-Null
-    Wait-ForFastboot
+    try { Wait-ForFastboot } catch { Stop-Staging $_.Exception.Message }
     if ((Get-CurrentSlot) -ne $slot) { throw 'Active slot changed during staging; stopped before the final flash.' }
     Invoke-Fastboot @('flash', "system_$slot", $SystemImg) | Out-Null
     Invoke-Fastboot @('reboot') | Out-Null
 }
 
 if (-not $staged) {
-    # Magisk variant without root on the old system: stage with MagiskSU on the new system, then reboot once more.
+    # Magisk variant without staging (fastboot start, no root on the old system, or after a wipe): stage with MagiskSU on the new system, then reboot once more.
     Write-Host 'Unlock the phone and approve this computer for USB debugging if asked. Waiting for Android ...'
-    if (-not (Wait-ForAdb 400)) { throw 'Timed out waiting for authorized ADB. Finish my_stock staging by hand (README.md).' }
-    if (-not (Wait-ForBoot 400)) { throw 'Android did not report boot completed. Finish my_stock staging by hand (README.md).' }
+    if (-not (Wait-ForAdb $waitBoot)) { Stop-Staging 'Timed out waiting for authorized ADB. Finish my_stock staging by hand (README.md).' }
+    if (-not (Wait-ForBoot $waitBoot)) { Stop-Staging 'Android did not report boot completed. Finish my_stock staging by hand (README.md).' }
     if ((Get-AdbOut @('shell', 'pm', 'path', 'com.topjohnwu.magisk')) -notmatch 'package:') { Invoke-Adb @('install', '-r', $MagiskApk) | Out-Null }
     Find-Root
-    if ($script:SuMode -ne 'su') { throw 'MagiskSU root was not granted. Approve it in Magisk, then rerun this installer.' }
+    if ($script:SuMode -ne 'su') { Stop-Staging 'MagiskSU root was not granted. Approve it in Magisk, then rerun this installer.' }
     Stage-MyStock; $staged = $true
     Invoke-Adb @('reboot') | Out-Null
 } elseif ($script:Variant -eq 'magisk') {
@@ -296,7 +388,11 @@ if (-not $staged) {
 
 Invoke-NetGuard
 Invoke-HealthDenyList
-Write-Host '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
+if ($script:Wiped) {
+    Write-Host '17k-r2 CLEAN INSTALL flashed; /data was wiped and my_stock.img copied. The first boot can take several minutes; finish the setup wizard.'
+} else {
+    Write-Host '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
+}
 Write-Host 'After it has booted, once (see README.md):'
 Write-Host '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'
 Write-Host '  seed the wallpaper keeper as root: echo com.heytap.colorfulengine/.wallpaper.service.ColorfulWallpaperService > /data/port/wp/wallpaper-component'

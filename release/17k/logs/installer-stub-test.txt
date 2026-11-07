@@ -1,0 +1,399 @@
+17k-r2 installer test with STUB adb/fastboot (2026-11-07). Not run on a phone. PATH starts with the stub dir, ADB/FASTBOOT point at stub wrappers; each case checks adb resolves to the stub.
+Harness: scripts/installer-tests/ (stub.sh, run-tests.sh for .sh, run-ps-tests.sh for .ps1)
+
+=== bash installers (Magisk + NoRoot) ===
+grep: /c/Users/Han/AppData/Local/Temp/claude/a04ccd39e5de3a86/b1981f1c-3f51-48f9-bbf5-14356cbf9d4d/scratchpad/stub/work/c-noroot-badflag/state/cmd.log: No such file or directory
+grep: /c/Users/Han/AppData/Local/Temp/claude/a04ccd39e5de3a86/b1981f1c-3f51-48f9-bbf5-14356cbf9d4d/scratchpad/stub/work/c-magisk-badflag/state/cmd.log: No such file or directory
+
+PASS  noroot android Enter: exit 0
+PASS  noroot android Enter: no fastboot -w in the command log
+PASS  noroot android Enter: userdata not wiped (state)
+PASS  noroot android Enter: my_stock present at the end
+PASS  noroot android Enter: final production system flashed last
+PASS  noroot android Enter: no unhandled stub calls
+PASS  noroot android Enter: asked the wipe question
+PASS  noroot android Enter: no GM1910/PLK110 prompt
+PASS  noroot android Enter: my_stock pushed BEFORE reboot bootloader (staged)
+PASS  noroot android Enter: only one my_stock push
+PASS  noroot android EOF stdin: exit 0
+PASS  noroot android EOF stdin: no fastboot -w in the command log
+PASS  noroot android EOF stdin: userdata not wiped (state)
+PASS  noroot android EOF stdin: my_stock present at the end
+PASS  noroot android EOF stdin: final production system flashed last
+PASS  noroot android EOF stdin: no unhandled stub calls
+PASS  noroot android piped 'no': exit 0
+PASS  noroot android piped 'no': no fastboot -w in the command log
+PASS  noroot android piped 'no': userdata not wiped (state)
+PASS  noroot android piped 'no': my_stock present at the end
+PASS  noroot android piped 'no': final production system flashed last
+PASS  noroot android piped 'no': no unhandled stub calls
+PASS  noroot android lowercase 'wipe': exit 0
+PASS  noroot android lowercase 'wipe': no fastboot -w in the command log
+PASS  noroot android lowercase 'wipe': userdata not wiped (state)
+PASS  noroot android lowercase 'wipe': my_stock present at the end
+PASS  noroot android lowercase 'wipe': final production system flashed last
+PASS  noroot android lowercase 'wipe': no unhandled stub calls
+PASS  noroot android 'WIPE now': exit 0
+PASS  noroot android 'WIPE now': no fastboot -w in the command log
+PASS  noroot android 'WIPE now': userdata not wiped (state)
+PASS  noroot android 'WIPE now': my_stock present at the end
+PASS  noroot android 'WIPE now': final production system flashed last
+PASS  noroot android 'WIPE now': no unhandled stub calls
+PASS  noroot android --no-wipe: exit 0
+PASS  noroot android --no-wipe: no fastboot -w in the command log
+PASS  noroot android --no-wipe: userdata not wiped (state)
+PASS  noroot android --no-wipe: my_stock present at the end
+PASS  noroot android --no-wipe: final production system flashed last
+PASS  noroot android --no-wipe: no unhandled stub calls
+PASS  noroot android --no-wipe: no question asked
+PASS  noroot android WIPE: exit 0
+PASS  noroot android WIPE: fastboot -w called once
+PASS  noroot android WIPE: -w after vendor/system/boot flashes
+PASS  noroot android WIPE: -w before the first reboot after the flashes
+PASS  noroot android WIPE: userdata wiped (state)
+PASS  noroot android WIPE: my_stock present at the end (re-provided after wipe)
+PASS  noroot android WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  noroot android WIPE: my_stock swap happened on the wiped data
+PASS  noroot android WIPE: /data/port created after the wipe
+PASS  noroot android WIPE: final system in place
+PASS  noroot android WIPE: no unhandled stub calls
+PASS  noroot android WIPE: pushed once only (the pre-wipe copy is not pushed twice)
+PASS  noroot android --wipe: exit 0
+PASS  noroot android --wipe: fastboot -w called once
+PASS  noroot android --wipe: -w after vendor/system/boot flashes
+PASS  noroot android --wipe: -w before the first reboot after the flashes
+PASS  noroot android --wipe: userdata wiped (state)
+PASS  noroot android --wipe: my_stock present at the end (re-provided after wipe)
+PASS  noroot android --wipe: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  noroot android --wipe: my_stock swap happened on the wiped data
+PASS  noroot android --wipe: /data/port created after the wipe
+PASS  noroot android --wipe: final system in place
+PASS  noroot android --wipe: no unhandled stub calls
+PASS  noroot android --wipe: no question asked, no pre-wipe push
+PASS  noroot fastboot msmnile Enter: exit 0
+PASS  noroot fastboot msmnile Enter: no fastboot -w in the command log
+PASS  noroot fastboot msmnile Enter: userdata not wiped (state)
+PASS  noroot fastboot msmnile Enter: my_stock present at the end
+PASS  noroot fastboot msmnile Enter: final production system flashed last
+PASS  noroot fastboot msmnile Enter: no unhandled stub calls
+PASS  noroot fastboot msmnile: no product warning
+PASS  noroot fastboot msmnile: my_stock staged after first boot (1 push)
+PASS  noroot fastboot msmnile WIPE: exit 0
+PASS  noroot fastboot msmnile WIPE: fastboot -w called once
+PASS  noroot fastboot msmnile WIPE: -w after vendor/system/boot flashes
+PASS  noroot fastboot msmnile WIPE: -w before the first reboot after the flashes
+PASS  noroot fastboot msmnile WIPE: userdata wiped (state)
+PASS  noroot fastboot msmnile WIPE: my_stock present at the end (re-provided after wipe)
+PASS  noroot fastboot msmnile WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  noroot fastboot msmnile WIPE: my_stock swap happened on the wiped data
+PASS  noroot fastboot msmnile WIPE: /data/port created after the wipe
+PASS  noroot fastboot msmnile WIPE: final system in place
+PASS  noroot fastboot msmnile WIPE: no unhandled stub calls
+PASS  noroot fastboot wrong product 'no': exit non-zero
+PASS  noroot fastboot wrong product 'no': warning shows reported + expected
+PASS  noroot fastboot wrong product 'no': nothing written (no flash/-w/reboot)
+PASS  noroot fastboot wrong product Enter: aborts, nothing written
+PASS  noroot fastboot wrong product EOF: aborts, nothing written
+PASS  noroot fastboot wrong product 'YES' (case): aborts
+PASS  noroot fastboot wrong product 'yes' then Enter: exit 0
+PASS  noroot fastboot wrong product 'yes' then Enter: no fastboot -w in the command log
+PASS  noroot fastboot wrong product 'yes' then Enter: userdata not wiped (state)
+PASS  noroot fastboot wrong product 'yes' then Enter: my_stock present at the end
+PASS  noroot fastboot wrong product 'yes' then Enter: final production system flashed last
+PASS  noroot fastboot wrong product 'yes' then Enter: no unhandled stub calls
+PASS  noroot fastboot wrong product 'yes': proceeded to flash
+PASS  noroot fastboot wrong product yes + WIPE: exit 0
+PASS  noroot fastboot wrong product yes + WIPE: fastboot -w called once
+PASS  noroot fastboot wrong product yes + WIPE: -w after vendor/system/boot flashes
+PASS  noroot fastboot wrong product yes + WIPE: -w before the first reboot after the flashes
+PASS  noroot fastboot wrong product yes + WIPE: userdata wiped (state)
+PASS  noroot fastboot wrong product yes + WIPE: my_stock present at the end (re-provided after wipe)
+PASS  noroot fastboot wrong product yes + WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  noroot fastboot wrong product yes + WIPE: my_stock swap happened on the wiped data
+PASS  noroot fastboot wrong product yes + WIPE: /data/port created after the wipe
+PASS  noroot fastboot wrong product yes + WIPE: final system in place
+PASS  noroot fastboot wrong product yes + WIPE: no unhandled stub calls
+PASS  noroot fastboot wrong product --confirm-device: exit 0
+PASS  noroot fastboot wrong product --confirm-device: no fastboot -w in the command log
+PASS  noroot fastboot wrong product --confirm-device: userdata not wiped (state)
+PASS  noroot fastboot wrong product --confirm-device: my_stock present at the end
+PASS  noroot fastboot wrong product --confirm-device: final production system flashed last
+PASS  noroot fastboot wrong product --confirm-device: no unhandled stub calls
+PASS  noroot dry-run android: exit 0
+PASS  noroot dry-run android: nothing flashed/pushed/rebooted/wiped
+PASS  noroot dry-run android: state untouched
+PASS  noroot dry-run android: prints the plan
+PASS  noroot dry-run fastboot: exit 0
+PASS  noroot dry-run fastboot: nothing flashed/pushed/rebooted/wiped
+PASS  noroot dry-run fastboot: state untouched
+PASS  noroot dry-run fastboot: prints the plan
+PASS  noroot dry-run --wipe: says it would wipe, wrote nothing
+PASS  noroot two adb devices: error, no writes
+PASS  noroot no device: error
+PASS  noroot unknown option: error, no writes
+PASS  noroot --wipe --no-wipe: error
+PASS  noroot android: not the port -> refuses (safety check kept)
+PASS  noroot android: wrong codename -> refuses
+PASS  magisk android Enter: exit 0
+PASS  magisk android Enter: no fastboot -w in the command log
+PASS  magisk android Enter: userdata not wiped (state)
+PASS  magisk android Enter: my_stock present at the end
+PASS  magisk android Enter: final production system flashed last
+PASS  magisk android Enter: no unhandled stub calls
+PASS  magisk android Enter: asked the wipe question
+PASS  magisk android Enter: no GM1910/PLK110 prompt
+PASS  magisk android Enter: my_stock pushed BEFORE reboot bootloader (staged)
+PASS  magisk android Enter: only one my_stock push
+PASS  magisk android EOF stdin: exit 0
+PASS  magisk android EOF stdin: no fastboot -w in the command log
+PASS  magisk android EOF stdin: userdata not wiped (state)
+PASS  magisk android EOF stdin: my_stock present at the end
+PASS  magisk android EOF stdin: final production system flashed last
+PASS  magisk android EOF stdin: no unhandled stub calls
+PASS  magisk android piped 'no': exit 0
+PASS  magisk android piped 'no': no fastboot -w in the command log
+PASS  magisk android piped 'no': userdata not wiped (state)
+PASS  magisk android piped 'no': my_stock present at the end
+PASS  magisk android piped 'no': final production system flashed last
+PASS  magisk android piped 'no': no unhandled stub calls
+PASS  magisk android lowercase 'wipe': exit 0
+PASS  magisk android lowercase 'wipe': no fastboot -w in the command log
+PASS  magisk android lowercase 'wipe': userdata not wiped (state)
+PASS  magisk android lowercase 'wipe': my_stock present at the end
+PASS  magisk android lowercase 'wipe': final production system flashed last
+PASS  magisk android lowercase 'wipe': no unhandled stub calls
+PASS  magisk android 'WIPE now': exit 0
+PASS  magisk android 'WIPE now': no fastboot -w in the command log
+PASS  magisk android 'WIPE now': userdata not wiped (state)
+PASS  magisk android 'WIPE now': my_stock present at the end
+PASS  magisk android 'WIPE now': final production system flashed last
+PASS  magisk android 'WIPE now': no unhandled stub calls
+PASS  magisk android --no-wipe: exit 0
+PASS  magisk android --no-wipe: no fastboot -w in the command log
+PASS  magisk android --no-wipe: userdata not wiped (state)
+PASS  magisk android --no-wipe: my_stock present at the end
+PASS  magisk android --no-wipe: final production system flashed last
+PASS  magisk android --no-wipe: no unhandled stub calls
+PASS  magisk android --no-wipe: no question asked
+PASS  magisk android WIPE: exit 0
+PASS  magisk android WIPE: fastboot -w called once
+PASS  magisk android WIPE: -w after vendor/system/boot flashes
+PASS  magisk android WIPE: -w before the first reboot after the flashes
+PASS  magisk android WIPE: userdata wiped (state)
+PASS  magisk android WIPE: my_stock present at the end (re-provided after wipe)
+PASS  magisk android WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  magisk android WIPE: my_stock swap happened on the wiped data
+PASS  magisk android WIPE: /data/port created after the wipe
+PASS  magisk android WIPE: final system in place
+PASS  magisk android WIPE: no unhandled stub calls
+PASS  magisk android WIPE: pushed once only (the pre-wipe copy is not pushed twice)
+PASS  magisk android --wipe: exit 0
+PASS  magisk android --wipe: fastboot -w called once
+PASS  magisk android --wipe: -w after vendor/system/boot flashes
+PASS  magisk android --wipe: -w before the first reboot after the flashes
+PASS  magisk android --wipe: userdata wiped (state)
+PASS  magisk android --wipe: my_stock present at the end (re-provided after wipe)
+PASS  magisk android --wipe: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  magisk android --wipe: my_stock swap happened on the wiped data
+PASS  magisk android --wipe: /data/port created after the wipe
+PASS  magisk android --wipe: final system in place
+PASS  magisk android --wipe: no unhandled stub calls
+PASS  magisk android --wipe: no question asked, no pre-wipe push
+PASS  magisk fastboot msmnile Enter: exit 0
+PASS  magisk fastboot msmnile Enter: no fastboot -w in the command log
+PASS  magisk fastboot msmnile Enter: userdata not wiped (state)
+PASS  magisk fastboot msmnile Enter: my_stock present at the end
+PASS  magisk fastboot msmnile Enter: final production system flashed last
+PASS  magisk fastboot msmnile Enter: no unhandled stub calls
+PASS  magisk fastboot msmnile: no product warning
+PASS  magisk fastboot msmnile: my_stock staged after first boot (1 push)
+PASS  magisk fastboot msmnile WIPE: exit 0
+PASS  magisk fastboot msmnile WIPE: fastboot -w called once
+PASS  magisk fastboot msmnile WIPE: -w after vendor/system/boot flashes
+PASS  magisk fastboot msmnile WIPE: -w before the first reboot after the flashes
+PASS  magisk fastboot msmnile WIPE: userdata wiped (state)
+PASS  magisk fastboot msmnile WIPE: my_stock present at the end (re-provided after wipe)
+PASS  magisk fastboot msmnile WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  magisk fastboot msmnile WIPE: my_stock swap happened on the wiped data
+PASS  magisk fastboot msmnile WIPE: /data/port created after the wipe
+PASS  magisk fastboot msmnile WIPE: final system in place
+PASS  magisk fastboot msmnile WIPE: no unhandled stub calls
+PASS  magisk fastboot wrong product 'no': exit non-zero
+PASS  magisk fastboot wrong product 'no': warning shows reported + expected
+PASS  magisk fastboot wrong product 'no': nothing written (no flash/-w/reboot)
+PASS  magisk fastboot wrong product Enter: aborts, nothing written
+PASS  magisk fastboot wrong product EOF: aborts, nothing written
+PASS  magisk fastboot wrong product 'YES' (case): aborts
+PASS  magisk fastboot wrong product 'yes' then Enter: exit 0
+PASS  magisk fastboot wrong product 'yes' then Enter: no fastboot -w in the command log
+PASS  magisk fastboot wrong product 'yes' then Enter: userdata not wiped (state)
+PASS  magisk fastboot wrong product 'yes' then Enter: my_stock present at the end
+PASS  magisk fastboot wrong product 'yes' then Enter: final production system flashed last
+PASS  magisk fastboot wrong product 'yes' then Enter: no unhandled stub calls
+PASS  magisk fastboot wrong product 'yes': proceeded to flash
+PASS  magisk fastboot wrong product yes + WIPE: exit 0
+PASS  magisk fastboot wrong product yes + WIPE: fastboot -w called once
+PASS  magisk fastboot wrong product yes + WIPE: -w after vendor/system/boot flashes
+PASS  magisk fastboot wrong product yes + WIPE: -w before the first reboot after the flashes
+PASS  magisk fastboot wrong product yes + WIPE: userdata wiped (state)
+PASS  magisk fastboot wrong product yes + WIPE: my_stock present at the end (re-provided after wipe)
+PASS  magisk fastboot wrong product yes + WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  magisk fastboot wrong product yes + WIPE: my_stock swap happened on the wiped data
+PASS  magisk fastboot wrong product yes + WIPE: /data/port created after the wipe
+PASS  magisk fastboot wrong product yes + WIPE: final system in place
+PASS  magisk fastboot wrong product yes + WIPE: no unhandled stub calls
+PASS  magisk fastboot wrong product --confirm-device: exit 0
+PASS  magisk fastboot wrong product --confirm-device: no fastboot -w in the command log
+PASS  magisk fastboot wrong product --confirm-device: userdata not wiped (state)
+PASS  magisk fastboot wrong product --confirm-device: my_stock present at the end
+PASS  magisk fastboot wrong product --confirm-device: final production system flashed last
+PASS  magisk fastboot wrong product --confirm-device: no unhandled stub calls
+PASS  magisk dry-run android: exit 0
+PASS  magisk dry-run android: nothing flashed/pushed/rebooted/wiped
+PASS  magisk dry-run android: state untouched
+PASS  magisk dry-run android: prints the plan
+PASS  magisk dry-run fastboot: exit 0
+PASS  magisk dry-run fastboot: nothing flashed/pushed/rebooted/wiped
+PASS  magisk dry-run fastboot: state untouched
+PASS  magisk dry-run fastboot: prints the plan
+PASS  magisk dry-run --wipe: says it would wipe, wrote nothing
+PASS  magisk two adb devices: error, no writes
+PASS  magisk no device: error
+PASS  magisk unknown option: error, no writes
+PASS  magisk --wipe --no-wipe: error
+PASS  magisk android: not the port -> refuses (safety check kept)
+PASS  magisk android: wrong codename -> refuses
+PASS  noroot android (old system has no root, bootstrap): exit 0
+PASS  noroot android (old system has no root, bootstrap): no fastboot -w in the command log
+PASS  noroot android (old system has no root, bootstrap): userdata not wiped (state)
+PASS  noroot android (old system has no root, bootstrap): my_stock present at the end
+PASS  noroot android (old system has no root, bootstrap): final production system flashed last
+PASS  noroot android (old system has no root, bootstrap): no unhandled stub calls
+PASS  noroot android no-root: bootstrap flashed first then final
+PASS  noroot android (old system has no root) WIPE: exit 0
+PASS  noroot android (old system has no root) WIPE: fastboot -w called once
+PASS  noroot android (old system has no root) WIPE: -w after vendor/system/boot flashes
+PASS  noroot android (old system has no root) WIPE: -w before the first reboot after the flashes
+PASS  noroot android (old system has no root) WIPE: userdata wiped (state)
+PASS  noroot android (old system has no root) WIPE: my_stock present at the end (re-provided after wipe)
+PASS  noroot android (old system has no root) WIPE: my_stock (re)pushed AFTER the wipe; a pre-wipe copy is erased and redone
+PASS  noroot android (old system has no root) WIPE: my_stock swap happened on the wiped data
+PASS  noroot android (old system has no root) WIPE: /data/port created after the wipe
+PASS  noroot android (old system has no root) WIPE: final system in place
+PASS  noroot android (old system has no root) WIPE: no unhandled stub calls
+PASS  magisk android (old system has no root): exit 0
+PASS  magisk android (old system has no root): no fastboot -w in the command log
+PASS  magisk android (old system has no root): userdata not wiped (state)
+PASS  magisk android (old system has no root): my_stock present at the end
+PASS  magisk android (old system has no root): final production system flashed last
+PASS  magisk android (old system has no root): no unhandled stub calls
+PASS  noroot android staged then WIPE: bootstrap reflashed once, before -w; final system again at the end
+
+TOTAL PASS=283 FAIL=0
+
+=== PowerShell installers (pwsh 7, Start-Sleep stubbed) ===
+
+PASS  PS noroot android Enter: exit 0
+PASS  PS noroot android Enter: no -w
+PASS  PS noroot android Enter: my_stock present
+PASS  PS noroot android Enter: final system
+PASS  PS noroot android Enter: no unhandled
+PASS  PS noroot android Enter: question asked, no model prompt
+PASS  PS noroot android EOF: exit 0
+PASS  PS noroot android EOF: no -w
+PASS  PS noroot android EOF: my_stock present
+PASS  PS noroot android EOF: final system
+PASS  PS noroot android EOF: no unhandled
+PASS  PS noroot android lowercase wipe: exit 0
+PASS  PS noroot android lowercase wipe: no -w
+PASS  PS noroot android lowercase wipe: my_stock present
+PASS  PS noroot android lowercase wipe: final system
+PASS  PS noroot android lowercase wipe: no unhandled
+PASS  PS noroot android WIPE: exit 0
+PASS  PS noroot android WIPE: one -w
+PASS  PS noroot android WIPE: wiped
+PASS  PS noroot android WIPE: my_stock re-provided after wipe (pre-wipe copy erased and redone)
+PASS  PS noroot android WIPE: mkdir after wipe
+PASS  PS noroot android WIPE: final system
+PASS  PS noroot android WIPE: no unhandled
+PASS  PS noroot android -Wipe: exit 0
+PASS  PS noroot android -Wipe: one -w
+PASS  PS noroot android -Wipe: wiped
+PASS  PS noroot android -Wipe: my_stock re-provided after wipe (pre-wipe copy erased and redone)
+PASS  PS noroot android -Wipe: mkdir after wipe
+PASS  PS noroot android -Wipe: final system
+PASS  PS noroot android -Wipe: no unhandled
+PASS  PS noroot fastboot msmnile: exit 0
+PASS  PS noroot fastboot msmnile: no -w
+PASS  PS noroot fastboot msmnile: my_stock present
+PASS  PS noroot fastboot msmnile: final system
+PASS  PS noroot fastboot msmnile: no unhandled
+PASS  PS noroot fastboot WIPE: exit 0
+PASS  PS noroot fastboot WIPE: one -w
+PASS  PS noroot fastboot WIPE: wiped
+PASS  PS noroot fastboot WIPE: my_stock re-provided after wipe (pre-wipe copy erased and redone)
+PASS  PS noroot fastboot WIPE: mkdir after wipe
+PASS  PS noroot fastboot WIPE: final system
+PASS  PS noroot fastboot WIPE: no unhandled
+PASS  PS noroot wrong product no: aborts, nothing written
+PASS  PS noroot wrong product EOF: aborts, nothing written
+PASS  PS noroot wrong product yes + Enter: exit 0
+PASS  PS noroot wrong product yes + Enter: no -w
+PASS  PS noroot wrong product yes + Enter: my_stock present
+PASS  PS noroot wrong product yes + Enter: final system
+PASS  PS noroot wrong product yes + Enter: no unhandled
+PASS  PS noroot dry-run fastboot: nothing written
+PASS  PS noroot dry-run android: nothing written
+PASS  PS magisk android Enter: exit 0
+PASS  PS magisk android Enter: no -w
+PASS  PS magisk android Enter: my_stock present
+PASS  PS magisk android Enter: final system
+PASS  PS magisk android Enter: no unhandled
+PASS  PS magisk android Enter: question asked, no model prompt
+PASS  PS magisk android EOF: exit 0
+PASS  PS magisk android EOF: no -w
+PASS  PS magisk android EOF: my_stock present
+PASS  PS magisk android EOF: final system
+PASS  PS magisk android EOF: no unhandled
+PASS  PS magisk android lowercase wipe: exit 0
+PASS  PS magisk android lowercase wipe: no -w
+PASS  PS magisk android lowercase wipe: my_stock present
+PASS  PS magisk android lowercase wipe: final system
+PASS  PS magisk android lowercase wipe: no unhandled
+PASS  PS magisk android WIPE: exit 0
+PASS  PS magisk android WIPE: one -w
+PASS  PS magisk android WIPE: wiped
+PASS  PS magisk android WIPE: my_stock re-provided after wipe (pre-wipe copy erased and redone)
+PASS  PS magisk android WIPE: mkdir after wipe
+PASS  PS magisk android WIPE: final system
+PASS  PS magisk android WIPE: no unhandled
+PASS  PS magisk android -Wipe: exit 0
+PASS  PS magisk android -Wipe: one -w
+PASS  PS magisk android -Wipe: wiped
+PASS  PS magisk android -Wipe: my_stock re-provided after wipe (pre-wipe copy erased and redone)
+PASS  PS magisk android -Wipe: mkdir after wipe
+PASS  PS magisk android -Wipe: final system
+PASS  PS magisk android -Wipe: no unhandled
+PASS  PS magisk fastboot msmnile: exit 0
+PASS  PS magisk fastboot msmnile: no -w
+PASS  PS magisk fastboot msmnile: my_stock present
+PASS  PS magisk fastboot msmnile: final system
+PASS  PS magisk fastboot msmnile: no unhandled
+PASS  PS magisk fastboot WIPE: exit 0
+PASS  PS magisk fastboot WIPE: one -w
+PASS  PS magisk fastboot WIPE: wiped
+PASS  PS magisk fastboot WIPE: my_stock re-provided after wipe (pre-wipe copy erased and redone)
+PASS  PS magisk fastboot WIPE: mkdir after wipe
+PASS  PS magisk fastboot WIPE: final system
+PASS  PS magisk fastboot WIPE: no unhandled
+PASS  PS magisk wrong product no: aborts, nothing written
+PASS  PS magisk wrong product EOF: aborts, nothing written
+PASS  PS magisk wrong product yes + Enter: exit 0
+PASS  PS magisk wrong product yes + Enter: no -w
+PASS  PS magisk wrong product yes + Enter: my_stock present
+PASS  PS magisk wrong product yes + Enter: final system
+PASS  PS magisk wrong product yes + Enter: no unhandled
+PASS  PS magisk dry-run fastboot: nothing written
+PASS  PS magisk dry-run android: nothing written
+
+TOTAL PASS=102 FAIL=0

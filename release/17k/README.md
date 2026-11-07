@@ -16,18 +16,18 @@ the LineageOS 24 vendor and kernel. It contains two standalone fastboot bundles:
 
 What changed: [docs/CHANGELOG-17k.md](docs/CHANGELOG-17k.md) (17k = 17j-r2 + B20 charge-limit enforcer + B21 real fuel-gauge level; 17k-r2 = 17k + B22 network-restriction guard + B24/B25b slider hold + B26 audio sharing); everything since 17d is in [docs/CHANGELOG-17j-history.md](docs/CHANGELOG-17j-history.md) (builds 17e–17i plus the 17j bake: ColorOS 17 donor camera, battery-drain fixes, H.40 props, OnePlus 7 Pro identity, live-wallpaper keeper).
 
-## Install = upgrade, user data is kept
+## Install: upgrade by default, optional WIPE
 
-The 17k installers are **upgrade installers for a phone that already runs this port (17d or later)**. They do not wipe: no
-`fastboot -w`, no format or erase of userdata/metadata, no "type WIPE" step. They write only the active slot's `vendor`, `system` and
-`boot` partitions and replace `/data/port/my_stock.img` (about 6.9 GB, it lives in userdata); the previous image stays as
-`/data/port/my_stock-prev.img`. The other slot is never touched. Back up anyway.
+**Installer revision 2026-11-07 (still 17k-r2, images unchanged).** The installers detect whether the phone is in Android (adb) or bootloader (fastboot) mode, no longer ask for `GM1910` / `PLK110`, flash the active slot's `vendor`, `system` and `boot`, and then ask before the final reboot: `Wipe user data? Default is No: upgrade keeps your data. Type WIPE to erase /data.` Only the exact word `WIPE` (case sensitive) erases `/data` (`fastboot -w`, a clean install); Enter, any other text, or piped / non-interactive input without the word keeps your data. Scripts: `--wipe` / `--no-wipe` (`-Wipe` / `-NoWipe`), `--confirm-device` (`-ConfirmDevice`). **Tested only with stub adb/fastboot scripts, never on a phone** (`logs/installer-stub-test.txt`).
+
+Without the word WIPE this is the unchanged upgrade: only the active slot's `vendor`, `system` and `boot` are written and `/data/port/my_stock.img` (about 6.9 GB, it lives in userdata) is replaced (the previous one stays as `my_stock-prev.img`). The other slot is never touched. Back up anyway.
 
 1. Extract the ZIP for your variant completely; install platform-tools (`adb`, `fastboot`) on `PATH`.
-2. Boot the phone into the port with USB debugging on and this computer authorized (preferred), or put it in fastboot mode.
-3. Dry run (changes nothing): `Install-17k.bat -DryRun` on Windows, `bash ./Install-17k.sh --dry-run` on Linux/macOS. It checks the
-   image hashes, the phone (`guacamole`, port installed), the slot, whether root is available for staging, and free space on /data.
-4. Run `Install-17k.bat` (or the `.ps1`), or `bash ./Install-17k.sh`, and type `GM1910` or `PLK110` when asked.
+2. Connect exactly one phone: booted into the port with USB debugging authorized (preferred; the installer reboots it to the bootloader), or already in the bootloader.
+3. Dry run (changes nothing): `Install-17k.bat -DryRun` on Windows, `bash ./Install-17k.sh --dry-run` on Linux/macOS.
+4. Run `Install-17k.bat` (or the `.ps1`), or `bash ./Install-17k.sh`. In Android mode it checks `guacamole`, the installed port, the slot, free space and root. In bootloader mode it reads `fastboot getvar product`: `msmnile` continues; anything else prints a warning (reported vs expected) and needs a typed `yes` after you make sure the phone is a OnePlus 7 Pro (GM1910 / guacamole), otherwise it aborts with nothing written.
+
+**my_stock.img from the bootloader or after a WIPE:** adb does not exist then, so the image is copied after the first boot, with the 17d clean-install mechanisms: NoRoot flashes the temporary bootstrap system (adb root) first, copies and verifies the image (creating `/data/port` on a wiped phone), returns to fastboot and flashes the final system; Magisk flashes the final system and Magisk boot, waits for authorized adb (you must enable USB debugging on the fresh phone and approve Magisk's root request), installs the Magisk app, copies and verifies the image and reboots. If an Android-mode run already copied the image and you then answer WIPE, the copy is erased with `/data` and made again. If a step fails after a wipe the installer prints the manual commands: do not leave a wiped phone without `my_stock.img`.
 
 How `my_stock.img` gets into userdata without a wipe:
 - **Root available on the running port** (development build with `adb root`, or MagiskSU): the image is pushed to
@@ -60,18 +60,13 @@ boot ramdisk or cmdline, see `logs/boot-compare.txt`).
 4. **Charging limit / gauge (B20+B21)** — after boot: `logcat -d | grep -E "chglimit|bmslevel"` should show `bound battery/capacity -> bms/capacity`; `grep battery/capacity /proc/mounts` shows the bind mount; set the Settings > Battery charging limit and watch `hold (cap=.. L=..)` in the log at the limit.
 5. Run the first-boot checks in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
-## Clean install (manual only, not scripted)
+## Clean install
 
-Only for a phone that does not run the port yet, or to start over. It **erases all user data**. From fastboot on the active slot X:
-flash `vendor_X` = `images/vendor.img`, `system_X` = `images/bootstrap-system.img`, `boot_X` = `images/boot-ese-final.img`, then
-`fastboot -w` (wipes userdata and metadata), reboot, `adb root`, wait for `/data/port`, `adb push images/my_stock.img
-/data/port/my_stock.img`, `adb shell 'chown 0:0 /data/port/my_stock.img; chmod 0644 /data/port/my_stock.img; chcon
-u:object_r:system_file:s0 /data/port/my_stock.img; sync'`, `adb reboot bootloader`, flash `system_X` = `images/system.img` (and
-`boot_X` = `images/boot-magisk31-17d.img` for root), reboot. This is the 17d installer's flow; the 17k scripts do not do it.
+Run the installer and answer `WIPE` (or pass `--wipe`); see above. The manual equivalent, from fastboot on the active slot X: flash `vendor_X` = `images/vendor.img`, `system_X` = `images/bootstrap-system.img`, `boot_X` = `images/boot-ese-final.img`, then `fastboot -w`, reboot, `adb root`, wait for `/data/port`, `adb push images/my_stock.img /data/port/my_stock.img`, `adb shell 'chown 0:0 /data/port/my_stock.img; chmod 0644 /data/port/my_stock.img; chcon u:object_r:system_file:s0 /data/port/my_stock.img; sync'`, `adb reboot bootloader`, flash `system_X` = `images/system.img` (and `boot_X` = `images/boot-magisk31-17d.img` for root), reboot. This is the 17d installer's flow.
 
 ## Requirements
 
-Unlocked bootloader, matching H.40 firmware, current platform-tools, a OnePlus 7 Pro (fastboot product `guacamole` or `msmnile`). The bundles do
+Unlocked bootloader, matching H.40 firmware, current platform-tools, a OnePlus 7 Pro (fastboot product `msmnile`). The bundles do
 not flash firmware, modem, dtbo or vbmeta.
 
 ## Documentation and evidence

@@ -1,5 +1,12 @@
 # 17k / 17k-r2 test status
 
+## Installer revision (2026-11-07): mode detection, product check, optional WIPE - stub-tested only
+- Images unchanged. New installers (`.sh`, `.ps1`, `.bat`; Magisk and NoRoot) tested ONLY with stub `adb`/`fastboot` scripts on PATH (`logs/installer-stub-test.txt`: Android mode no-wipe, bootloader mode with msmnile, wrong product with `no` / Enter / EOF / `YES` / `yes`, WIPE, Enter, EOF, lowercase `wipe`, piped text without the word, `--wipe`, `--no-wipe`, `--dry-run`, two devices, unknown option) plus `bash -n` and the PowerShell parser. Result: bash installers 283 PASS / 0 FAIL, PowerShell installers 102 PASS / 0 FAIL (Magisk and NoRoot; see that log).
+- **Not run on any phone.** Not verified: the real `fastboot getvar product` text on the author's bootloader, `fastboot -w` with this device, the first boot after a wipe, adb authorization and the Magisk root request on a wiped phone, `my_stock.img` staging on a wiped phone, the `.ps1` / `.bat` installers anywhere.
+- The earlier statement that only the Magisk `.sh` installer ever ran end to end refers to the OLD installer; the new one has not run at all.
+
+---
+
 ## 17k-r2 rebuilt (2026-11-07): NOT flashed, NOT boot-tested
 - Adds B24/B25b slider hold and B26 audio sharing (vendor image only, vendor sha256 `e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c`) to the r2 below.
 - **Verified LIVE on the author's phone (bind mounts, not the baked image), 2026-11-07:** holding the alert slider DOWN started 随口记, recorded audio and saved a note (B26 `primary input` maxOpenCount 1 + B24/B25b dex).

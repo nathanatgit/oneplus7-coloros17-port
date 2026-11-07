@@ -1,5 +1,17 @@
 # 17k changelog vs 17j-r2
 
+## Installer revision (2026-11-07, still named 17k-r2): connection-mode detection, product check, optional WIPE
+
+Images are unchanged (vendor `e61b3b199ae48f3518119d489aced6425fec0f8bb086f8537f50e382be731f3c`, same system / my_stock / boot / Magisk hashes). Only the installers (`.sh`, `.ps1`, `.bat` wrappers; both variants), the package READMEs, these docs, the packager guard and the two ZIPs (new hashes) changed.
+
+- The installer detects the mode first: exactly one device in `adb devices` (Android) or `fastboot devices` (bootloader), else an error as before.
+- The typed `GM1910 / PLK110` prompt is gone. Android mode keeps the adb-side checks (project_codename guacamole, the port installed, active slot, free space, root) and stages `my_stock.img` before rebooting to the bootloader.
+- Bootloader mode: `fastboot getvar product`; `msmnile` continues; any other value prints a warning (reported vs expected) and asks to confirm a OnePlus 7 Pro (GM1910 / guacamole) by typing `yes`; anything else aborts with nothing written. `--confirm-device` / `-ConfirmDevice` accepts it in scripts. (After an Android-mode run, where guacamole was already verified over adb, a fastboot product of `guacamole` is also accepted.)
+- After the images are flashed and before the final reboot: `Wipe user data? Default is No: upgrade keeps your data. Type WIPE to erase /data.` Only the exact word `WIPE` runs `fastboot -w`; Enter / other text / no input = keep. `--wipe` / `--no-wipe` (`-Wipe` / `-NoWipe`) for scripts; `--dry-run` prints what would happen and changes nothing.
+- my_stock after a wipe or from the bootloader: no adb exists then, so it is copied after the first boot, using the mechanisms the 17d clean install used. NoRoot: bootstrap system (adb root) flashed first, `/data/port` waited for / created, image pushed and SHA-256 verified, back to fastboot, final system flashed. Magisk: final system + Magisk boot, wait for authorized adb (up to 15 min after a wipe), install the Magisk app, MagiskSU, create `/data/port`, push, verify, reboot. If an Android-mode run already staged the image and the user then answers WIPE, the staged copy is erased with `/data`; the NoRoot bootstrap system is reflashed and the copy is redone. On failure after a wipe the installer prints the manual commands.
+- Kept: image hash checks, Magisk app install, restricted_networking_mode step, Magisk DenyList for com.heytap.health, hints, the no-wipe default path (same sequence as before except the dropped prompt and the WIPE question).
+- Tested ONLY with stub adb/fastboot (`logs/installer-stub-test.txt`) plus bash / PowerShell syntax parsing. Never run on a phone. Not verified: the real bootloader's `getvar product` output on the author's device, `fastboot -w` on this device with these images, the first boot after a wipe, ADB authorization and Magisk root grant on a fresh phone, the Windows `.ps1`/`.bat` paths on a phone.
+
 ## 17k-r2 rebuilt (2026-11-07) = 17k + B22 + B24/B25b slider hold + B26 audio sharing
 
 | Item | Change | Status |

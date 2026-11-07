@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # OnePlus 7 Pro ColorOS 17 port, 17k-r2 NoRoot UPGRADE installer (Linux/macOS).
-# Upgrades an installed port (17d or later) on the ACTIVE slot and KEEPS ALL USER DATA: it never wipes userdata or
-# metadata (no `fastboot -w`, no format). It flashes vendor, system and boot of the active slot only and replaces
-# /data/port/my_stock.img (the previous one is kept as /data/port/my_stock-prev.img).
-#   bash ./Install-17k.sh            install
-#   bash ./Install-17k.sh --dry-run  check images, phone, slot, root and free space; change nothing
-# Start with the phone booted into the current port with USB debugging authorized (preferred), or in fastboot mode.
+# Default = UPGRADE of an installed port (17d or later) on the ACTIVE slot, KEEPING ALL USER DATA: it flashes vendor, system and
+# boot of the active slot only and replaces /data/port/my_stock.img (the previous one is kept as my_stock-prev.img).
+# After the images are flashed it asks whether to wipe /data; only the exact word WIPE does (clean install, `fastboot -w`);
+# Enter, anything else, or no input (piped/non-interactive) keeps the data.
+#   bash ./Install-17k.sh                 install (asks the WIPE question after flashing)
+#   bash ./Install-17k.sh --dry-run       check images, phone, slot, root and free space; change nothing
+#   bash ./Install-17k.sh --wipe          scripted: wipe /data without asking (clean install)
+#   bash ./Install-17k.sh --no-wipe       scripted: keep /data without asking
+#   bash ./Install-17k.sh --confirm-device  scripted: accept a fastboot product other than msmnile without asking
+# Start with the phone booted into the current port with USB debugging authorized (preferred), or in fastboot (bootloader) mode.
 set -euo pipefail
 # Git Bash on Windows: stop MSYS from rewriting phone paths such as /data/port/... into C:/Program Files/Git/data/port/...
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
@@ -17,7 +21,17 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$SCRIPT_DIR"
 FASTBOOT=${FASTBOOT:-fastboot}
 ADB=${ADB:-adb}
-DRY=0; [[ "${1:-}" == --dry-run ]] && DRY=1
+DRY=0; WIPE_MODE=ask; CONFIRM_DEVICE=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY=1 ;;
+    --wipe) [[ $WIPE_MODE != no ]] || die '--wipe and --no-wipe cannot be combined.'; WIPE_MODE=yes ;;
+    --no-wipe) [[ $WIPE_MODE != yes ]] || die '--wipe and --no-wipe cannot be combined.'; WIPE_MODE=no ;;
+    --confirm-device) CONFIRM_DEVICE=1 ;;
+    *) die "Unknown option '$arg' (known: --dry-run --wipe --no-wipe --confirm-device)." ;;
+  esac
+done
+WIPED=0
 command -v "$FASTBOOT" >/dev/null 2>&1 || die 'fastboot is not on PATH.'
 command -v "$ADB" >/dev/null 2>&1 || die 'adb is not on PATH.'
 
@@ -143,7 +157,14 @@ R() {   # run a command as root on the phone
 # (old one -> my_stock-prev.img). The running system keeps using the old inode until it reboots.
 stage_mystock() {
   local free need
-  R 'test -f /data/port/my_stock.img' || die 'No /data/port/my_stock.img on this phone: this is not an installed port. Use the clean install in README.md.'
+  if [[ $WIPED == 1 ]]; then
+    # /data was just wiped: it is empty, create the directory exactly like the 17d clean install did (init normally makes it too)
+    local i
+    for ((i = 0; i < 90; i += 2)); do R 'test -d /data/port' >/dev/null 2>&1 && break; sleep 2; done
+    R 'mkdir -p /data/port; chown 0:0 /data/port; chmod 0750 /data/port; mkdir -p /data/local/tmp' >/dev/null 2>&1 || true
+  else
+    R 'test -f /data/port/my_stock.img' || die 'No /data/port/my_stock.img on this phone: this is not an installed port. Rerun and answer WIPE for a clean install (README.md), or copy images/my_stock.img to /data/port by hand.'
+  fi
   free=$(R 'df -k /data/port | tail -n 1' | awk '{print $4}')
   if [[ $ROOT == su ]]; then need=$((MYSTOCK_SIZE * 2 / 1024 + 1048576)); else need=$((MYSTOCK_SIZE / 1024 + 1048576)); fi
   [[ "$free" =~ ^[0-9]+$ ]] || die "Could not read free space on /data: $free"
@@ -160,9 +181,9 @@ stage_mystock() {
   local got
   got=$(R 'sha256sum /data/port/my_stock.img.new' | awk '{print tolower($1)}')
   [[ "$got" == "$MYSTOCK_SHA" ]] || { R 'rm -f /data/port/my_stock.img.new'; die "my_stock.img on the phone has SHA-256 $got; removed, nothing swapped."; }
-  R 'cd /data/port && rm -f my_stock-prev.img && mv my_stock.img my_stock-prev.img && mv my_stock.img.new my_stock.img && chown 0:0 my_stock.img && chmod 0644 my_stock.img && chcon u:object_r:system_file:s0 my_stock.img && sync' \
+  R 'cd /data/port && rm -f my_stock-prev.img && { test ! -f my_stock.img || mv my_stock.img my_stock-prev.img; } && mv my_stock.img.new my_stock.img && chown 0:0 my_stock.img && chmod 0644 my_stock.img && chcon u:object_r:system_file:s0 my_stock.img && sync' \
     || die 'Swapping my_stock.img failed; check /data/port by hand (README.md, rollback).'
-  say 'my_stock.img staged; the previous image is /data/port/my_stock-prev.img.'
+  if [[ $WIPED == 1 ]]; then say 'my_stock.img staged on the freshly wiped /data.'; else say 'my_stock.img staged; the previous image is /data/port/my_stock-prev.img.'; fi
 }
 
 # ---------- phase 0: running Android ----------
@@ -170,7 +191,7 @@ STAGED=0; SLOT=
 if [[ $MODE == adb ]]; then
   CODE=$(A shell getprop ro.boot.project_codename | tr -d '\r')
   [[ "$CODE" == guacamole ]] || die "Expected a OnePlus 7 Pro (ro.boot.project_codename guacamole), got '$CODE'."
-  A shell 'test -f /system/etc/init/00-port-mystock.rc' || die 'The running system is not this ColorOS port (no 00-port-mystock.rc). Use the clean install in README.md.'
+  A shell 'test -f /system/etc/init/00-port-mystock.rc' || die 'The running system is not this ColorOS port (no 00-port-mystock.rc). Start the phone in fastboot mode and rerun this installer, answering WIPE for a clean install (README.md).'
   SLOT=$(A shell getprop ro.boot.slot_suffix | tr -d '\r'); SLOT=${SLOT#_}
   [[ "$SLOT" == a || "$SLOT" == b ]] || die "Cannot read the active slot: '$SLOT'."
   say "Device $SERIAL: guacamole, running the port on slot $SLOT."
@@ -184,37 +205,97 @@ if [[ $MODE == adb ]]; then
   fi
 fi
 
+if [[ $MODE == fastboot ]]; then
+  say "Device $SERIAL: bootloader (fastboot) mode."
+  say 'Nothing can be staged through adb from here, so my_stock.img is copied after the first boot (see below) once the images are flashed.'
+fi
+
+# ---------- fastboot product check ----------
+# msmnile = the OnePlus 7 Pro (GM1910 / guacamole) board name. In bootloader mode anything else needs a typed "yes".
+check_product() {
+  local out prod
+  out=$(F getvar product 2>&1) || die "Could not read fastboot product: $out"
+  prod=$(printf '%s\n' "$out" | sed -nE 's/^[[:space:]]*(\(bootloader\)[[:space:]]*)?product:[[:space:]]*([^[:space:]]+).*/\2/p' | head -n 1)
+  [[ -n "$prod" ]] || die "Cannot parse the fastboot product: $out"
+  if [[ $prod == msmnile ]]; then say 'fastboot product: msmnile (OnePlus 7 Pro).'; return 0; fi
+  if [[ $MODE == adb && $prod == guacamole ]]; then return 0; fi   # already verified over adb (project_codename guacamole)
+  say "WARNING: fastboot reports product '$prod', expected 'msmnile' (OnePlus 7 Pro GM1910 / guacamole)."
+  say 'Flashing this port onto another model can leave the phone unbootable.'
+  if [[ $MODE == adb ]]; then die "The phone was verified as guacamole over adb but fastboot reports '$prod'. Stopped before flashing; the phone is in fastboot (run: fastboot reboot)."; fi
+  if [[ $DRY == 1 ]]; then say 'DRY RUN: the real run would ask you to type yes to continue.'; return 0; fi
+  if [[ $CONFIRM_DEVICE == 1 ]]; then say '--confirm-device given: continuing.'; return 0; fi
+  say 'Make sure this is a OnePlus 7 Pro (GM1910 / guacamole) before continuing.'
+  local ans=
+  printf 'Type yes to continue; anything else aborts and nothing is written: '
+  read -r ans || ans=
+  [[ "$ans" == yes ]] || die 'Aborted: product not confirmed; nothing was written.'
+  return 0
+}
+
+# ---------- wipe question (asked after the images are flashed, before the final reboot) ----------
+DO_WIPE=0
+ask_wipe() {
+  DO_WIPE=0
+  if [[ $WIPE_MODE == yes ]]; then DO_WIPE=1; say '--wipe given: /data will be erased.'; return 0; fi
+  if [[ $WIPE_MODE == no ]]; then say '--no-wipe given: /data is kept.'; return 0; fi
+  say 'Wipe user data? Default is No: upgrade keeps your data. Type WIPE to erase /data.'
+  local ans=
+  printf '> '
+  read -r ans || ans=      # no input (Enter, EOF, piped stdin without the word) = keep the data
+  printf '\n'
+  if [[ "$ans" == WIPE ]]; then DO_WIPE=1; fi
+  return 0
+}
+
+# After a wipe the phone must not be left without my_stock.img: say exactly how to finish by hand.
+stage_die() {
+  if [[ $WIPED == 1 ]]; then
+    say 'IMPORTANT: /data was wiped and my_stock.img is NOT on the phone yet, so the port will not start properly. Finish by hand (needs adb root or MagiskSU):'
+    say '  adb shell "mkdir -p /data/port; chown 0:0 /data/port; chmod 0750 /data/port"'
+    say '  adb push images/my_stock.img /data/local/tmp/my_stock.img   (then as root: cp it to /data/port/my_stock.img; chown 0:0; chmod 0644; chcon u:object_r:system_file:s0; sync)'
+  fi
+  die "$1"
+}
+
 if [[ $DRY == 1 ]]; then
   say 'DRY RUN: image hashes and the phone verified; nothing was written, nothing rebooted, no data changed.'
   if [[ $MODE == fastboot ]]; then
-    PRODUCT=$(F getvar product 2>&1 || true); SI=$(F getvar current-slot 2>&1 || true)
-    say "fastboot: $(printf '%s\n' "$PRODUCT" | grep -o 'product:.*' | head -n1); $(printf '%s\n' "$SI" | grep -o 'current-slot:.*' | head -n1)"
+    check_product
+    SI=$(F getvar current-slot 2>&1 || true)
+    say "fastboot: $(printf '%s\n' "$SI" | grep -o 'current-slot:.*' | head -n1)"
   fi
-  if [[ $ROOT != none ]]; then
-    say "Would: copy my_stock.img to /data/port (keeping the old one as my_stock-prev.img), reboot to fastboot, flash vendor_X, system_X, boot_X ($BOOT_IMG) of the active slot, reboot. No wipe."
+  if [[ $WIPE_MODE == yes ]]; then
+    say "Would: wipe /data (clean install, --wipe given). Variant $VARIANT: flash the images, wipe userdata and metadata, boot, copy my_stock.img onto the fresh /data (see README.md), reboot. my_stock.img is NOT pushed before the wipe."
+  elif [[ $MODE == fastboot ]]; then
+    say 'Would: flash vendor_X, system_X, boot_X of the active slot, then ask "Wipe user data?" (default No; only the word WIPE wipes). No wipe: boot, copy my_stock.img after the first boot (NoRoot: via the temporary bootstrap system; Magisk: via MagiskSU), reboot. WIPE: wipe userdata, same copy onto the fresh /data.'
+  elif [[ $ROOT != none ]]; then
+    say "Would: copy my_stock.img to /data/port (keeping the old one as my_stock-prev.img), reboot to fastboot, flash vendor_X, system_X, boot_X ($BOOT_IMG) of the active slot, then ask \"Wipe user data?\" (default No, only the word WIPE wipes; --no-wipe skips the question), reboot."
   elif [[ $VARIANT == noroot ]]; then
-    say 'Would: reboot to fastboot, flash vendor_X + the 17k bootstrap system (adb root) + boot_X of the active slot, boot it, copy my_stock.img to /data/port, reboot to fastboot, flash the final system_X, reboot. No wipe.'
+    say 'Would: reboot to fastboot, flash vendor_X + the 17k bootstrap system (adb root) + boot_X, then ask "Wipe user data?" (default No), boot, copy my_stock.img to /data/port, reboot to fastboot, flash the final system_X, reboot.'
   else
-    say 'Would: reboot to fastboot, flash vendor_X, system_X and the Magisk boot_X of the active slot, boot, install Magisk if missing, copy my_stock.img with MagiskSU, reboot. No wipe.'
+    say 'Would: reboot to fastboot, flash vendor_X, system_X and the Magisk boot_X, then ask "Wipe user data?" (default No), boot, install Magisk if missing, copy my_stock.img with MagiskSU, reboot.'
   fi
+  say 'Without the word WIPE (or --wipe) nothing is erased.'
   exit 0
 fi
 
-say 'This UPGRADES the port on the active slot and keeps your data (apps, accounts, settings, files).'
-say 'It does not wipe anything, but back up first anyway: a failed flash can still leave the phone unbootable.'
-read -r -p 'Confirm the phone is a OnePlus 7 Pro running this port; type GM1910 or PLK110: ' MODEL
-[[ "$MODEL" == GM1910 || "$MODEL" == PLK110 ]] || die 'Model confirmation did not match; nothing was changed.'
+if [[ $WIPE_MODE == yes ]]; then
+  say 'WIPE requested (--wipe): /data will be erased after the images are flashed. Back up first.'
+else
+  say 'Default is an UPGRADE that keeps your data (apps, accounts, settings, files). You will be asked about a wipe after the images are flashed.'
+  say 'Back up first anyway: a failed flash can still leave the phone unbootable.'
+fi
 
 if [[ $MODE == adb ]]; then
-  if [[ $ROOT != none ]]; then stage_mystock; STAGED=1; fi
+  # With --wipe the staged copy would be erased with /data, so it is skipped; the copy happens after the wipe instead.
+  if [[ $ROOT != none && $WIPE_MODE != yes ]]; then stage_mystock; STAGED=1; fi
   A reboot bootloader
   say 'Waiting for fastboot ...'
   wait_fastboot || die 'Timed out waiting for fastboot.'
 fi
 
 # ---------- phase 1: fastboot ----------
-PRODUCT=$(F getvar product 2>&1) || die "Could not read fastboot product: $PRODUCT"
-printf '%s\n' "$PRODUCT" | grep -Eq 'product:[[:space:]]*(guacamole|msmnile)([[:space:]]|$)' || die "Expected fastboot product guacamole or msmnile (OnePlus 7 Pro bootloaders report either): $PRODUCT"
+check_product
 UNLOCKED=$(F getvar unlocked 2>&1) || die "Could not read bootloader state: $UNLOCKED"
 printf '%s\n' "$UNLOCKED" | grep -Eqi 'unlocked:[[:space:]]*yes' || die 'Bootloader is not reported unlocked.'
 SI=$(F getvar current-slot 2>&1) || die "Could not read the active slot: $SI"
@@ -222,28 +303,49 @@ FSLOT=$(printf '%s\n' "$SI" | sed -nE 's/.*current-slot:[[:space:]]*([ab]).*/\1/
 [[ "$FSLOT" == a || "$FSLOT" == b ]] || die "Cannot parse the active slot: $SI"
 [[ -z "$SLOT" || "$SLOT" == "$FSLOT" ]] || die "Active slot changed ($SLOT -> $FSLOT); stopped before flashing."
 SLOT=$FSLOT
-say "Flashing slot $SLOT only (the other slot is not touched). No wipe."
+say "Flashing slot $SLOT only (the other slot is not touched)."
 
-if [[ $STAGED == 1 || $VARIANT == magisk ]]; then
-  F flash "vendor_$SLOT" "$VENDOR_IMG"
-  F flash "system_$SLOT" "$SYSTEM_IMG"
-  F flash "boot_$SLOT" "$BOOT_IMG"
-  F reboot
+# NoRoot with nothing staged (and every wipe): the 17k development system (adb root) boots once so my_stock.img can be copied,
+# then the final system is flashed. Magisk copies with MagiskSU on the final system instead.
+if [[ $VARIANT == noroot && $STAGED == 0 ]]; then FIRST_SYSTEM=$BOOTSTRAP_IMG; else FIRST_SYSTEM=$SYSTEM_IMG; fi
+F flash "vendor_$SLOT" "$VENDOR_IMG"
+F flash "system_$SLOT" "$FIRST_SYSTEM"
+F flash "boot_$SLOT" "$BOOT_IMG"
+
+ask_wipe
+if [[ $DO_WIPE == 1 ]]; then
+  if [[ $STAGED == 1 ]]; then
+    say 'The my_stock.img copied to /data/port before the reboot is erased by the wipe; it is copied again onto the fresh /data after the first boot.'
+    STAGED=0
+    if [[ $VARIANT == noroot && $FIRST_SYSTEM != "$BOOTSTRAP_IMG" ]]; then
+      say 'Reflashing the temporary bootstrap system so my_stock.img can be copied onto the fresh /data.'
+      FIRST_SYSTEM=$BOOTSTRAP_IMG
+      F flash "system_$SLOT" "$BOOTSTRAP_IMG"
+    fi
+  fi
+  say 'Wiping userdata and metadata ...'
+  F -w
+  WIPED=1
+  say 'After the reboot the phone starts like a new phone. Keep it connected; the installer copies my_stock.img to /data/port once Android (or the bootstrap) is up.'
+  if [[ $VARIANT == magisk ]]; then
+    say 'Magisk variant: on the fresh phone enable USB debugging (Settings > About phone > tap Build number 7x > Developer options > USB debugging), authorize this computer, and approve the Magisk root request for the ADB shell when it appears.'
+  fi
 else
-  # no-root, nothing staged: the 17k development system (adb root) boots once so my_stock.img can be copied, then the final system
-  F flash "vendor_$SLOT" "$VENDOR_IMG"
-  F flash "system_$SLOT" "$BOOTSTRAP_IMG"
-  F flash "boot_$SLOT" "$BOOT_IMG"
-  F reboot
+  say 'Keeping /data (no wipe).'
+fi
+F reboot
+WAIT_BOOT=400; if [[ $WIPED == 1 ]]; then WAIT_BOOT=900; fi
+
+if [[ $VARIANT == noroot && $STAGED == 0 ]]; then
   say 'Waiting for the temporary 17k bootstrap system (adb root) ...'
-  wait_adb 400 || die 'Timed out waiting for the bootstrap system. The phone runs the bootstrap; rerun this installer.'
-  wait_boot 400 || true
+  wait_adb "$WAIT_BOOT" || stage_die 'Timed out waiting for the bootstrap system. The phone runs the bootstrap; rerun this installer.'
+  wait_boot "$WAIT_BOOT" || true
   A root >/dev/null 2>&1 || true; sleep 3; wait_adb 60 || true
   detect_root
-  [[ $ROOT == adbd ]] || die 'Bootstrap adb root is unavailable; the final system was not flashed. Rerun this installer.'
+  [[ $ROOT == adbd ]] || stage_die 'Bootstrap adb root is unavailable; the final system was not flashed. Rerun this installer.'
   stage_mystock; STAGED=1
   A reboot bootloader
-  wait_fastboot || die 'Timed out waiting for fastboot.'
+  wait_fastboot || stage_die 'Timed out waiting for fastboot.'
   SI=$(F getvar current-slot 2>&1); FSLOT=$(printf '%s\n' "$SI" | sed -nE 's/.*current-slot:[[:space:]]*([ab]).*/\1/p' | head -n 1)
   [[ "$FSLOT" == "$SLOT" ]] || die 'Active slot changed during staging; stopped before the final flash.'
   F flash "system_$SLOT" "$SYSTEM_IMG"
@@ -251,13 +353,13 @@ else
 fi
 
 if [[ $STAGED == 0 ]]; then
-  # Magisk variant without root on the old system: stage with MagiskSU on the new system, then reboot once more.
+  # Magisk variant without staging (fastboot start, no root on the old system, or after a wipe): stage with MagiskSU on the new system, then reboot once more.
   say 'Unlock the phone and approve this computer for USB debugging if asked. Waiting for Android ...'
-  wait_adb 400 || die 'Timed out waiting for authorized ADB. Finish my_stock staging by hand (README.md).'
-  wait_boot 400 || die 'Android did not report boot completed. Finish my_stock staging by hand (README.md).'
+  wait_adb "$WAIT_BOOT" || stage_die 'Timed out waiting for authorized ADB. Finish my_stock staging by hand (README.md).'
+  wait_boot "$WAIT_BOOT" || stage_die 'Android did not report boot completed. Finish my_stock staging by hand (README.md).'
   A shell pm path com.topjohnwu.magisk 2>/dev/null | grep -q package: || A install -r images/Magisk-v31.0.apk
   detect_root
-  [[ $ROOT == su ]] || die 'MagiskSU root was not granted. Approve it in Magisk, then rerun this installer.'
+  [[ $ROOT == su ]] || stage_die 'MagiskSU root was not granted. Approve it in Magisk, then rerun this installer.'
   stage_mystock; STAGED=1
   A reboot
 elif [[ $VARIANT == magisk ]]; then
@@ -272,7 +374,11 @@ fi
 
 net_guard || true
 health_denylist || true
-say '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
+if [[ $WIPED == 1 ]]; then
+  say '17k-r2 CLEAN INSTALL flashed; /data was wiped and my_stock.img copied. The first boot can take several minutes; finish the setup wizard.'
+else
+  say '17k-r2 upgrade flashed; user data kept. If the phone is still starting, the first boot can take a few minutes.'
+fi
 say 'After it has booted, once (see README.md):'
 say '  adb shell pm uninstall-system-updates com.oplus.camera   # only if pm path com.oplus.camera shows /data/app'
 say '  seed the wallpaper keeper as root: echo com.heytap.colorfulengine/.wallpaper.service.ColorfulWallpaperService > /data/port/wp/wallpaper-component'

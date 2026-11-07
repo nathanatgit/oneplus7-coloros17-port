@@ -2,7 +2,7 @@ bash -n PASS Install-17k-Magisk.sh
 bash -n PASS Install-17k-NoRoot.sh
 bash -n PASS packages/magisk/Install-17k.sh
 bash -n PASS packages/no-root/Install-17k.sh
-PS parse PASS Install-17k-Magisk.ps1 17k
-PS parse PASS Install-17k-NoRoot.ps1 17k
-PS parse PASS Install-17k.ps1 magisk
-PS parse PASS Install-17k.ps1 no-root
+PS parse PASS Install-17k-Magisk.ps1
+PS parse PASS Install-17k-NoRoot.ps1
+PS parse PASS packages/magisk/Install-17k.ps1
+PS parse PASS packages/no-root/Install-17k.ps1

@@ -82,9 +82,15 @@ def render(template: str, variant: str, vname: str, images: list[str], sums: dic
     if any(t in out for t in ("@VARIANT", "@SHA_", "@SIZE_", "@CHECK_")):
         raise RuntimeError("unfilled placeholder in " + template)
     code = "\n".join(l for l in out.split("\n") if not l.lstrip().startswith("#"))
-    for pat in (r"fastboot\S*\s[^\n]*\s-w\b", r"\bF\s+-w\b", r"'-w'", r"\bWIPE\b", r"\berase\b", r"\bformat\b"):
+    # 17k-r2 installers may wipe, but only through ONE call, taken only after the typed word WIPE or --wipe/-Wipe: exactly one
+    # `fastboot -w`, no other fastboot -w spelling, and no fastboot erase/format of any partition.
+    wipes = len(re.findall(r"^\s*F -w$|Invoke-Fastboot @\('-w'\)", code, re.M))
+    others = [l for l in code.split("\n") if re.search(r"(fastboot\S*|\bF|Invoke-Fastboot\s+@\()[^\n]*['\s]-w\b", l)]
+    if wipes != 1 or len(others) != 1:
+        raise RuntimeError(f"installer {template}: expected exactly one gated fastboot -w call, found {wipes} ({len(others)} lines with -w)")
+    for pat in (r"\bF\s+(erase|format)\b", r"fastboot\S*\s[^\n]*\s(erase|format)\b", r"'(erase|format)'"):
         if re.search(pat, code):
-            raise RuntimeError(f"installer {template} contains a wipe/format/erase command ({pat})")
+            raise RuntimeError(f"installer {template} contains a fastboot erase/format command ({pat})")
     return out
 
 
