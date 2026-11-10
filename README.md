@@ -59,3 +59,12 @@ Screenshots taken on the phone running 17k (2026-11-10).
 ## Others
 
 Hosting is welcomed for users who don't want to use Quark Drive. Please link to this readme when hosting.
+
+## Credits
+
+This port stands on two projects. Thank you to both:
+
+- **[LineageOS](https://lineageos.org/)** - the kernel (`android_kernel_oneplus_sm8150`, 4.14), the vendor image, device trees and the guacamole nightly builds that provide the hardware layer of this port. Downloads: <https://download.lineageos.org/devices/guacamole/builds>.
+- **Axis GSI** (`axisgsiupdates`) - the ColorOS 17 (PLK110) GSI that is the system donor. Releases: <https://sourceforge.net/projects/axisgsiupdates/>.
+
+ColorOS, OxygenOS and OnePlus/OPPO firmware remain the property of their owners; this repository ships only build scripts, patches and documentation (images are distributed separately).
