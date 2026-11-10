@@ -1,0 +1,14 @@
+# Large inputs and build outputs live on disk only
+/StockRom/
+/release/trial/
+/release/*/images/*
+!/release/*/images/README.md
+/release/*/*.zip
+/docs/logs/
+
+# Keys and secrets: backed up in Oneplus7ProPortKey, never commit
+*.pem
+*.jks
+*.keystore
+adbkey
+adbkey.pub

@@ -68,3 +68,9 @@ This port stands on two projects. Thank you to both:
 - **Axis GSI** (`axisgsiupdates`) - the ColorOS 17 (PLK110) GSI that is the system donor. Releases: <https://sourceforge.net/projects/axisgsiupdates/>.
 
 ColorOS, OxygenOS and OnePlus/OPPO firmware remain the property of their owners; this repository ships only build scripts, patches and documentation (images are distributed separately).
+
+## License
+
+The original scripts, installers, patches and documentation in this repository are released under the [Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)). Kernel driver code (the eSE p73 driver and its patch) is GPL-2.0-only, and some bundled third-party files keep their own licenses: see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). ColorOS, OxygenOS and OnePlus/OPPO firmware are not covered by this license.
+
+This project is not affiliated with OPPO, OnePlus, LineageOS or Axis GSI. Flashing a phone can brick it and erase its data; everything is provided as is, without warranty, and you use it at your own risk.
