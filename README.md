@@ -55,3 +55,7 @@ Screenshots taken on the phone running 17k (2026-11-10).
 | [release/17k/FACTS.md](release/17k/FACTS.md) | Hashes and verified facts of the shipped images |
 | [release/17k/BUILD_SOURCES.md](release/17k/BUILD_SOURCES.md) | Build inputs and how to rebuild |
 | [release/17d/source/history/](release/17d/source/history/) | Original working handoffs and test notes, 2026-10-14 to 2026-10-17 |
+
+## Others
+
+Hosting is welcomed for users who don't want to use Quark Drive. Please link to this readme when hosting.
