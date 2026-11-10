@@ -6,6 +6,28 @@ Current release: **17k** (local test release, not production). 17k is a no-wipe 
 
 **Download (17k-r3 ZIPs and images): ** The Quark share <https://pan.quark.cn/s/3dfce1464625?pwd=5VTb> (code `5VTb`) still holds. Check each file against `release/17k/RELEASE-SHA256SUMS.txt` before flashing.
 
+Known working:
+
+Cellular · WiFi · Bluetooth · Device Connect
+
+Camera (Three camera included: open camera, ColorOS12 Camera and ColorOS 17 Camera, all working and new ColorOS 17 has new filters, master mode and motion pictures)
+
+Breeno·Fingerprint·NFC(except Wallet)
+
+Slider(with mapping to adjust new action button operation, top = single click, middle = nothing/release hold, bottom = long pressing) 
+
+Screen color mode · Low Light DC dimming · Eye Care · New Dynamic Lock Screen and Wallpaper · Dash Charging · Screen-off Gestures
+
+Known not working：
+
+Wallet card for banks and transit (bootloader unlocked security reasons, fixing)
+
+Adaptive tone (lack of environment color sensor, will remove the setting item later)
+
+Reverse wireless charging (no hardware, will remove the related feature entrance)
+
+Wallpaper will reset on reboot and currently script will handle re-applying, but details (like depth effect) may missing.
+
 | Start here | |
 | --- | --- |
 | [release/17k/README.md](release/17k/README.md) | What the release contains and how to install it |
